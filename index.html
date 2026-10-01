@@ -3,116 +3,91 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      name="description"
-      content="Micohstore: piezas de crochet hechas a mano, listas para descubrir y comprar."
-    />
-    <title>Micohstore — Hecho a mano, encontrado con intención</title>
+    <meta name="description" content="Setareh conecta agentes con tiendas Shopify para descubrir, cotizar y crear órdenes seguras." />
+    <title>Setareh — comercio para agentes</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Playfair+Display:ital,wght@500;600;700&display=swap"
-      rel="stylesheet"
-    />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Playfair+Display:ital,wght@500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="photos.css" />
   </head>
   <body>
-    <div class="announcement">Piezas únicas tejidas en Chile · envíos a todo el país</div>
-
+    <div class="sky" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
     <header class="site-header">
-      <a class="wordmark" href="#inicio" aria-label="Micohstore, inicio">micoh<span>store</span></a>
+      <a class="wordmark" href="#inicio" aria-label="Setareh, inicio"><span>✦</span> setareh</a>
       <nav aria-label="Navegación principal">
-        <a href="#coleccion">Tienda</a>
-        <a href="#proceso">El proceso</a>
-        <a href="#como-funciona">Setareh</a>
+        <a href="#como-funciona">Cómo funciona</a>
+        <a href="#comercios">Para comercios</a>
+        <a href="docs/SETAREH.md">Documentación</a>
       </nav>
-      <a class="bag" href="#coleccion">Bolsa <span>0</span></a>
+      <a class="header-cta" href="#conectar">Conectar tienda <span>↗</span></a>
     </header>
 
     <main id="inicio">
       <section class="hero">
-        <div class="hero-copy">
-          <p class="eyebrow">Mico crochet · piezas con personalidad</p>
-          <h1>Un pequeño<br />mundo <em>tejido.</em></h1>
-          <p class="intro">Objetos hechos punto por punto para acompañar tus llaves, tu bolso y tus días más normales.</p>
-          <div class="hero-actions">
-            <a class="button button-dark" href="#coleccion">Ver la colección <span>↗</span></a>
-            <a class="text-link" href="#como-funciona">Comprar con un agente <span>↓</span></a>
-          </div>
+        <p class="eyebrow">Infraestructura de comercio para agentes</p>
+        <div class="orbital-mark" aria-hidden="true"><span></span><span></span><b>✦</b></div>
+        <h1>El comercio tiene<br /><em>nuevas estrellas.</em></h1>
+        <p class="hero-copy">Setareh permite que un agente encuentre productos reales, consulte disponibilidad y cree órdenes en tiendas Shopify, con reglas claras y sin tocar las credenciales del comercio.</p>
+        <div class="hero-actions">
+          <a class="button button-light" href="#como-funciona">Descubrir Setareh <span>↓</span></a>
+          <a class="text-link" href="docs/SETAREH.md">Leer la propuesta <span>↗</span></a>
         </div>
-        <div class="hero-art hero-photo" aria-label="Gato mago de crochet hecho por Micohstore">
-          <img src="assets/products/gato-mago-crochet.jpg" alt="Gato mago de crochet en el bosque" />
-          <p class="art-note">Una puntada,<br />una historia.</p>
+        <p class="hero-note"><span></span> Shopify es la fuente de verdad</p>
+      </section>
+
+      <section class="signal" aria-label="Principios de Setareh">
+        <span>Catálogo real</span><b>✦</b><span>Pagos verificables</span><b>✦</b><span>Órdenes en Shopify</span><b>✦</b><span>Compras con límites</span>
+      </section>
+
+      <section class="flow" id="como-funciona">
+        <div class="section-intro">
+          <p class="eyebrow">Una señal clara entre agentes y tiendas</p>
+          <h2>De una intención<br />a una orden real.</h2>
+        </div>
+        <ol class="steps">
+          <li><span>01</span><h3>Descubrir</h3><p>El agente busca entre productos y variantes activas del catálogo de Shopify.</p></li>
+          <li><span>02</span><h3>Confirmar</h3><p>Setareh consulta stock y condiciones antes de ofrecer una pieza única o por encargo.</p></li>
+          <li><span>03</span><h3>Cotizar</h3><p>La compra se fija con dirección, precio y reglas del comercio antes del pago.</p></li>
+          <li><span>04</span><h3>Crear</h3><p>Tras verificar el pago, la orden se crea en Shopify para su fulfillment habitual.</p></li>
+        </ol>
+      </section>
+
+      <section class="commerce" id="comercios">
+        <div class="commerce-copy">
+          <p class="eyebrow">Para tiendas que ya operan en Shopify</p>
+          <h2>Tu tienda sigue siendo tu universo.</h2>
+          <p>Setareh no reemplaza tu catálogo, inventario ni despacho. Los conecta a una interfaz segura que los agentes pueden entender y usar.</p>
+          <ul>
+            <li>Productos, variantes e inventario desde Shopify</li>
+            <li>Permisos mínimos y tokens protegidos en servidor</li>
+            <li>Reglas por colección, monto y zona de despacho</li>
+          </ul>
+        </div>
+        <div class="commerce-card">
+          <div class="card-top"><span class="status"></span> tienda conectada <small>Shopify</small></div>
+          <p class="card-label">Solicitud del agente</p>
+          <p class="request">“Encuentra un regalo lila, único, bajo $30.000.”</p>
+          <div class="match"><span class="constellation">✦</span><div><b>Variante encontrada</b><small>Stock confirmado · lista para cotizar</small></div><strong>CLP</strong></div>
+          <div class="card-footer">Setareh verifica · Shopify ejecuta <span>↗</span></div>
         </div>
       </section>
 
-      <section class="marquee" aria-label="Valores de Micohstore">
-        <div>
-          <span>Hecho a mano</span><b>✦</b><span>Pequeñas ediciones</span><b>✦</b><span>Materiales con cariño</span><b>✦</b><span>Hecho a mano</span><b>✦</b><span>Pequeñas ediciones</span>
+      <section class="boundary">
+        <p class="eyebrow">Construido para la confianza</p>
+        <h2>Un agente no adivina.<br /><em>Consulta, confirma y registra.</em></h2>
+        <div class="boundary-grid">
+          <p>Una pieza agotada no aparece como disponible. Un reintento no debe duplicar una venta. Un pago no se presenta como confirmado hasta que pueda verificarse.</p>
+          <a class="button button-outline" href="docs/SETAREH-SHOPIFY-CONNECTION.md">Ver conexión Shopify <span>↗</span></a>
         </div>
       </section>
 
-      <section class="collection" id="coleccion">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Pequeña colección</p>
-            <h2>Hechos para encontrar<br />su persona.</h2>
-          </div>
-          <a class="text-link" href="#coleccion">Ver todo <span>↗</span></a>
-        </div>
-        <div class="product-grid">
-          <article class="product-card product-peach">
-            <div class="product-image"><span class="tag">Pieza única</span><img src="assets/products/gato-mago-crochet.jpg" alt="Gato mago de crochet en el bosque" /></div>
-            <div class="product-info"><div><h3>Gato mago</h3><p>Amigurumi tejido a mano</p></div><strong>Próximamente</strong></div>
-          </article>
-          <article class="product-card product-lilac">
-            <div class="product-image"><span class="tag">Hecho por encargo</span><img src="assets/products/tortuga-azul-crochet.jpg" alt="Tortuga azul de crochet" /></div>
-            <div class="product-info"><div><h3>Tortuga azul</h3><p>Amigurumi tejido a mano</p></div><strong>Por encargo</strong></div>
-          </article>
-          <article class="product-card product-blue">
-            <div class="product-image"><span class="tag">Pieza única</span><img src="assets/products/colibri-turquesa-crochet.jpg" alt="Colibrí turquesa de crochet sobre una rama" /></div>
-            <div class="product-info"><div><h3>Colibrí turquesa</h3><p>Amigurumi tejido a mano</p></div><strong>Próximamente</strong></div>
-          </article>
-        </div>
-      </section>
-
-      <section class="process" id="proceso">
-        <div class="process-title"><p class="eyebrow">No hay dos iguales</p><h2>La belleza está<br />en el proceso.</h2></div>
-        <div class="process-steps">
-          <article><span>01</span><h3>Elegir el hilo</h3><p>Color, textura y la primera idea antes de que exista una forma.</p></article>
-          <article><span>02</span><h3>Tejer lento</h3><p>Cada pieza se hace a mano; las pequeñas diferencias son parte de ella.</p></article>
-          <article><span>03</span><h3>Mandarla a casa</h3><p>Envuelta con cariño y lista para comenzar otra historia contigo.</p></article>
-        </div>
-      </section>
-
-      <section class="agent-section" id="como-funciona">
-        <div class="agent-visual">
-          <div class="chat-window">
-            <div class="chat-head"><span class="status-dot"></span> Micohstore assistant <small>en línea</small></div>
-            <div class="message user-message">Busca un regalo pequeño, suave y lila, bajo $30.000.</div>
-            <div class="message store-message">Encontré el Mini bolso Mimo. Es único y está disponible para envío.</div>
-            <div class="mini-product"><div class="mini-yarn"></div><span>Mini bolso Mimo<br /><b>$28.000</b></span><button aria-label="Agregar al carrito">+</button></div>
-          </div>
-        </div>
-        <div class="agent-copy">
-          <p class="eyebrow">Una tienda lista para agentes</p>
-          <h2>Una tienda humana, también lista para agentes.</h2>
-          <p>Micohstore se conecta a Setareh para que un agente pueda consultar stock, respetar que una pieza es única y crear una orden real en Shopify.</p>
-          <a class="button button-light" href="#about">Conoce Setareh <span>↗</span></a>
-        </div>
-      </section>
-
-      <section class="about" id="about">
-        <p class="eyebrow">Mico crochet, hecho despacio</p>
-        <p class="large-copy">No hacemos objetos perfectos. Hacemos pequeños compañeros con textura, color y mucho tiempo encima.</p>
-        <div class="about-bottom"><span>Diseñado y tejido en Chile</span><span>© 2026 Micohstore</span></div>
+      <section class="connect" id="conectar">
+        <p class="eyebrow">Primer paso</p>
+        <h2>Conecta tu tienda<br />a la constelación.</h2>
+        <a class="button button-light" href="docs/SHOPIFY-MICOHSTORE-GUIDE.md">Preparar una tienda Shopify <span>↗</span></a>
       </section>
     </main>
 
-    <footer>
-      <a class="wordmark" href="#inicio">micoh<span>store</span></a>
-      <div><a href="mailto:hola@micohstore.cl">hola@micohstore.cl</a><a href="#inicio">Instagram ↗</a></div>
-    </footer>
+    <footer><a class="wordmark" href="#inicio"><span>✦</span> setareh</a><p>Comercio verificable para agentes y tiendas humanas.</p><a href="docs/SETAREH.md">Documentación ↗</a></footer>
   </body>
 </html>

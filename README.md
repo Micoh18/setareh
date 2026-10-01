@@ -1,19 +1,34 @@
-# Micohstore
+# Setareh
 
-Landing estática para una tienda de crochet conectable a Setareh. La dirección visual actual es un estudio/jardín de lana: tipografía editorial, tonos crema, coral, lila, cielo y verde, con tramas que evocan el tejido. Los elementos CSS son originales y provisionales, preparados para reemplazarse por fotos propias.
+Setareh conecta agentes con comercios que operan en Shopify. Permite descubrir productos reales, comprobar disponibilidad y crear órdenes bajo reglas de compra definidas por cada tienda.
 
-## Imágenes de productos
+Micohstore es la tienda de referencia de la demostración. Su storefront ya vive en Shopify; el tema exportado se conserva en [`micohstore-shopify-theme`](micohstore-shopify-theme).
 
-Para producción, las fotos deben vivir en Shopify (`Product.media` / CDN de Shopify) y Setareh debe consumir las URLs que Shopify expone. Esto centraliza catálogo e inventario en el comercio y aplica automáticamente sus transformaciones de tamaño.
+## Repositorio
 
-Cloudinary es una buena alternativa si se necesita procesamiento editorial antes de subirlas. Coolify sirve para desplegar la landing o el backend de Setareh, pero no es un host/CDN de imágenes.
+- [`index.html`](index.html): landing estática de Setareh.
+- [`backend`](backend): servidor MCP TypeScript para Shopify.
+- [`micohstore-shopify-theme`](micohstore-shopify-theme): tema Shopify de Micohstore basado en Dawn.
+- [`docs`](docs): propuesta de producto, seguridad y guías de conexión.
 
-Los motivos visuales actuales son CSS y deben reemplazarse con las fotos reales de los productos al conectar el catálogo Shopify.
+## Estado del conector
 
-## Setareh
+El backend implementa la ruta de hackathon: el agente invoca directamente el MCP de Setareh para buscar catálogo y stock, crea un quote fijo y recibe una ruta HTTP x402. La wallet local del agente firma USDC en Stellar testnet; tras el settlement, Setareh completa una única orden Shopify y guarda el receipt y hash Stellar.
 
-La propuesta técnica, flujo de órdenes reales y seguridad están en [docs/SETAREH.md](docs/SETAREH.md).
+El MVP está limitado a Micohstore, USDC testnet, un máximo de 30 USDC, confirmación explícita y una tarifa de envío demo configurable. Bazaar, mainnet, tarjetas y custodia de wallets quedan fuera de esta entrega.
 
-La preparación de fotografías y su futura sustitución por media real de Shopify está en [docs/MICOHSTORE-PHOTOGRAPHY.md](docs/MICOHSTORE-PHOTOGRAPHY.md).
+## Desarrollo del backend
 
-La guía paso a paso para crear y configurar la tienda está en [docs/SHOPIFY-MICOHSTORE-GUIDE.md](docs/SHOPIFY-MICOHSTORE-GUIDE.md).
+```powershell
+cd backend
+Copy-Item .env.example .env
+npm.cmd install
+npm.cmd run check
+npm.cmd test
+npm.cmd run doctor -- --verify
+npm.cmd run dev
+```
+
+Nunca subas `backend/.env` ni las credenciales de Shopify.
+
+Consulta el [plan de implementación](docs/HACKATHON-IMPLEMENTATION.md) y el [runbook de demo](docs/HACKATHON-DEMO-RUNBOOK.md).
