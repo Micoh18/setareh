@@ -1,0 +1,50 @@
+/* Fotografía real de Micohstore: estas reglas reemplazan los motivos provisionales. */
+.hero-art.hero-photo {
+  background: var(--sage);
+}
+
+.hero-art.hero-photo > img {
+  display: block;
+  width: 100%;
+  min-height: 500px;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 48%;
+  filter: saturate(.92) contrast(1.03);
+}
+
+.hero-art.hero-photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(38, 51, 38, 0) 48%, rgba(38, 51, 38, .24));
+}
+
+.hero-art.hero-photo .art-note {
+  z-index: 1;
+  color: #fff9ef;
+  text-shadow: 0 1px 7px rgba(0, 0, 0, .35);
+}
+
+.product-image > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform .45s ease;
+}
+
+.product-card:hover .product-image > img {
+  transform: scale(1.045);
+}
+
+.product-image .tag {
+  z-index: 1;
+}
+
+@media (max-width: 760px) {
+  .hero-art.hero-photo > img {
+    min-height: 400px;
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "sections": {
+    "micoh_hero": {
+      "type": "micoh-hero",
+      "settings": {
+        "eyebrow": "Mico crochet · piezas con personalidad",
+        "heading": "Un pequeño mundo\ntejido.",
+        "text": "<p>Objetos tejidos punto por punto para acompañar tus llaves, tu bolso y tus días más normales.</p>",
+        "button_label": "Ver la colección",
+        "button_link": "shopify://collections/all",
+        "note": "Una puntada, una historia.",
+        "color_scheme": "scheme-1"
+      }
+    },
+    "featured_collection": {
+      "type": "featured-collection",
+      "settings": {
+        "title": "Hechos para encontrar su persona.",
+        "heading_size": "h1",
+        "collection": "all",
+        "products_to_show": 8,
+        "columns_desktop": 4,
+        "color_scheme": "scheme-1",
+        "full_width": false,
+        "show_view_all": true,
+        "view_all_style": "solid",
+        "enable_desktop_slider": false,
+        "swipe_on_mobile": true,
+        "image_ratio": "portrait",
+        "image_shape": "arch",
+        "show_secondary_image": true,
+        "show_vendor": false,
+        "show_rating": false,
+        "quick_add": "standard",
+        "columns_mobile": "2",
+        "padding_top": 72,
+        "padding_bottom": 72
+      }
+    },
+    "micoh_process": {
+      "type": "micoh-process",
+      "blocks": {
+        "step_1": { "type": "step", "settings": { "title": "Elegir el hilo", "text": "Color, textura y la primera idea antes de que exista una forma." } },
+        "step_2": { "type": "step", "settings": { "title": "Tejer lento", "text": "Cada pieza se hace a mano; las pequeñas diferencias son parte de ella." } },
+        "step_3": { "type": "step", "settings": { "title": "Mandarla a casa", "text": "Envuelta con cariño y lista para comenzar otra historia contigo." } }
+      },
+      "block_order": ["step_1", "step_2", "step_3"],
+      "settings": { "eyebrow": "No hay dos iguales", "heading": "La belleza está\nen el proceso.", "color_scheme": "scheme-2" }
+    }
+  },
+  "order": ["micoh_hero", "featured_collection", "micoh_process"]
+}

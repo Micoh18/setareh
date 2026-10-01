@@ -1,0 +1,28 @@
+{%- liquid
+  assign hero_product = section.settings.product
+  if hero_product == blank
+    assign hero_product = collections.all.products.first
+  endif
+  assign hero_image = section.settings.image
+-%}
+
+<section class="micoh-hero color-{{ section.settings.color_scheme }}">
+  <div class="micoh-hero__copy page-width">
+    <p class="micoh-eyebrow">{{ section.settings.eyebrow | escape }}</p>
+    <h1>{{ section.settings.heading | escape | newline_to_br }}</h1>
+    <div class="micoh-hero__text rte">{{ section.settings.text }}</div>
+    <div class="micoh-hero__actions">
+      <a class="micoh-button" href="{{ section.settings.button_link | default: routes.all_products_collection_url }}">{{ section.settings.button_label | escape }} <span aria-hidden="true">↗</span></a>
+      {% if hero_product != blank %}<a class="micoh-link" href="{{ hero_product.url }}">Conoce esta pieza <span aria-hidden="true">↓</span></a>{% endif %}
+    </div>
+  </div>
+  <div class="micoh-hero__media">
+    {% if hero_image != blank %}
+      {{ hero_image | image_url: width: 1800 | image_tag: class: 'micoh-hero__image', loading: 'eager', widths: '550, 750, 1100, 1500, 1800', alt: hero_image.alt | default: hero_product.title }}
+    {% else %}<img class="micoh-hero__image" src="{{ 'kolog.jpeg' | asset_url }}" width="902" height="1600" loading="eager" alt="Figura tejida a mano en un bosque">{% endif %}
+  </div>
+</section>
+
+{% schema %}
+{"name":"Micohstore hero","settings":[{"type":"text","id":"eyebrow","label":"Antetítulo","default":"Mico crochet · piezas con personalidad"},{"type":"textarea","id":"heading","label":"Título","default":"Un pequeño mundo\ntejido."},{"type":"richtext","id":"text","label":"Texto","default":"<p>Objetos tejidos punto por punto para acompañar tus llaves, tu bolso y tus días más normales.</p>"},{"type":"text","id":"button_label","label":"Botón principal","default":"Ver la colección"},{"type":"url","id":"button_link","label":"Enlace del botón"},{"type":"image_picker","id":"image","label":"Imagen de hero"},{"type":"product","id":"product","label":"Producto destacado"},{"type":"text","id":"note","label":"Texto sobre imagen","default":"Una puntada, una historia."},{"type":"color_scheme","id":"color_scheme","label":"Esquema de color","default":"scheme-1"}],"presets":[{"name":"Micohstore hero"}]}
+{% endschema %}
