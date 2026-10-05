@@ -1,0 +1,15 @@
+# Setareh Docs
+
+Documentación pública de Setareh, infraestructura de comercio verificable para agentes.
+
+## Documentos
+
+- [Inicio](/): propósito, alcance y flujo del sistema.
+- [Runbook operativo](/runbook/): preparación, preflight, demo, incidentes y conciliación.
+- [Uso por agentes](/agentes/): fuentes, límites y forma recomendada de consultar la documentación.
+
+## Límites
+
+- El MVP acepta sólo USDC en Stellar testnet.
+- Nunca se deben publicar secretos, claves privadas, datos personales ni receipts de pago.
+- La información operativa sensible permanece fuera de este sitio.

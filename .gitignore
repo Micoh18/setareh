@@ -1,2 +1,8 @@
 # Private working documents must never be committed.
 .private-docs/
+
+# Generated documentation-site artifacts and installed dependencies.
+docs-site/node_modules/
+docs-site/dist/
+docs-site/.astro/
+docs-site/src/content/docs/

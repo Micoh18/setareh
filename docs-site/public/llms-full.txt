@@ -1,0 +1,9 @@
+# Setareh Docs — resumen para modelos de lenguaje
+
+Setareh es una infraestructura de comercio verificable para agentes. El flujo consulta catálogo y stock de Shopify, crea un quote con vencimiento, liquida USDC en Stellar testnet usando x402 y crea una orden Shopify tras validar el pago. Shopify es la fuente de verdad de catálogo, inventario y órdenes.
+
+El MVP opera exclusivamente con USDC en stellar:testnet. No debe usarse con mainnet o fondos reales. Los secretos de Shopify y las claves privadas de Stellar no deben aparecer en documentación, respuestas, logs públicos o commits.
+
+Para operar una demostración, instalar dependencias en backend, completar los archivos locales de entorno y ejecutar `npm.cmd run check`, `npm.cmd test` y `npm.cmd run doctor -- --verify`. Antes de pagar, el agente debe confirmar explícitamente la compra y respetar el vencimiento y el máximo del quote. Para investigar un draft se usa `npm.cmd run reconcile:draft -- gid://shopify/DraftOrder/<id>`; para una orden pagada, `npm.cmd run reconcile:order -- <quoteId>`.
+
+Fuentes canónicas: /, /runbook/ y /agentes/.

@@ -1,0 +1,16 @@
+{
+  "name": "setareh-docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "prebuild": "npm run sync-content",
+    "build": "astro build",
+    "preview": "astro preview",
+    "sync-content": "node scripts/sync-content.mjs"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.42.5",
+    "astro": "^7.3.5"
+  }
+}
