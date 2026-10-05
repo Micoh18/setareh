@@ -1,0 +1,111 @@
+/*
+ * Setareh’s public palette is derived from the private brand guide:
+ * lapis night, Ishtar gold, Astar violet, Babylonian clay and moon ivory.
+ */
+:root {
+  --sl-color-white: #f8f4ec;
+  --sl-color-gray-1: #e9e5ef;
+  --sl-color-gray-2: #c7c5d2;
+  --sl-color-gray-3: #aeb8d0;
+  --sl-color-gray-4: #70799b;
+  --sl-color-gray-5: #343f62;
+  --sl-color-gray-6: #1b2342;
+  --sl-color-black: #10152b;
+
+  --sl-color-accent-low: #3b2b11;
+  --sl-color-accent: #d9a441;
+  --sl-color-accent-high: #f6df9f;
+  --sl-color-text-accent: #f6df9f;
+  --sl-color-text-invert: #231707;
+  --sl-color-bg: #10152b;
+  --sl-color-bg-nav: #151c36;
+  --sl-color-bg-sidebar: #151c36;
+  --sl-color-bg-inline-code: #1b2342;
+  --sl-color-bg-accent: #f6df9f;
+  --sl-color-hairline-light: #343f62;
+  --sl-color-hairline: #1b2342;
+  --sl-color-hairline-shade: #10152b;
+
+  --sl-color-purple-low: #2d2448;
+  --sl-color-purple: #8066c6;
+  --sl-color-purple-high: #d5c9f6;
+  --sl-color-orange-low: #42271f;
+  --sl-color-orange: #c86a4b;
+  --sl-color-orange-high: #f1c2af;
+}
+
+:root[data-theme='light'] {
+  --sl-color-white: #24190f;
+  --sl-color-gray-1: #38291c;
+  --sl-color-gray-2: #584536;
+  --sl-color-gray-3: #766553;
+  --sl-color-gray-4: #9d8c79;
+  --sl-color-gray-5: #d9cdbc;
+  --sl-color-gray-6: #eee5d7;
+  --sl-color-gray-7: #fffaf1;
+  --sl-color-black: #f8f4ec;
+
+  --sl-color-accent-low: #f4e6bd;
+  --sl-color-accent: #a4670c;
+  --sl-color-accent-high: #5c3607;
+  --sl-color-text-accent: #7c4b09;
+  --sl-color-text-invert: #fffaf1;
+  --sl-color-bg: #f8f4ec;
+  --sl-color-bg-nav: #fffaf1;
+  --sl-color-bg-sidebar: #fbf5e9;
+  --sl-color-bg-inline-code: #eee5d7;
+  --sl-color-bg-accent: #a4670c;
+  --sl-color-hairline-light: #e6dac9;
+  --sl-color-hairline: #d9cdbc;
+  --sl-color-hairline-shade: #eee5d7;
+
+  --sl-color-purple-low: #ede7fb;
+  --sl-color-purple: #7356b6;
+  --sl-color-purple-high: #49337b;
+  --sl-color-orange-low: #f8e3da;
+  --sl-color-orange: #b65236;
+  --sl-color-orange-high: #71301f;
+}
+
+:root[data-theme='dark'] body {
+  background-image:
+    radial-gradient(circle at 88% -12rem, rgb(128 102 198 / 18%), transparent 34rem),
+    radial-gradient(circle at -10% 28rem, rgb(217 164 65 / 10%), transparent 26rem);
+  background-attachment: fixed;
+}
+
+:root[data-theme='light'] body {
+  background-image:
+    radial-gradient(circle at 92% -14rem, rgb(217 164 65 / 16%), transparent 36rem),
+    radial-gradient(circle at -8% 34rem, rgb(128 102 198 / 10%), transparent 27rem);
+  background-attachment: fixed;
+}
+
+.site-title {
+  gap: 0.65rem;
+  letter-spacing: 0.025em;
+}
+
+.site-title img {
+  background: #f8f4ec;
+  border: 1px solid #d9a441;
+  border-radius: 0.45rem;
+  box-shadow: 0 0 0 3px rgb(217 164 65 / 12%);
+  padding: 0.1rem;
+}
+
+:root[data-theme='light'] .site-title img {
+  box-shadow: 0 0 0 3px rgb(128 102 198 / 10%);
+}
+
+.sl-link-button.primary {
+  box-shadow: 0 0.4rem 1.3rem rgb(217 164 65 / 22%);
+}
+
+:root[data-theme='light'] .sl-link-button.primary {
+  box-shadow: 0 0.35rem 1.1rem rgb(164 103 12 / 20%);
+}
+
+main a:not(.sl-link-button) {
+  text-underline-offset: 0.18em;
+}

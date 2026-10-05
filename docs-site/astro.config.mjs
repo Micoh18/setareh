@@ -7,6 +7,12 @@ export default defineConfig({
     starlight({
       title: 'Setareh Docs',
       description: 'Documentación pública de Setareh.',
+      logo: {
+        src: './src/assets/setareh-logo.png',
+        alt: 'Emblema solar de Setareh',
+      },
+      favicon: '/setareh-logo.png',
+      customCss: ['./src/styles/setareh.css'],
       disable404Route: true,
       defaultLocale: 'root',
       locales: {
