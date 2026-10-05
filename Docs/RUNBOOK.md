@@ -3,8 +3,6 @@ title: Runbook operativo
 description: Preparación, ejecución, recuperación y cierre de una demostración de Setareh.
 ---
 
-# Runbook operativo de Setareh
-
 Este runbook describe cómo preparar, verificar y operar el flujo de compra de
 Setareh en el entorno de demostración. No almacenes secretos, direcciones de
 clientes, identificadores de pedidos ni datos de incidentes en este archivo.

@@ -29,9 +29,24 @@ orden.
 4. La wallet liquida USDC por x402 en Stellar testnet.
 5. Setareh valida el pago y crea una única orden Shopify.
 
-## Documentos disponibles
+## Empieza aquí
 
-- [Runbook operativo](/runbook/): preparación, ejecución, incidentes y
-  conciliación.
-- [Uso por agentes](/agentes/): cómo consultar esta documentación y los límites
-  de seguridad aplicables.
+- [Primeros pasos](/primeros-pasos/): instala, configura y verifica el backend.
+- [Arquitectura](/arquitectura/): entiende las responsabilidades y el ciclo de
+  compra.
+- [Runbook operativo](/runbook/): prepara y ejecuta un demo de forma segura.
+
+## Integrar
+
+- [Referencia MCP](/referencia/mcp/): herramientas para un runtime de agentes.
+- [API HTTP y x402](/referencia/http-x402/): endpoints y settlement.
+- [Checkout para agentes](/agentes/checkout/): confirmación, límites y wallet.
+- [Conectar un comercio Shopify](/comercios/shopify/): permisos y preflight.
+
+## Operar con seguridad
+
+- [Configuración](/referencia/configuracion/)
+- [Seguridad y límites](/seguridad/)
+- [Estados y recuperación](/operaciones/estados-y-recuperacion/)
+- [Uso por agentes](/agentes/)
+- [Mantener el portal](/portal-de-documentacion/)

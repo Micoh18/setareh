@@ -4,9 +4,19 @@ Documentación pública de Setareh, infraestructura de comercio verificable para
 
 ## Documentos
 
-- [Inicio](/): propósito, alcance y flujo del sistema.
-- [Runbook operativo](/runbook/): preparación, preflight, demo, incidentes y conciliación.
-- [Uso por agentes](/agentes/): fuentes, límites y forma recomendada de consultar la documentación.
+- [Uso por agentes](/agentes/): Cómo usar la documentación pública de Setareh de forma segura.
+- [Runbook operativo](/runbook/): Preparación, ejecución, recuperación y cierre de una demostración de Setareh.
+- [Checkout para agentes](/agentes/checkout/): Cómo un runtime de agente usa MCP, x402 y una wallet local sin perder controles de gasto.
+- [Arquitectura y modelo de compra](/arquitectura/): Cómo cooperan el agente, Setareh, Shopify, Stellar y el facilitador x402.
+- [Conectar un comercio Shopify](/comercios/shopify/): Requisitos, permisos y comprobaciones para el comercio que usa Setareh.
+- [Setareh Docs](/): Documentación pública para operar e integrar Setareh.
+- [Estados y recuperación](/operaciones/estados-y-recuperacion/): Cómo interpretar una compra y conciliarla de forma segura sin duplicar pagos u órdenes.
+- [Mantener el portal de documentación](/portal-de-documentacion/): Cómo editar, compilar y publicar docs.setareh.site sin incluir material privado.
+- [Primeros pasos](/primeros-pasos/): Configura y verifica una instancia local de Setareh para el flujo de demostración.
+- [Configuración](/referencia/configuracion/): Variables de entorno y límites de una instancia de Setareh.
+- [API HTTP y x402](/referencia/http-x402/): Endpoints HTTP del MVP y el ciclo de pago protegido con x402.
+- [Referencia MCP](/referencia/mcp/): Herramientas MCP disponibles para descubrir, cotizar y seguir una compra Setareh.
+- [Seguridad y límites](/seguridad/): Controles implementados, datos sensibles y límites que no deben confundirse con garantías de producción.
 
 ## Límites
 
