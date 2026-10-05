@@ -75,4 +75,4 @@ runtime de agente elegido, conservando esas mismas verificaciones.
 - Un fallo de Shopify después de pago queda en `manual_review`; si Shopify alcanzó a crear la orden, su ID queda persistido para conciliación y nunca se responde como compra exitosa.
 - La incorporación de pagos x402 directamente en metadatos MCP queda para una siguiente iteración; la ruta HTTP x402 es la ruta pagable actual.
 
-Consulta el [plan de implementación](../docs/HACKATHON-IMPLEMENTATION.md) y el [runbook de demo](../docs/HACKATHON-DEMO-RUNBOOK.md) para el guion reproducible y las cuentas externas requeridas.
+Consulta el [runbook operativo público](../Docs/RUNBOOK.md) para preparar, ejecutar y conciliar una demo.

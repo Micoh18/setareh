@@ -128,11 +128,11 @@ La herramienta `pay_and_place_order` devuelve una URL HTTP completa cuando `SETA
 │   ├── src/shopify.ts           # cliente Shopify Admin API
 │   └── src/doctor.ts            # preflight de demo
 ├── micohstore-shopify-theme/    # tema Shopify del comercio piloto
-└── docs/                        # arquitectura, operación y material de hackathon
+└── Docs/                        # documentación pública
 ```
 
 ## Alcance del MVP
 
 Setareh está diseñado para una hackathon y deliberadamente acotado: un comercio piloto, USDC testnet, quotes con tope configurable y una wallet de demo. Mainnet, tarjetas, descubrimiento mediante Bazaar, políticas avanzadas por colección/zona y custodia de wallets quedan fuera de esta versión.
 
-Consulta el [documento técnico](docs/SETAREH.md), la [guía de conexión Shopify](docs/SETAREH-SHOPIFY-CONNECTION.md) y el README del [backend](backend/README.md) para más detalle.
+Consulta el [runbook operativo](Docs/RUNBOOK.md) y el README del [backend](backend/README.md) para más detalle.

@@ -1,6 +1,2 @@
-# Private documentation and legacy documents at this level stay local.
-docs/*
-
-# Public documentation is deliberately versioned.
-!docs/public/
-!docs/public/**
+# Private working documents must never be committed.
+.private-docs/
