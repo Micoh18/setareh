@@ -25,6 +25,7 @@ Para crear la versión publicable:
 
 ```powershell
 cd docs-site
+npm.cmd run check:public-content
 npm.cmd run build
 ```
 
@@ -51,7 +52,10 @@ Tras cada publicación, verifica al menos `/`, `/primeros-pasos/`,
 
 ## Revisión antes de publicar
 
-- Ejecuta `npm.cmd run build` sin errores.
+- Ejecuta `npm.cmd run check:public-content` y `npm.cmd run build` sin errores.
+- El CI ejecuta el mismo control de contenido antes de compilar. Detecta
+  patrones conocidos de tokens Shopify, seeds Stellar y asignaciones de secretos;
+  es una barrera adicional, no un reemplazo de la revisión humana.
 - Comprueba que no haya secretos, direcciones de cliente, correos ni datos de
   pedido en `Docs/`.
 - Usa enlaces relativos del sitio, por ejemplo `/seguridad/`.

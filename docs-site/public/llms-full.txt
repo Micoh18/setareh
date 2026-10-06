@@ -482,6 +482,7 @@ Para crear la versión publicable:
 
 ```powershell
 cd docs-site
+npm.cmd run check:public-content
 npm.cmd run build
 ```
 
@@ -508,7 +509,10 @@ Tras cada publicación, verifica al menos `/`, `/primeros-pasos/`,
 
 ## Revisión antes de publicar
 
-- Ejecuta `npm.cmd run build` sin errores.
+- Ejecuta `npm.cmd run check:public-content` y `npm.cmd run build` sin errores.
+- El CI ejecuta el mismo control de contenido antes de compilar. Detecta
+  patrones conocidos de tokens Shopify, seeds Stellar y asignaciones de secretos;
+  es una barrera adicional, no un reemplazo de la revisión humana.
 - Comprueba que no haya secretos, direcciones de cliente, correos ni datos de
   pedido en `Docs/`.
 - Usa enlaces relativos del sitio, por ejemplo `/seguridad/`.
@@ -824,6 +828,10 @@ URL canónica: /seguridad/
   atómicamente para evitar duplicados ante reintentos.
 - La evidencia persistida expone un resumen y hash de transacción, no el
   receipt crudo del facilitador a través de `get_order_status`.
+- El CI revisa `Docs/` contra patrones conocidos de tokens Shopify, seeds Stellar
+  y asignaciones de secretos antes de compilar el portal. Es una barrera contra
+  errores comunes, no un sustituto de la revisión humana o de un gestor de
+  secretos.
 
 ## Modelo de amenazas del MVP
 

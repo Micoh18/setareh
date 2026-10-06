@@ -50,5 +50,7 @@ jobs:
           cache-dependency-path: docs-site/package-lock.json
       - name: Instalar dependencias bloqueadas
         run: npm ci
+      - name: Revisar que los docs no expongan secretos
+        run: npm run check:public-content
       - name: Construir el portal
         run: npm run build

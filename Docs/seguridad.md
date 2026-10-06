@@ -15,6 +15,10 @@ description: Controles implementados, límites del MVP, amenazas tratadas y ries
   atómicamente para evitar duplicados ante reintentos.
 - La evidencia persistida expone un resumen y hash de transacción, no el
   receipt crudo del facilitador a través de `get_order_status`.
+- El CI revisa `Docs/` contra patrones conocidos de tokens Shopify, seeds Stellar
+  y asignaciones de secretos antes de compilar el portal. Es una barrera contra
+  errores comunes, no un sustituto de la revisión humana o de un gestor de
+  secretos.
 
 ## Modelo de amenazas del MVP
 
