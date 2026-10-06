@@ -15,6 +15,7 @@
   <a href="#flujo-de-compra">Flujo</a> ·
   <a href="#inicio-rápido">Inicio rápido</a> ·
   <a href="#seguridad-y-límites">Seguridad</a> ·
+  <a href="#evidencia-y-recursos-públicos">Evidencia</a> ·
   <a href="https://docs.setareh.site/">Docs</a>
 </p>
 
@@ -31,18 +32,20 @@ Setareh conecta esos componentes sin reemplazar al comercio:
 - **x402 + Stellar testnet** permiten que la wallet del agente liquide USDC sin entregar su clave privada al servidor.
 - **SQLite e idempotencia** vinculan quote, pago y orden para impedir cobros u órdenes duplicadas.
 
-Micohstore es el entorno de referencia usado durante el desarrollo. No se presenta como un piloto externo independiente: ese piloto se anunciará sólo después de contar con una tienda operada por un tercero y su confirmación escrita. Las [liquidaciones internas de referencia en Stellar testnet](Docs/evidencia.md) son públicas y verificables, pero no prueban una venta comercial ni sustituyen la evaluación de un tercero. La evidencia redactada de una orden y el reporte del evaluador se publicarán únicamente cuando existan y puedan verificarse.
+Micohstore es el entorno de referencia usado durante el desarrollo. Las confirmaciones escritas del comercio tercero y de un evaluador independiente ya fueron recibidas y se conservan fuera del repositorio público. No se publican sus nombres, contactos, documentos ni enlaces privados. El piloto externo se anunciará sólo después de ejecutar el flujo autorizado y contar con evidencia redactada verificable. Las [liquidaciones internas de referencia en Stellar testnet](Docs/evidencia.md) son públicas y verificables, pero no prueban una venta comercial ni sustituyen la evaluación de un tercero.
 
 ## Diferenciación y alcance
 
 Setareh no afirma ser el primer proyecto que conecta Stellar o x402 con comercio. Existen referencias cercanas, entre ellas [`nimrid/x402-shopify-commerce`](https://github.com/nimrid/x402-shopify-commerce), [StellarPay para comercios Shopify](https://communityfund.stellar.org/awards/rec4GoPVeyuPkEDsu) y [REAPP](https://github.com/ackrate/ackrate-protocol). Las referencias se revisaron el 5 de octubre de 2026; sus capacidades pueden evolucionar.
 
-El alcance específico que Setareh busca demostrar es distinto: llevar una compra de bienes de un comercio a través de una traza operable y verificable, `quote → settlement → orden`, sin sustituir el backoffice del comerciante.
+El alcance específico que Setareh busca demostrar es distinto: llevar una compra de bienes de un comercio a través de una traza operable y verificable, `quote → settlement → orden`, sin sustituir el backoffice del comerciante. No se limita a iniciar un pago: conserva el contexto de la cotización aprobada, compara el settlement exacto con sus requisitos y crea como máximo una orden conciliable para ese quote.
+
+**Diferencia central.** Setareh se enfoca en el tramo que une el pago con la operación comercial: una cotización limitada y confirmada, un settlement validado contra esa cotización, una orden idempotente en Shopify y estados de recuperación cuando una dependencia falla. El piloto está diseñado para que una tercera persona pueda revisar esa traza mediante CI, runbook, threat model, hash testnet y evidencia redactada; no para afirmar una auditoría formal ni una capacidad de producción antes de demostrarla.
 
 | Área | Afirmación verificable de Setareh | Límite honesto |
 | --- | --- | --- |
 | Ejecución de comercio | Congela un quote, vuelve a comprobar stock, verifica settlement x402 y crea como máximo una orden Shopify por quote. | La implementación actual sólo soporta Shopify. |
-| Evidencia operativa | Persiste el vínculo entre quote, resumen de pago y orden para conciliación; los fallos posteriores al settlement pasan a `manual_review`. | Un piloto externo y su reporte independiente siguen pendientes de confirmación y ejecución. |
+| Evidencia operativa | Persiste el vínculo entre quote, resumen de pago y orden para conciliación; los fallos posteriores al settlement pasan a `manual_review`. | Las confirmaciones privadas están listas; la ejecución del piloto y su reporte independiente siguen pendientes. |
 | Seguridad | Publica el modelo de amenazas, límites, runbook y estados de recuperación del flujo. | No es una auditoría externa, no hay mainnet ni custodia. |
 | Evolución | Mantendrá x402, políticas, quotes e idempotencia como núcleo independiente de plataforma. | Los adaptadores para otros comercios son trabajo futuro, no una integración disponible hoy. |
 
@@ -60,10 +63,11 @@ La ruta no depende de una fecha ni se describe como un simple seguimiento. Cada
 etapa tiene una puerta de decisión:
 
 1. **Cerrar el piloto testnet.** Un comercio operado por un tercero y un
-   evaluador distinto de la implementación deben confirmar por escrito su
-   participación, repetir el flujo autorizado y documentar una orden por quote,
-   el resultado de un reintento y sus hallazgos redactados. Se congelará una
-   revisión con CI verde, hashes consultables, runbook y modelo de amenazas.
+   evaluador distinto de la implementación ya confirmaron por escrito su
+   participación; sus documentos permanecen privados. Falta ejecutar el flujo
+   autorizado, documentar una orden por quote, el resultado de un reintento y
+   sus hallazgos redactados. Se congelará una revisión con CI verde, hashes
+   consultables, runbook y modelo de amenazas.
 2. **Decidir si procede mainnet.** Antes de fondos reales se requiere una
    revisión independiente de autorización y conciliación, límites operativos,
    rotación y revocación de secretos, monitoreo, respuesta a incidentes,
@@ -76,6 +80,25 @@ etapa tiene una puerta de decisión:
    trabajo de seguridad/operación que permita evaluar un lanzamiento limitado.
 
 Mainnet, custodia y adaptadores adicionales no son entregables del MVP actual.
+
+## Evidencia y recursos públicos
+
+| Recurso | Propósito |
+| --- | --- |
+| [Documentación oficial](https://docs.setareh.site/) | Portal HTTPS explorable por personas y agentes. |
+| [Runbook](https://docs.setareh.site/runbook/) | Preparación, ejecución y recuperación de una demostración. |
+| [Threat model](https://docs.setareh.site/seguridad/) | Límites de confianza, amenazas, controles y riesgos residuales. |
+| [Evidencia Stellar testnet](https://docs.setareh.site/evidencia/) | Hashes verificables de liquidaciones internas de referencia, con sus límites explícitos. |
+| [Corpus para LLMs](https://docs.setareh.site/llms.txt) / [corpus completo](https://docs.setareh.site/llms-full.txt) | Contenido público indexable para agentes; excluye documentación privada. |
+| [Revisión del sitio](https://docs.setareh.site/build-info.json) | Commit que produjo el despliegue de documentación vigente. |
+| [CI público](https://github.com/Micoh18/setareh/actions/workflows/ci.yml) | Instalación bloqueada, auditoría de dependencias de producción, typecheck, pruebas y build documental. |
+| [Ficha actualizada de postulación](https://auspicious-roarer-c32.notion.site/Setareh-3ec70b1c47448039ad1aefdd2c117927?pvs=74) | Contexto y propuesta de Setareh. |
+| [Video pitch](https://www.youtube.com/watch?v=C74eUAoU1Ck) | Presentación breve del proyecto. |
+
+Las confirmaciones de participación, datos de contacto, enlaces a documentos
+privados, configuración de Shopify, identificadores de clientes y receipts de
+pago no pertenecen a estos recursos públicos. La evidencia del piloto se
+publicará sólo de forma redactada y con autorización correspondiente.
 
 ## Flujo de compra
 

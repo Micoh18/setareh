@@ -32,8 +32,8 @@ evidencia duradera de fondos reales.
   residuales del flujo.
 - [Runbook operativo](/runbook/): preparación, ejecución y recuperación.
 - [CI del repositorio](https://github.com/Micoh18/setareh/actions/workflows/ci.yml): instala,
-  verifica backend, revisa que `Docs/` no publique secretos y construye este
-  portal.
+  audita dependencias de producción, verifica backend, revisa que `Docs/` no
+  publique secretos y construye este portal.
 - [`build-info.json`](/build-info.json): hash exacto del commit que produjo el
   sitio desplegado. Tras cada subida se debe comprobar que coincida con la
   revisión revisada en GitHub.

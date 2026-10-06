@@ -41,7 +41,31 @@ cantidad, dirección, despacho o presupuesto, descarta el quote y crea otro.
 | `STELLAR_PAYMENT_ASSET` | Sí | Debe ser `USDC`. |
 | `STELLAR_MERCHANT_ADDRESS` | Sí | Dirección pública Stellar receptora; Setareh valida su formato. |
 | `X402_FACILITATOR_URL` | No | URL del facilitador; por defecto `https://x402.org/facilitator`. |
-| `PORT` | No | Activa la superficie HTTP, normalmente `4020`. |
+| `PORT` | No | Puerto de la superficie HTTP, normalmente `4020`. |
+| `SETAREH_TRANSPORT` | No | `stdio` para MCP local, `http` para un contenedor desplegado o `both` para desarrollo. Sin valor, infiere `stdio` sin `PORT` y `both` con `PORT`. |
+
+## Contenedor HTTP
+
+El repositorio incluye `backend/Dockerfile` para ejecutar la API HTTP sin
+exponer el transporte MCP por stdio. Construye y arranca una instancia local
+así:
+
+```powershell
+docker build -t setareh-backend ./backend
+docker volume create setareh-data
+docker run --rm --name setareh-api -p 4020:4020 `
+  --env-file backend/.env `
+  -e SETAREH_TRANSPORT=http `
+  -e SETAREH_HTTP_HOST=0.0.0.0 `
+  -e SETAREH_DATABASE_PATH=/data/setareh.db `
+  -v setareh-data:/data setareh-backend
+```
+
+El volumen conserva los quotes y estados de conciliación. En un despliegue,
+termina HTTPS antes del contenedor, configura `SETAREH_BASE_URL` con la URL
+HTTPS pública y conserva `.env` y el volumen fuera de Git. No expongas el
+puerto directamente a Internet ni pongas claves privadas de wallets en el
+servidor.
 
 ## Wallet del agente
 
