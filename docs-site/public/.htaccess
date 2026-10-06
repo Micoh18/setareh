@@ -1,5 +1,13 @@
 # Hostinger/Apache: declare the generated LLM corpus as UTF-8.
 # Without this, text/plain defaults may render Spanish accents as mojibake.
+# `Header set` makes the intent explicit for CDN/proxy paths that do not infer
+# a charset from AddCharset alone.
+<IfModule mod_headers.c>
+  <FilesMatch "\.txt$">
+    Header set Content-Type "text/plain; charset=UTF-8"
+  </FilesMatch>
+</IfModule>
+
 <IfModule mod_mime.c>
   AddCharset UTF-8 .txt
 </IfModule>
