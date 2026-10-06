@@ -54,6 +54,29 @@ Shopify es el primer conector porque ofrece catálogo, inventario y órdenes en 
 
 Después de validar el piloto, la evolución prevista es extraer un contrato de adaptador de comercio para descubrir catálogo, consultar disponibilidad, crear quotes, crear/consultar órdenes y registrar fulfillment. El núcleo de x402, las políticas, expiración, idempotencia, auditoría y conciliación debe quedar independiente del adaptador. Otros e-commerce, backoffices propios o comercio físico sólo se incorporarán con un alcance, comercio y presupuesto propios.
 
+## Ruta posterior: piloto, mainnet y SCF Build
+
+La ruta no depende de una fecha ni se describe como un simple seguimiento. Cada
+etapa tiene una puerta de decisión:
+
+1. **Cerrar el piloto testnet.** Un comercio operado por un tercero y un
+   evaluador distinto de la implementación deben confirmar por escrito su
+   participación, repetir el flujo autorizado y documentar una orden por quote,
+   el resultado de un reintento y sus hallazgos redactados. Se congelará una
+   revisión con CI verde, hashes consultables, runbook y modelo de amenazas.
+2. **Decidir si procede mainnet.** Antes de fondos reales se requiere una
+   revisión independiente de autorización y conciliación, límites operativos,
+   rotación y revocación de secretos, monitoreo, respuesta a incidentes,
+   términos de devolución/soporte acordados con el comercio y un despliegue
+   limitado con reversión documentada. No hay compromiso ni fecha de mainnet
+   hasta completar esas puertas.
+3. **Preparar una propuesta SCF Build.** Se basará en métricas y hallazgos del
+   piloto, no en la intención de continuar: adaptación multi-comercio,
+   aislamiento por tenant, políticas por tienda, onboarding verificable y el
+   trabajo de seguridad/operación que permita evaluar un lanzamiento limitado.
+
+Mainnet, custodia y adaptadores adicionales no son entregables del MVP actual.
+
 ## Flujo de compra
 
 ```text
