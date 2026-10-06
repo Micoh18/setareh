@@ -498,14 +498,18 @@ El build hace tres cosas:
 En el File Manager del sitio `docs.setareh.site`, abre `public_html` y sube el
 contenido completo de `docs-site/dist/`, no la carpeta `dist` como nivel extra.
 Incluye `index.html`, `_astro/`, `pagefind/`, las carpetas de rutas,
-`llms.txt`, `llms-full.txt` y los archivos sitemap. La URL final debe ser:
+`llms.txt`, `llms-full.txt`, `build-info.json` y los archivos sitemap. La URL
+final debe ser:
 
 ```text
 https://docs.setareh.site/
 ```
 
 Tras cada publicación, verifica al menos `/`, `/primeros-pasos/`,
-`/referencia/mcp/`, `/runbook/`, `/llms.txt` y `/llms-full.txt`.
+`/referencia/mcp/`, `/runbook/`, `/llms.txt`, `/llms-full.txt` y
+`/build-info.json`. El campo `sourceRevision` de este último debe coincidir con
+el commit que se construyó; permite distinguir el contenido publicado de un
+artefacto local o anterior.
 
 ## Revisión antes de publicar
 

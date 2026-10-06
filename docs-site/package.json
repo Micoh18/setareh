@@ -6,6 +6,7 @@
     "dev": "npm run sync-content && astro dev",
     "prebuild": "npm run sync-content",
     "build": "astro build",
+    "postbuild": "node scripts/write-build-info.mjs",
     "preview": "astro preview",
     "sync-content": "node scripts/sync-content.mjs",
     "check:public-content": "node scripts/check-public-content.mjs"
