@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+.env.*
+agent.env
+agent.env.*
+*.db
+.git
+npm-debug.log*
