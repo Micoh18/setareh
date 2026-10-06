@@ -54,4 +54,3 @@ como capacidad disponible antes de implementarla.
 - [Estados y recuperación](/operaciones/estados-y-recuperacion/)
 - [Uso por agentes](/agentes/)
 - [Evidencia pública de referencia](/evidencia/)
-- [Mantener el portal](/portal-de-documentacion/)

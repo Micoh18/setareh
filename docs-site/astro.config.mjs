@@ -41,7 +41,6 @@ export default defineConfig({
             { slug: 'seguridad' },
             { slug: 'agentes' },
             { slug: 'evidencia' },
-            { slug: 'portal-de-documentacion' },
           ],
         },
       ],
