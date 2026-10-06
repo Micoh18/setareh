@@ -31,7 +31,7 @@ Setareh conecta esos componentes sin reemplazar al comercio:
 - **x402 + Stellar testnet** permiten que la wallet del agente liquide USDC sin entregar su clave privada al servidor.
 - **SQLite e idempotencia** vinculan quote, pago y orden para impedir cobros u órdenes duplicadas.
 
-Micohstore es el entorno de referencia usado durante el desarrollo. No se presenta como un piloto externo independiente: ese piloto se anunciará sólo después de contar con una tienda operada por un tercero y su confirmación escrita. Las pruebas y la documentación describen el flujo técnico; los hashes, la evidencia redactada de una orden y el reporte del evaluador se publicarán únicamente cuando existan y puedan verificarse.
+Micohstore es el entorno de referencia usado durante el desarrollo. No se presenta como un piloto externo independiente: ese piloto se anunciará sólo después de contar con una tienda operada por un tercero y su confirmación escrita. Las [liquidaciones internas de referencia en Stellar testnet](Docs/evidencia.md) son públicas y verificables, pero no prueban una venta comercial ni sustituyen la evaluación de un tercero. La evidencia redactada de una orden y el reporte del evaluador se publicarán únicamente cuando existan y puedan verificarse.
 
 ## Diferenciación y alcance
 
@@ -160,4 +160,4 @@ La herramienta `pay_and_place_order` devuelve una URL HTTP completa cuando `SETA
 
 Setareh está diseñado para una hackathon y deliberadamente acotado: un comercio Shopify de referencia, USDC testnet, quotes con tope configurable y una wallet de demo. El piloto externo, mainnet, tarjetas, descubrimiento mediante Bazaar, políticas avanzadas por colección/zona, custodia de wallets y adaptadores para otras plataformas quedan fuera de esta versión.
 
-Consulta la [documentación pública](https://docs.setareh.site/), el [modelo de amenazas](Docs/seguridad.md), el [runbook operativo](Docs/RUNBOOK.md) y el README del [backend](backend/README.md) para más detalle.
+Consulta la [documentación pública](https://docs.setareh.site/), la [evidencia pública de referencia](Docs/evidencia.md), el [modelo de amenazas](Docs/seguridad.md), el [runbook operativo](Docs/RUNBOOK.md) y el README del [backend](backend/README.md) para más detalle.

@@ -1,0 +1,5 @@
+# Hostinger/Apache: declare the generated LLM corpus as UTF-8.
+# Without this, text/plain defaults may render Spanish accents as mojibake.
+<IfModule mod_mime.c>
+  AddCharset UTF-8 .txt
+</IfModule>

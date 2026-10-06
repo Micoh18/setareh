@@ -9,6 +9,7 @@ Documentación pública de Setareh, infraestructura de comercio verificable para
 - [Checkout para agentes](/agentes/checkout/): Cómo un runtime de agente usa MCP, x402 y una wallet local sin perder controles de gasto.
 - [Arquitectura y modelo de compra](/arquitectura/): Cómo cooperan el agente, Setareh, Shopify, Stellar y el facilitador x402.
 - [Conectar un comercio Shopify](/comercios/shopify/): Requisitos, permisos y comprobaciones para el comercio que usa Setareh.
+- [Evidencia pública de referencia](/evidencia/): Trazas verificables del entorno de referencia y límites de lo que demuestran.
 - [Setareh Docs](/): Documentación pública para operar e integrar Setareh.
 - [Estados y recuperación](/operaciones/estados-y-recuperacion/): Cómo interpretar una compra y conciliarla de forma segura sin duplicar pagos u órdenes.
 - [Mantener el portal de documentación](/portal-de-documentacion/): Cómo editar, compilar y publicar docs.setareh.site sin incluir material privado.

@@ -40,6 +40,7 @@ export default defineConfig({
             { slug: 'operaciones/estados-y-recuperacion' },
             { slug: 'seguridad' },
             { slug: 'agentes' },
+            { slug: 'evidencia' },
             { slug: 'portal-de-documentacion' },
           ],
         },
