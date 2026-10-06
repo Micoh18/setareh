@@ -46,8 +46,9 @@ clientes, identificadores de pedidos ni datos de incidentes en este archivo.
 
 Setareh permite que un agente consulte el catálogo Shopify, cree un quote con
 vigencia limitada y liquide USDC en Stellar testnet mediante x402. Tras validar
-el pago, el backend crea una orden en Shopify. El comercio piloto es
-Micohstore.
+el pago, el backend crea una orden en Shopify. Micohstore es el entorno de
+referencia usado durante el desarrollo; no debe presentarse como un comercio
+piloto externo sin una confirmación escrita de su propietario.
 
 El MVP opera sólo con `USDC` y `stellar:testnet`. No usar mainnet ni fondos
 reales.
@@ -240,6 +241,27 @@ Setareh no recibe la clave privada de la wallet. Shopify tampoco se sustituye:
 la orden final, sus datos de fulfillment y el inventario permanecen en el
 backoffice del comercio.
 
+## Shopify primero, no Shopify para siempre
+
+El código del MVP usa un cliente Shopify directamente. Esa decisión permite
+probar catálogo, inventario, borradores y órdenes con una sola fuente de verdad,
+pero **no significa que Setareh ya soporte otras plataformas**.
+
+La frontera de extensión prevista es un adaptador de comercio. Antes de sumar
+otro canal, debe existir una implementación del adaptador y sus pruebas para:
+
+1. buscar catálogo y variantes;
+2. consultar disponibilidad para una cantidad concreta;
+3. crear una cotización/borrador con el precio y despacho del comercio;
+4. completar o crear la orden después de un settlement válido;
+5. consultar la orden para recuperación y conciliación.
+
+El núcleo de Setareh —políticas, quote con vencimiento, estado de pago,
+idempotencia, auditoría y `manual_review`— debe conservar el mismo contrato
+independientemente del adaptador. Un futuro conector para otro e-commerce,
+backoffice propio o comercio físico tendrá su alcance, amenazas y pruebas
+propios; no es una capacidad actual del MVP.
+
 ## Flujo de compra
 
 ```text
@@ -344,9 +366,13 @@ URL canónica: /
 ## Qué es Setareh
 
 Setareh conecta un agente con un comercio Shopify para completar compras bajo
-un flujo verificable. Shopify conserva la fuente de verdad de catálogo,
-inventario y pedidos; Setareh crea quotes y valida el pago antes de crear una
-orden.
+un flujo verificable. Shopify es el primer conector: conserva la fuente de
+verdad de catálogo, inventario y pedidos; Setareh crea quotes y valida el pago
+antes de crear una orden.
+
+La implementación pública actual sólo integra Shopify. La evolución a otros
+backoffices requiere adaptadores de comercio explícitos y no debe anunciarse
+como capacidad disponible antes de implementarla.
 
 ## Flujo
 
@@ -359,8 +385,8 @@ orden.
 ## Empieza aquí
 
 - [Primeros pasos](/primeros-pasos/): instala, configura y verifica el backend.
-- [Arquitectura](/arquitectura/): entiende las responsabilidades y el ciclo de
-  compra.
+- [Arquitectura](/arquitectura/): entiende las responsabilidades, el ciclo de
+  compra y el límite actual del adaptador Shopify.
 - [Runbook operativo](/runbook/): prepara y ejecuta un demo de forma segura.
 
 ## Integrar
@@ -373,7 +399,7 @@ orden.
 ## Operar con seguridad
 
 - [Configuración](/referencia/configuracion/)
-- [Seguridad y límites](/seguridad/)
+- [Seguridad, límites y modelo de amenazas](/seguridad/)
 - [Estados y recuperación](/operaciones/estados-y-recuperacion/)
 - [Uso por agentes](/agentes/)
 - [Mantener el portal](/portal-de-documentacion/)
@@ -782,7 +808,7 @@ revisión manual.
 La respuesta entrega estado, datos mínimos de la orden Shopify y un resumen
 seguro de pago. No expone el receipt crudo del facilitador.
 
-## Seguridad y límites
+## Seguridad, límites y modelo de amenazas
 
 URL canónica: /seguridad/
 
@@ -798,6 +824,29 @@ URL canónica: /seguridad/
   atómicamente para evitar duplicados ante reintentos.
 - La evidencia persistida expone un resumen y hash de transacción, no el
   receipt crudo del facilitador a través de `get_order_status`.
+
+## Modelo de amenazas del MVP
+
+### Activos y límites de confianza
+
+| Activo o decisión | Quién lo controla | Límite que Setareh debe respetar |
+| --- | --- | --- |
+| Clave y política de gasto de la wallet | Persona/agente | La clave no llega al backend; la wallet decide si firma. |
+| Catálogo, stock, precio y fulfillment | Comercio/Shopify | Shopify sigue siendo la fuente de verdad hasta crear la orden. |
+| Quote, estado de pago e idempotencia | Setareh | Se persisten para impedir que un reintento cree dos órdenes. |
+| Autorización/settlement x402 | Wallet y facilitador | Setareh verifica requisitos del pago antes de crear la orden. |
+| Secretos Shopify y operación | Comercio/operador | Nunca se publican en docs, logs ni respuestas MCP. |
+
+### Amenazas, controles y riesgo residual
+
+| Amenaza | Control actual | Riesgo que permanece |
+| --- | --- | --- |
+| Agente intenta pagar más, con otro activo/red/destino o tras expirar el quote | El backend compara red, activo, destinatario, monto y vencimiento contra el quote; la wallet tiene límites locales. | La configuración de límites y la wallet siguen siendo responsabilidad del operador/agente. |
+| Reintento concurrente crea dos órdenes o dos cargos | Una fila de pago/orden por quote y reclamación atómica de creación de orden. | Casos de infraestructura no probados deben pasar a conciliación, no asumirse como éxito. |
+| Shopify falla después de un settlement válido | Se conserva evidencia y el estado pasa a `manual_review`; el runbook impide reintentar el pago a ciegas. | No hay reembolso automático ni resolución comercial automatizada. |
+| Facilitador o respuesta x402 no coincide con el quote | Se valida el requisito de pago y su settlement antes de completar Shopify. | El facilitador sigue siendo una dependencia externa que debe evaluarse para producción. |
+| Se filtran claves, PII o receipts | `.env` está ignorado, `get_order_status` entrega un resumen y los docs prohíben publicar datos sensibles. | No hay gestor centralizado de secretos, DLP ni auditoría externa en el MVP. |
+| Endpoint público recibe abuso o tráfico no autorizado | No se debe exponer el servidor local; producción requeriría HTTPS, control de acceso y rate limiting. | Esos controles aún no están implementados como servicio público. |
 
 ## Datos que nunca deben aparecer en este sitio
 

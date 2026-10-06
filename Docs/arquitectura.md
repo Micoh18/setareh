@@ -18,6 +18,27 @@ Setareh no recibe la clave privada de la wallet. Shopify tampoco se sustituye:
 la orden final, sus datos de fulfillment y el inventario permanecen en el
 backoffice del comercio.
 
+## Shopify primero, no Shopify para siempre
+
+El código del MVP usa un cliente Shopify directamente. Esa decisión permite
+probar catálogo, inventario, borradores y órdenes con una sola fuente de verdad,
+pero **no significa que Setareh ya soporte otras plataformas**.
+
+La frontera de extensión prevista es un adaptador de comercio. Antes de sumar
+otro canal, debe existir una implementación del adaptador y sus pruebas para:
+
+1. buscar catálogo y variantes;
+2. consultar disponibilidad para una cantidad concreta;
+3. crear una cotización/borrador con el precio y despacho del comercio;
+4. completar o crear la orden después de un settlement válido;
+5. consultar la orden para recuperación y conciliación.
+
+El núcleo de Setareh —políticas, quote con vencimiento, estado de pago,
+idempotencia, auditoría y `manual_review`— debe conservar el mismo contrato
+independientemente del adaptador. Un futuro conector para otro e-commerce,
+backoffice propio o comercio físico tendrá su alcance, amenazas y pruebas
+propios; no es una capacidad actual del MVP.
+
 ## Flujo de compra
 
 ```text

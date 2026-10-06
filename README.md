@@ -11,10 +11,14 @@
 
 <p align="center">
   <a href="#qué-resuelve">Producto</a> ·
+  <a href="#diferenciación-y-alcance">Diferenciación</a> ·
   <a href="#flujo-de-compra">Flujo</a> ·
   <a href="#inicio-rápido">Inicio rápido</a> ·
-  <a href="#seguridad-y-límites">Seguridad</a>
+  <a href="#seguridad-y-límites">Seguridad</a> ·
+  <a href="https://docs.setareh.site/">Docs</a>
 </p>
+
+[![CI](https://github.com/Micoh18/setareh/actions/workflows/ci.yml/badge.svg)](https://github.com/Micoh18/setareh/actions/workflows/ci.yml)
 
 ## Qué resuelve
 
@@ -27,7 +31,28 @@ Setareh conecta esos componentes sin reemplazar al comercio:
 - **x402 + Stellar testnet** permiten que la wallet del agente liquide USDC sin entregar su clave privada al servidor.
 - **SQLite e idempotencia** vinculan quote, pago y orden para impedir cobros u órdenes duplicadas.
 
-El piloto de hackathon usa **Micohstore**, una tienda Shopify de productos artesanales. El flujo se validó de punta a punta con una orden Shopify real y una liquidación USDC en Stellar testnet.
+Micohstore es el entorno de referencia usado durante el desarrollo. No se presenta como un piloto externo independiente: ese piloto se anunciará sólo después de contar con una tienda operada por un tercero y su confirmación escrita. Las pruebas y la documentación describen el flujo técnico; los hashes, la evidencia redactada de una orden y el reporte del evaluador se publicarán únicamente cuando existan y puedan verificarse.
+
+## Diferenciación y alcance
+
+Setareh no afirma ser el primer proyecto que conecta Stellar o x402 con comercio. Existen referencias cercanas, entre ellas [`nimrid/x402-shopify-commerce`](https://github.com/nimrid/x402-shopify-commerce), [StellarPay para comercios Shopify](https://communityfund.stellar.org/awards/rec4GoPVeyuPkEDsu) y [REAPP](https://github.com/ackrate/ackrate-protocol). Las referencias se revisaron el 5 de octubre de 2026; sus capacidades pueden evolucionar.
+
+El alcance específico que Setareh busca demostrar es distinto: llevar una compra de bienes de un comercio a través de una traza operable y verificable, `quote → settlement → orden`, sin sustituir el backoffice del comerciante.
+
+| Área | Afirmación verificable de Setareh | Límite honesto |
+| --- | --- | --- |
+| Ejecución de comercio | Congela un quote, vuelve a comprobar stock, verifica settlement x402 y crea como máximo una orden Shopify por quote. | La implementación actual sólo soporta Shopify. |
+| Evidencia operativa | Persiste el vínculo entre quote, resumen de pago y orden para conciliación; los fallos posteriores al settlement pasan a `manual_review`. | Un piloto externo y su reporte independiente siguen pendientes de confirmación y ejecución. |
+| Seguridad | Publica el modelo de amenazas, límites, runbook y estados de recuperación del flujo. | No es una auditoría externa, no hay mainnet ni custodia. |
+| Evolución | Mantendrá x402, políticas, quotes e idempotencia como núcleo independiente de plataforma. | Los adaptadores para otros comercios son trabajo futuro, no una integración disponible hoy. |
+
+Esta comparación no pretende afirmar que los otros proyectos carezcan de esas propiedades. StellarPay se presenta como gateway de pagos Stellar para Shopify, sitios web y aplicaciones; REAPP se presenta como una capa de autorización con mandatos de pago en Stellar. Setareh se concentra en el tramo operativo entre una liquidación válida y la orden conciliable de un comercio. Consulta las fuentes enlazadas antes de hacer afirmaciones comparativas más específicas.
+
+## Shopify primero; comercio extensible después
+
+Shopify es el primer conector porque ofrece catálogo, inventario y órdenes en un backoffice real para validar el piloto. El código actual es deliberadamente Shopify-específico: no afirma compatibilidad con otras plataformas.
+
+Después de validar el piloto, la evolución prevista es extraer un contrato de adaptador de comercio para descubrir catálogo, consultar disponibilidad, crear quotes, crear/consultar órdenes y registrar fulfillment. El núcleo de x402, las políticas, expiración, idempotencia, auditoría y conciliación debe quedar independiente del adaptador. Otros e-commerce, backoffices propios o comercio físico sólo se incorporarán con un alcance, comercio y presupuesto propios.
 
 ## Flujo de compra
 
@@ -133,6 +158,6 @@ La herramienta `pay_and_place_order` devuelve una URL HTTP completa cuando `SETA
 
 ## Alcance del MVP
 
-Setareh está diseñado para una hackathon y deliberadamente acotado: un comercio piloto, USDC testnet, quotes con tope configurable y una wallet de demo. Mainnet, tarjetas, descubrimiento mediante Bazaar, políticas avanzadas por colección/zona y custodia de wallets quedan fuera de esta versión.
+Setareh está diseñado para una hackathon y deliberadamente acotado: un comercio Shopify de referencia, USDC testnet, quotes con tope configurable y una wallet de demo. El piloto externo, mainnet, tarjetas, descubrimiento mediante Bazaar, políticas avanzadas por colección/zona, custodia de wallets y adaptadores para otras plataformas quedan fuera de esta versión.
 
-Consulta el [runbook operativo](Docs/RUNBOOK.md) y el README del [backend](backend/README.md) para más detalle.
+Consulta la [documentación pública](https://docs.setareh.site/), el [modelo de amenazas](Docs/seguridad.md), el [runbook operativo](Docs/RUNBOOK.md) y el README del [backend](backend/README.md) para más detalle.

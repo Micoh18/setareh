@@ -17,9 +17,13 @@ hero:
 ## Qué es Setareh
 
 Setareh conecta un agente con un comercio Shopify para completar compras bajo
-un flujo verificable. Shopify conserva la fuente de verdad de catálogo,
-inventario y pedidos; Setareh crea quotes y valida el pago antes de crear una
-orden.
+un flujo verificable. Shopify es el primer conector: conserva la fuente de
+verdad de catálogo, inventario y pedidos; Setareh crea quotes y valida el pago
+antes de crear una orden.
+
+La implementación pública actual sólo integra Shopify. La evolución a otros
+backoffices requiere adaptadores de comercio explícitos y no debe anunciarse
+como capacidad disponible antes de implementarla.
 
 ## Flujo
 
@@ -32,8 +36,8 @@ orden.
 ## Empieza aquí
 
 - [Primeros pasos](/primeros-pasos/): instala, configura y verifica el backend.
-- [Arquitectura](/arquitectura/): entiende las responsabilidades y el ciclo de
-  compra.
+- [Arquitectura](/arquitectura/): entiende las responsabilidades, el ciclo de
+  compra y el límite actual del adaptador Shopify.
 - [Runbook operativo](/runbook/): prepara y ejecuta un demo de forma segura.
 
 ## Integrar
@@ -46,7 +50,7 @@ orden.
 ## Operar con seguridad
 
 - [Configuración](/referencia/configuracion/)
-- [Seguridad y límites](/seguridad/)
+- [Seguridad, límites y modelo de amenazas](/seguridad/)
 - [Estados y recuperación](/operaciones/estados-y-recuperacion/)
 - [Uso por agentes](/agentes/)
 - [Mantener el portal](/portal-de-documentacion/)

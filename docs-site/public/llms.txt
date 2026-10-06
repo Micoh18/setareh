@@ -16,7 +16,7 @@ Documentación pública de Setareh, infraestructura de comercio verificable para
 - [Configuración](/referencia/configuracion/): Variables de entorno y límites de una instancia de Setareh.
 - [API HTTP y x402](/referencia/http-x402/): Endpoints HTTP del MVP y el ciclo de pago protegido con x402.
 - [Referencia MCP](/referencia/mcp/): Herramientas MCP disponibles para descubrir, cotizar y seguir una compra Setareh.
-- [Seguridad y límites](/seguridad/): Controles implementados, datos sensibles y límites que no deben confundirse con garantías de producción.
+- [Seguridad, límites y modelo de amenazas](/seguridad/): Controles implementados, límites del MVP, amenazas tratadas y riesgos que siguen abiertos.
 
 ## Límites
 

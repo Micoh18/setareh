@@ -11,8 +11,9 @@ clientes, identificadores de pedidos ni datos de incidentes en este archivo.
 
 Setareh permite que un agente consulte el catálogo Shopify, cree un quote con
 vigencia limitada y liquide USDC en Stellar testnet mediante x402. Tras validar
-el pago, el backend crea una orden en Shopify. El comercio piloto es
-Micohstore.
+el pago, el backend crea una orden en Shopify. Micohstore es el entorno de
+referencia usado durante el desarrollo; no debe presentarse como un comercio
+piloto externo sin una confirmación escrita de su propietario.
 
 El MVP opera sólo con `USDC` y `stellar:testnet`. No usar mainnet ni fondos
 reales.
