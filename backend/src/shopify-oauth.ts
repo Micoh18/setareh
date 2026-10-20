@@ -94,6 +94,8 @@ export type ShopifyOAuthOptions = {
   fetch?: typeof fetch;
   /** Overridable for tests; production always talks to https://{shop}. */
   adminOrigin?: (shop: string) => string;
+  /** Runs after tokens are stored, e.g. to subscribe the uninstall webhook. Failures are logged, not fatal. */
+  onInstalled?: (shop: string) => Promise<void>;
 };
 
 /** Authorization code grant with expiring offline tokens, as Shopify requires for apps installed on other organizations' stores. */
@@ -140,6 +142,9 @@ export class ShopifyOAuth {
     const missing = this.scopes.filter((scope) => !granted.includes(scope));
     if (missing.length) throw new ShopifyOAuthError("missing_scopes", `Shopify did not grant required scopes: ${missing.join(", ")}.`);
     this.saveTokens(shop.toLowerCase(), tokens);
+    if (this.options.onInstalled) {
+      try { await this.options.onInstalled(shop.toLowerCase()); } catch (error) { console.error(`Post-install step failed for ${shop.toLowerCase()}: ${error instanceof Error ? error.message : String(error)}`); }
+    }
     return { shop: shop.toLowerCase(), scopes: granted };
   }
 
@@ -244,8 +249,16 @@ export function shopifyOAuthFromEnvironment(db: SetarehDatabase, baseUrl: string
     }
     return undefined;
   }
-  const redirectUri = `${baseUrl.replace(/\/+$/, "")}${SHOPIFY_CALLBACK_PATH}`;
-  return new ShopifyOAuth({ db, cipher: new TokenCipher(encryptionKey), clientId, clientSecret, redirectUri });
+  const origin = baseUrl.replace(/\/+$/, "");
+  const apiVersion = process.env.SHOPIFY_API_VERSION ?? "2026-10";
+  const oauth: ShopifyOAuth = new ShopifyOAuth({
+    db, cipher: new TokenCipher(encryptionKey), clientId, clientSecret, redirectUri: `${origin}${SHOPIFY_CALLBACK_PATH}`,
+    onInstalled: async (shop) => {
+      const result = await new ShopifyClient(shop, apiVersion, oauth.tokenProvider(shop)).ensureUninstallWebhook(`${origin}${SHOPIFY_UNINSTALLED_WEBHOOK_PATH}`);
+      console.error(`app/uninstalled webhook ${result.action} for ${shop}`);
+    },
+  });
+  return oauth;
 }
 
 /** Wires the Shopify client for the configured store with the selected authentication mode. */

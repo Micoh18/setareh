@@ -12,7 +12,8 @@
     "demo:pay": "node ./node_modules/tsx/dist/cli.mjs src/demo-agent.ts",
     "doctor": "node ./node_modules/tsx/dist/cli.mjs src/doctor.ts",
     "reconcile:draft": "node ./node_modules/tsx/dist/cli.mjs src/reconcile-draft.ts",
-    "reconcile:order": "node ./node_modules/tsx/dist/cli.mjs src/reconcile-order.ts"
+    "reconcile:order": "node ./node_modules/tsx/dist/cli.mjs src/reconcile-order.ts",
+    "webhooks:ensure": "node ./node_modules/tsx/dist/cli.mjs src/webhooks-ensure.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.1.0",

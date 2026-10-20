@@ -122,6 +122,31 @@ export class ShopifyClient {
     return payload.data;
   }
 
+  /** Creates or repoints the app/uninstalled subscription for this store. Idempotent; returns the subscription id. */
+  async ensureUninstallWebhook(callbackUrl: string): Promise<{ id: string; action: "created" | "updated" | "unchanged" }> {
+    const existing = await this.graphql<{ webhookSubscriptions: { nodes: Array<{ id: string; endpoint: { __typename: string; callbackUrl?: string } }> } }>(
+      `query SetarehUninstallWebhook { webhookSubscriptions(first: 10, topics: [APP_UNINSTALLED]) { nodes { id endpoint { __typename ... on WebhookHttpEndpoint { callbackUrl } } } } }`,
+    );
+    const http = existing.webhookSubscriptions.nodes.filter((node) => node.endpoint.__typename === "WebhookHttpEndpoint");
+    const current = http.find((node) => node.endpoint.callbackUrl === callbackUrl);
+    if (current) return { id: current.id, action: "unchanged" };
+    if (http[0]) {
+      const data = await this.graphql<{ webhookSubscriptionUpdate: { webhookSubscription: { id: string } | null; userErrors: ShopifyUserError[] } }>(
+        `mutation UpdateSetarehUninstallWebhook($id: ID!, $webhookSubscription: WebhookSubscriptionInput!) { webhookSubscriptionUpdate(id: $id, webhookSubscription: $webhookSubscription) { webhookSubscription { id } userErrors { field message } } }`,
+        { id: http[0].id, webhookSubscription: { callbackUrl, format: "JSON" } },
+      );
+      assertNoUserErrors(data.webhookSubscriptionUpdate.userErrors, "Unable to update the app/uninstalled webhook");
+      return { id: http[0].id, action: "updated" };
+    }
+    const data = await this.graphql<{ webhookSubscriptionCreate: { webhookSubscription: { id: string } | null; userErrors: ShopifyUserError[] } }>(
+      `mutation CreateSetarehUninstallWebhook($webhookSubscription: WebhookSubscriptionInput!) { webhookSubscriptionCreate(topic: APP_UNINSTALLED, webhookSubscription: $webhookSubscription) { webhookSubscription { id } userErrors { field message } } }`,
+      { webhookSubscription: { callbackUrl, format: "JSON" } },
+    );
+    assertNoUserErrors(data.webhookSubscriptionCreate.userErrors, "Unable to create the app/uninstalled webhook");
+    if (!data.webhookSubscriptionCreate.webhookSubscription) throw new Error("Shopify did not return the app/uninstalled webhook subscription.");
+    return { id: data.webhookSubscriptionCreate.webhookSubscription.id, action: "created" };
+  }
+
   get domain() { return this.storeDomain; }
   get authMode() { return this.tokens.mode; }
 }

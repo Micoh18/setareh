@@ -39,7 +39,7 @@ En la configuración de la app en el Dev Dashboard de Shopify:
 | --- | --- |
 | App URL | `SETAREH_BASE_URL/shopify/install` |
 | Allowed redirection URL | `SETAREH_BASE_URL/shopify/oauth/callback` |
-| Webhook `app/uninstalled` | `SETAREH_BASE_URL/shopify/webhooks/app-uninstalled` |
+| Webhook `app/uninstalled` | Lo registra Setareh por API al completar cada instalación; para la tienda propia, `npm run webhooks:ensure`. |
 
 ## Setareh y quotes
 
