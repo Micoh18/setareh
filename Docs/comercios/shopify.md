@@ -12,6 +12,16 @@ encargo. Para el piloto usa una tienda de desarrollo y Stellar testnet.
 Setareh no necesita la contraseña de la tienda ni una clave privada de wallet.
 Las credenciales de la app pertenecen al entorno seguro del backend.
 
+## Instalar la app
+
+La tienda recibe un enlace de instalación del equipo de Setareh, lo abre con
+su sesión de Shopify y aprueba los permisos. Shopify devuelve el control a
+Setareh, que verifica la firma de Shopify y un identificador de un solo uso
+antes de guardar el acceso. La tienda no envía credenciales por chat ni correo.
+
+El acceso queda guardado cifrado y se renueva solo. Si la tienda desinstala la
+app, Shopify avisa a Setareh y este borra sus tokens.
+
 ## Permisos solicitados
 
 | Scope | Motivo |

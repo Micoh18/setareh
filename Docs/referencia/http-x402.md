@@ -15,6 +15,15 @@ Con `PORT=4020`, Setareh expone estos endpoints HTTP:
 | `POST` | `/v1/quotes/:quoteId/pay-and-place` | Pagar con x402 y crear una orden. |
 | `GET` | `/v1/orders/:orderId` | Estado de quote u orden. |
 
+Si la instancia tiene configurada la instalación OAuth de Shopify, expone
+además estas rutas, usadas por Shopify y no por agentes:
+
+| Método | Ruta | Uso |
+| --- | --- | --- |
+| `GET` | `/shopify/install?shop=<tienda>.myshopify.com` | Inicia la autorización y redirige a Shopify. |
+| `GET` | `/shopify/oauth/callback` | Recibe el código, verifica HMAC y `state`, y guarda tokens cifrados. |
+| `POST` | `/shopify/webhooks/app-uninstalled` | Verifica la firma del webhook y borra los tokens de la tienda. |
+
 ## Crear un quote
 
 El cuerpo de `POST /v1/quotes` corresponde al de `create_quote` en MCP. Los

@@ -31,6 +31,7 @@ description: Controles implementados, límites del MVP, amenazas tratadas y ries
 | Quote, estado de pago e idempotencia | Setareh | Se persisten para impedir que un reintento cree dos órdenes. |
 | Autorización/settlement x402 | Wallet y facilitador | Setareh verifica requisitos del pago antes de crear la orden. |
 | Secretos Shopify y operación | Comercio/operador | Nunca se publican en docs, logs ni respuestas MCP. |
+| Tokens OAuth de cada tienda | Setareh | Se guardan cifrados con AES-256-GCM ligados a la tienda y se borran al desinstalar. |
 
 ### Amenazas, controles y riesgo residual
 
@@ -41,6 +42,7 @@ description: Controles implementados, límites del MVP, amenazas tratadas y ries
 | Shopify falla después de un settlement válido | Se conserva evidencia y el estado pasa a `manual_review`; el runbook impide reintentar el pago a ciegas. | No hay reembolso automático ni resolución comercial automatizada. |
 | Facilitador o respuesta x402 no coincide con el quote | Se valida el requisito de pago y su settlement antes de completar Shopify. | El facilitador sigue siendo una dependencia externa que debe evaluarse para producción. |
 | Se filtran claves, PII o receipts | `.env` está ignorado, `get_order_status` entrega un resumen y los docs prohíben publicar datos sensibles. | No hay gestor centralizado de secretos, DLP ni auditoría externa en el MVP. |
+| Instalación OAuth falsificada o repetida | El callback exige firma HMAC de Shopify, dominio `*.myshopify.com` anclado y un `state` de un solo uso que vence en 10 minutos; el webhook de desinstalación exige firma sobre el cuerpo crudo. | La clave de cifrado vive en el entorno del servidor; quien controle ese entorno puede descifrar los tokens. |
 | Endpoint público recibe abuso o tráfico no autorizado | No se debe exponer el servidor local; producción requeriría HTTPS, control de acceso y rate limiting. | Esos controles aún no están implementados como servicio público. |
 
 ## Datos que nunca deben aparecer en este sitio
@@ -58,7 +60,7 @@ genera únicamente desde `Docs/`.
 
 Setareh no es todavía un servicio de producción. No incluye autenticación,
 autorización multi-tenant, rate limiting, gestión de secretos, webhooks de
-Shopify, monitoreo centralizado, reembolsos automáticos, soporte mainnet ni
+Shopify distintos de la desinstalación, monitoreo centralizado, reembolsos automáticos, soporte mainnet ni
 políticas avanzadas por colección o zona.
 
 No publiques el HTTP local directamente. Una exposición productiva requiere,

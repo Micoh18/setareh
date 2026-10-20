@@ -4,6 +4,7 @@ import { paymentMiddleware } from "@x402/express";
 import { ExactStellarScheme } from "@x402/stellar/exact/server";
 import * as z from "zod/v4";
 import { CommerceService } from "./commerce.js";
+import { SHOPIFY_CALLBACK_PATH, SHOPIFY_INSTALL_PATH, SHOPIFY_UNINSTALLED_WEBHOOK_PATH, ShopifyOAuth, ShopifyOAuthError, isValidShopDomain, verifyQueryHmac, verifyWebhookHmac } from "./shopify-oauth.js";
 
 const addressSchema = z.object({ address1: z.string().min(3), address2: z.string().optional(), city: z.string().min(2), province: z.string().optional(), country: z.string().min(2), zip: z.string().min(3), firstName: z.string().min(1), lastName: z.string().min(1), phone: z.string().optional() });
 const quoteSchema = z.object({ merchantId: z.string().min(1), items: z.array(z.object({ variantId: z.string().startsWith("gid://shopify/ProductVariant/"), quantity: z.number().int().min(1).max(20) })).min(1).max(10), email: z.string().email(), shippingAddress: addressSchema, userConfirmed: z.literal(true) });
@@ -22,9 +23,52 @@ function transactionHash(value: unknown): string | undefined {
   return undefined;
 }
 
-export function createHttpApp(service: CommerceService) {
+function queryParams(request: { originalUrl: string }) {
+  return new URL(request.originalUrl, "http://setareh.invalid").searchParams;
+}
+
+function installPage(title: string, message: string) {
+  // Only static strings and validated *.myshopify.com domains reach this template.
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title></head><body style="font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem;line-height:1.5"><h1 style="font-size:1.4rem">${title}</h1><p>${message}</p></body></html>`;
+}
+
+function registerShopifyOAuthRoutes(app: ReturnType<typeof express>, oauth: ShopifyOAuth) {
+  // Shopify signs the raw webhook body, so this route must read it before express.json() parses it.
+  app.post(SHOPIFY_UNINSTALLED_WEBHOOK_PATH, express.raw({ type: "*/*", limit: "64kb" }), (request: any, response: any) => {
+    const body = Buffer.isBuffer(request.body) ? request.body : Buffer.alloc(0);
+    if (!verifyWebhookHmac(body, request.get("x-shopify-hmac-sha256"), oauth.clientSecret)) return response.status(401).json({ error: { code: "invalid_hmac" } });
+    const shop = request.get("x-shopify-shop-domain");
+    if (!isValidShopDomain(shop)) return response.status(400).json({ error: { code: "invalid_shop" } });
+    oauth.revoke(shop);
+    return response.status(200).json({ ok: true });
+  });
+
+  app.get(SHOPIFY_INSTALL_PATH, (request: any, response: any) => {
+    const params = queryParams(request);
+    const shop = params.get("shop");
+    if (!isValidShopDomain(shop)) return response.status(400).type("html").send(installPage("Tienda no válida", "Abre la instalación con el dominio *.myshopify.com de tu tienda."));
+    // Launches from Shopify Admin are signed; a forged signature is rejected. Unsigned links still require consent inside Shopify.
+    if (params.has("hmac") && !verifyQueryHmac(params, oauth.clientSecret)) return response.status(401).type("html").send(installPage("Solicitud no válida", "La firma de Shopify no coincide. Vuelve a abrir la app desde Shopify Admin."));
+    return response.redirect(302, oauth.beginInstall(shop));
+  });
+
+  app.get(SHOPIFY_CALLBACK_PATH, async (request: any, response: any) => {
+    try {
+      const result = await oauth.completeInstall(queryParams(request));
+      return response.status(200).type("html").send(installPage("Setareh quedó conectado", `La tienda ${result.shop} autorizó a Setareh. Puedes cerrar esta ventana y avisar al equipo de Setareh.`));
+    } catch (error) {
+      const status = error instanceof ShopifyOAuthError ? error.status : 500;
+      const code = error instanceof ShopifyOAuthError ? error.code : "internal_error";
+      console.error(`Shopify OAuth callback rejected: ${code}`);
+      return response.status(status).type("html").send(installPage("No se pudo completar la instalación", `Shopify no confirmó la autorización (${code}). Vuelve a abrir el enlace de instalación.`));
+    }
+  });
+}
+
+export function createHttpApp(service: CommerceService, options: { shopifyOAuth?: ShopifyOAuth } = {}) {
   const app = express();
   app.disable("x-powered-by");
+  if (options.shopifyOAuth) registerShopifyOAuthRoutes(app, options.shopifyOAuth);
   app.use(express.json({ limit: "64kb" }));
 
   app.get("/health", (_request: any, response: any) => response.json({ ok: true, service: "setareh", network: service.config.stellarNetwork }));
