@@ -4,6 +4,7 @@ import { paymentMiddleware } from "@x402/express";
 import { ExactStellarScheme } from "@x402/stellar/exact/server";
 import * as z from "zod/v4";
 import { CommerceService } from "./commerce.js";
+import { DEFAULT_QUOTE_RATE_LIMITS, SlidingWindowLimiter, clientKey, type QuoteRateLimits } from "./rate-limit.js";
 import { SHOPIFY_CALLBACK_PATH, SHOPIFY_INSTALL_PATH, SHOPIFY_UNINSTALLED_WEBHOOK_PATH, ShopifyOAuth, ShopifyOAuthError, isValidShopDomain, verifyQueryHmac, verifyWebhookHmac } from "./shopify-oauth.js";
 
 const addressSchema = z.object({ address1: z.string().min(3), address2: z.string().optional(), city: z.string().min(2), province: z.string().optional(), country: z.string().min(2), zip: z.string().min(3), firstName: z.string().min(1), lastName: z.string().min(1), phone: z.string().optional() });
@@ -65,9 +66,20 @@ function registerShopifyOAuthRoutes(app: ReturnType<typeof express>, oauth: Shop
   });
 }
 
-export function createHttpApp(service: CommerceService, options: { shopifyOAuth?: ShopifyOAuth } = {}) {
+export function createHttpApp(service: CommerceService, options: { shopifyOAuth?: ShopifyOAuth; quoteRateLimits?: QuoteRateLimits } = {}) {
   const app = express();
   app.disable("x-powered-by");
+  // Every quote creates a real Shopify draft order, so quote creation is throttled per client and globally.
+  const limits = options.quoteRateLimits ?? service.config.quoteRateLimits ?? DEFAULT_QUOTE_RATE_LIMITS;
+  const perClient = new SlidingWindowLimiter(limits.perClientPerHour, 3_600_000);
+  const global = new SlidingWindowLimiter(limits.globalPerHour, 3_600_000);
+  const throttleQuotes = (request: any, response: any, next: any) => {
+    if (!perClient.allow(clientKey(request)) || !global.allow("global")) {
+      response.set("Retry-After", "3600");
+      return response.status(429).json({ error: { code: "rate_limited", message: "Too many quotes were requested. Retry later." } });
+    }
+    return next();
+  };
   if (options.shopifyOAuth) registerShopifyOAuthRoutes(app, options.shopifyOAuth);
   app.use(express.json({ limit: "64kb" }));
 
@@ -78,7 +90,7 @@ export function createHttpApp(service: CommerceService, options: { shopifyOAuth?
   });
   app.get("/v1/catalog", async (request: any, response: any, next: any) => { try { response.json(await service.searchCatalog(String(request.query.query ?? ""), Math.min(Math.max(Number(request.query.limit ?? 10), 1), 25))); } catch (error) { next(error); } });
   app.get("/v1/availability/:variantId", async (request: any, response: any, next: any) => { try { response.json(await service.checkAvailability(request.params.variantId, Math.min(Math.max(Number(request.query.quantity ?? 1), 1), 20))); } catch (error) { next(error); } });
-  app.post("/v1/quotes", async (request: any, response: any, next: any) => { try { response.status(201).json(await service.createQuote(quoteSchema.parse(request.body))); } catch (error) { next(error); } });
+  app.post("/v1/quotes", throttleQuotes, async (request: any, response: any, next: any) => { try { response.status(201).json(await service.createQuote(quoteSchema.parse(request.body))); } catch (error) { next(error); } });
 
   const resourceServer = new x402ResourceServer(new HTTPFacilitatorClient({ url: service.config.facilitatorUrl }))
     .register(service.config.stellarNetwork, new ExactStellarScheme())

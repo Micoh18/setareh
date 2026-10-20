@@ -41,7 +41,16 @@ export type SetarehConfig = {
   shippingTitle?: string;
   port?: number;
   httpHost?: string;
+  quoteRateLimits?: { perClientPerHour: number; globalPerHour: number };
 };
+
+function positiveInteger(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1) throw new Error(`${name} must be a positive integer.`);
+  return value;
+}
 
 export function loadConfig(): SetarehConfig {
   const network = process.env.STELLAR_NETWORK ?? "stellar:testnet";
@@ -82,5 +91,6 @@ export function loadConfig(): SetarehConfig {
     shippingTitle: process.env.SETAREH_SHIPPING_TITLE ?? "Despacho Setareh",
     port,
     httpHost: process.env.SETAREH_HTTP_HOST ?? "127.0.0.1",
+    quoteRateLimits: { perClientPerHour: positiveInteger("SETAREH_QUOTES_PER_CLIENT_PER_HOUR", 10), globalPerHour: positiveInteger("SETAREH_QUOTES_PER_HOUR", 60) },
   };
 }

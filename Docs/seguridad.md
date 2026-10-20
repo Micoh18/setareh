@@ -43,7 +43,7 @@ description: Controles implementados, límites del MVP, amenazas tratadas y ries
 | Facilitador o respuesta x402 no coincide con el quote | Se valida el requisito de pago y su settlement antes de completar Shopify. | El facilitador sigue siendo una dependencia externa que debe evaluarse para producción. |
 | Se filtran claves, PII o receipts | `.env` está ignorado, `get_order_status` entrega un resumen y los docs prohíben publicar datos sensibles. | No hay gestor centralizado de secretos, DLP ni auditoría externa en el MVP. |
 | Instalación OAuth falsificada o repetida | El callback exige firma HMAC de Shopify, dominio `*.myshopify.com` anclado y un `state` de un solo uso que vence en 10 minutos; el webhook de desinstalación exige firma sobre el cuerpo crudo. | La clave de cifrado vive en el entorno del servidor; quien controle ese entorno puede descifrar los tokens. |
-| Endpoint público recibe abuso o tráfico no autorizado | No se debe exponer el servidor local; producción requeriría HTTPS, control de acceso y rate limiting. | Esos controles aún no están implementados como servicio público. |
+| Endpoint público recibe abuso o tráfico no autorizado | La creación de quotes, que genera drafts reales en Shopify, está limitada por cliente y en total por hora (`429` con `Retry-After`); el despliegue termina HTTPS. | El límite vive en memoria de una sola instancia; no hay autenticación de agentes, WAF ni control de acceso por comercio. |
 
 ## Datos que nunca deben aparecer en este sitio
 
@@ -59,7 +59,7 @@ genera únicamente desde `Docs/`.
 ## Límites del MVP
 
 Setareh no es todavía un servicio de producción. No incluye autenticación,
-autorización multi-tenant, rate limiting, gestión de secretos, webhooks de
+autorización multi-tenant, rate limiting más allá de la creación de quotes, gestión de secretos, webhooks de
 Shopify distintos de la desinstalación, monitoreo centralizado, reembolsos automáticos, soporte mainnet ni
 políticas avanzadas por colección o zona.
 

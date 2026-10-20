@@ -55,6 +55,8 @@ En la configuración de la app en el Dev Dashboard de Shopify:
 | `SETAREH_SHIPPING_TITLE` | No | Nombre del despacho en Shopify. |
 | `SETAREH_MAX_QUOTE_USDC` | No | Tope de gasto del servidor; por defecto `30`. |
 | `QUOTE_TTL_MINUTES` | No | Vida del quote; por defecto `10` minutos. |
+| `SETAREH_QUOTES_PER_CLIENT_PER_HOUR` | No | Máximo de `POST /v1/quotes` por cliente y hora; por defecto `10`. |
+| `SETAREH_QUOTES_PER_HOUR` | No | Máximo global de `POST /v1/quotes` por hora; por defecto `60`. Cada quote crea un draft real en Shopify. |
 
 La tasa y el total USDC se congelan dentro de cada quote. Si cambian artículos,
 cantidad, dirección, despacho o presupuesto, descarta el quote y crea otro.
