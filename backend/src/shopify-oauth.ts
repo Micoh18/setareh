@@ -14,6 +14,13 @@ const TOKEN_REFRESH_MARGIN_MS = 5 * 60_000;
 // Anchored at both ends so hosts such as "shop.myshopify.com.attacker.example" are rejected.
 const SHOP_DOMAIN_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$/;
 
+/** Shopify lists granted scopes without the read_* scopes that write_* scopes imply. */
+export function expandGrantedScopes(scope: string) {
+  const granted = new Set(scope.split(",").map((value) => value.trim()).filter(Boolean));
+  for (const value of [...granted]) if (value.startsWith("write_")) granted.add(`read_${value.slice("write_".length)}`);
+  return [...granted];
+}
+
 export class ShopifyOAuthError extends Error {
   constructor(readonly code: string, message: string, readonly status = 400) { super(message); }
 }
@@ -138,7 +145,7 @@ export class ShopifyOAuth {
     if (!code) throw new ShopifyOAuthError("missing_code", "OAuth callback did not include an authorization code.");
 
     const tokens = await this.requestTokens(shop.toLowerCase(), { code, expiring: "1" });
-    const granted = tokens.scope.split(",").map((scope) => scope.trim()).filter(Boolean);
+    const granted = expandGrantedScopes(tokens.scope);
     const missing = this.scopes.filter((scope) => !granted.includes(scope));
     if (missing.length) throw new ShopifyOAuthError("missing_scopes", `Shopify did not grant required scopes: ${missing.join(", ")}.`);
     this.saveTokens(shop.toLowerCase(), tokens);

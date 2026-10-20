@@ -9,7 +9,7 @@ import { CommerceService } from "./commerce.js";
 import type { SetarehConfig } from "./config.js";
 import { SetarehDatabase } from "./db.js";
 import { createHttpApp } from "./http.js";
-import { SHOPIFY_REQUIRED_SCOPES, ShopifyOAuth, TokenCipher, isValidShopDomain, queryHmacMessage, verifyQueryHmac, verifyWebhookHmac } from "./shopify-oauth.js";
+import { SHOPIFY_REQUIRED_SCOPES, ShopifyOAuth, TokenCipher, expandGrantedScopes, isValidShopDomain, queryHmacMessage, verifyQueryHmac, verifyWebhookHmac } from "./shopify-oauth.js";
 
 const clientId = "test-client-id";
 const clientSecret = "test-client-secret";
@@ -135,6 +135,15 @@ test("rejects callbacks with a forged signature, unknown state or another shop",
     const otherShopState = new URL(oauth.beginInstall("otra.myshopify.com")).searchParams.get("state")!;
     await assert.rejects(oauth.completeInstall(sign(new URLSearchParams({ code: "c", shop, state: otherShopState, timestamp: "1" }))), /state/i);
     assert.equal(shopify.calls.length, 0, "no code exchange happens for rejected callbacks");
+  } finally { cleanup(); }
+});
+
+test("accepts the scope list Shopify returns, where write_* implies read_*", async () => {
+  assert.deepEqual(expandGrantedScopes("read_products,read_inventory,write_draft_orders,write_orders").sort(), ["read_draft_orders", "read_inventory", "read_orders", "read_products", "write_draft_orders", "write_orders"]);
+  const { oauth, cleanup } = setup({ scope: "read_products,read_inventory,write_draft_orders,write_orders" });
+  try {
+    await oauth.completeInstall(callbackFor(oauth.beginInstall(shop)));
+    assert.equal(oauth.installationStatus(shop).installed, true);
   } finally { cleanup(); }
 });
 
