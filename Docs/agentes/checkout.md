@@ -58,6 +58,22 @@ Ese cliente obtiene primero el desafío, verifica red, activo y límite, y sólo
 entonces configura el firmante Ed25519 para el reintento x402. Es una referencia
 de seguridad para integrar otra wallet; no es una custodia de producción.
 
+## Usar el entorno publicado
+
+El cliente de referencia y cualquier wallet pueden apuntar al piloto publicado
+en lugar de una instancia local. En `backend/agent.env`:
+
+```ini
+SETAREH_API_URL=https://api.setareh.site
+AGENT_MAX_USDC=5
+# AGENT_STELLAR_PRIVATE_KEY se queda en este archivo local; nunca viaja al servidor.
+```
+
+El servidor nunca recibe la clave privada: la wallet firma el reintento x402 en
+local y Setareh sólo ve la prueba de pago que el facilitador liquida. Mantén
+`AGENT_MAX_USDC` igual o por debajo del tope del servidor (`30` USDC por quote
+en el piloto) y usa únicamente fondos de `stellar:testnet`.
+
 ## Resultado y lenguaje seguro
 
 Di “orden creada” solamente si Setareh devuelve `created` y un identificador de

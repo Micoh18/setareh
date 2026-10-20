@@ -38,6 +38,24 @@ evidencia duradera de fondos reales.
   sitio desplegado. Tras cada subida se debe comprobar que coincida con la
   revisión revisada en GitHub.
 
+## Entorno de piloto y CI
+
+Semana 1 del sprint: servicio desplegable, configuración por entorno, guía de
+release y CI. Estado al 20 de octubre de 2026:
+
+| Evidencia | Dónde comprobarla |
+| --- | --- |
+| URL del entorno HTTPS | `https://api.setareh.site/health` responde `{"ok":true,"service":"setareh","network":"stellar:testnet"}`; `http://` redirige con `301` |
+| Guía de despliegue sin secretos | [Despliegue y release](/operaciones/despliegue/) |
+| Configuración para agentes | [Usar el entorno publicado](/agentes/checkout/#usar-el-entorno-publicado) |
+| CI por cambio | [Pull request #1](https://github.com/Micoh18/setareh/pull/1); ejecuciones en verde para `400fc93` ([run](https://github.com/Micoh18/setareh/actions/runs/39361385460)), `3b8e77a` ([run](https://github.com/Micoh18/setareh/actions/runs/39361595515)), `2082d9c` ([run](https://github.com/Micoh18/setareh/actions/runs/39445624748)) y `c64e061` ([run](https://github.com/Micoh18/setareh/actions/runs/39468296438)) |
+| Pruebas automatizadas | 35 pruebas en `backend/src/*.test.ts`, incluidas OAuth (firma, dominio, cifrado, replay, renovación) y límite de peticiones |
+| Instalación Shopify sin compartir secretos | La tienda de referencia instaló la app por OAuth el 20 de octubre de 2026; tokens cifrados y renovación automática verificados con el preflight dentro de la instancia |
+
+Lo que esta evidencia no demuestra: ninguna compra de un evaluador externo,
+ningún uso en mainnet y ninguna garantía de disponibilidad. El proveedor de
+infraestructura y sus consolas no se publican.
+
 ## Criterio para declarar un piloto externo
 
 Un piloto con un comercio de un tercero se publicará como tal sólo cuando se

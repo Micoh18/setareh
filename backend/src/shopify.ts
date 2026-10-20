@@ -13,24 +13,44 @@ export function quoteTags(quoteId: string): string[] {
 type GraphQlResponse<T> = { data?: T; errors?: Array<{ message: string }> };
 const variantFields = `id title sku price inventoryQuantity inventoryPolicy availableForSale product { id title handle status featuredMedia { preview { image { url } } } }`;
 
-export class ShopifyClient {
-  private readonly endpoint: string;
-  private readonly accessScopesEndpoint: string;
+export type ShopifyAccessTokenProvider = { readonly mode: string; getAccessToken(): Promise<string> };
+
+/** Client credentials grant: only valid when the app and the store belong to the same Shopify organization. */
+export class ClientCredentialsTokenProvider implements ShopifyAccessTokenProvider {
+  readonly mode = "client_credentials";
   private accessToken: string | undefined;
   private tokenExpiresAt = 0;
 
-  constructor(private readonly storeDomain: string, private readonly clientId: string, private readonly clientSecret: string, apiVersion: string) {
+  constructor(private readonly storeDomain: string, private readonly clientId: string, private readonly clientSecret: string) {}
+
+  async getAccessToken(): Promise<string> {
+    if (this.accessToken && Date.now() < this.tokenExpiresAt - 60_000) return this.accessToken;
+    const response = await fetch(`https://${this.storeDomain}/admin/oauth/access_token`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "client_credentials", client_id: this.clientId, client_secret: this.clientSecret }) });
+    const payload = await response.json() as { access_token?: string; expires_in?: number; error?: string; error_description?: string };
+    if (!response.ok || !payload.access_token) throw new Error(`Shopify token request failed (${response.status}): ${payload.error_description ?? payload.error ?? "unknown error"}`);
+    this.accessToken = payload.access_token;
+    this.tokenExpiresAt = Date.now() + (payload.expires_in ?? 86_399) * 1_000;
+    return this.accessToken;
+  }
+}
+
+export type ShopifyEnvironment = { storeDomain: string; clientId: string; clientSecret: string; apiVersion: string };
+
+export function shopifyEnvironment(): ShopifyEnvironment {
+  const storeDomain = process.env.SHOPIFY_STORE_DOMAIN?.trim().toLowerCase();
+  const clientId = process.env.SHOPIFY_CLIENT_ID?.trim();
+  const clientSecret = process.env.SHOPIFY_CLIENT_SECRET?.trim();
+  if (!storeDomain || !clientId || !clientSecret) throw new Error("Shopify is not configured. Set SHOPIFY_STORE_DOMAIN, SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET in backend/.env.");
+  return { storeDomain, clientId, clientSecret, apiVersion: process.env.SHOPIFY_API_VERSION ?? "2026-10" };
+}
+
+export class ShopifyClient {
+  private readonly endpoint: string;
+  private readonly accessScopesEndpoint: string;
+
+  constructor(private readonly storeDomain: string, apiVersion: string, private readonly tokens: ShopifyAccessTokenProvider) {
     this.endpoint = `https://${storeDomain}/admin/api/${apiVersion}/graphql.json`;
     this.accessScopesEndpoint = `https://${storeDomain}/admin/oauth/access_scopes.json`;
-  }
-
-  static fromEnvironment(): ShopifyClient {
-    const storeDomain = process.env.SHOPIFY_STORE_DOMAIN;
-    const clientId = process.env.SHOPIFY_CLIENT_ID;
-    const clientSecret = process.env.SHOPIFY_CLIENT_SECRET;
-    const apiVersion = process.env.SHOPIFY_API_VERSION ?? "2026-10";
-    if (!storeDomain || !clientId || !clientSecret) throw new Error("Shopify is not configured. Set SHOPIFY_STORE_DOMAIN, SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET in backend/.env.");
-    return new ShopifyClient(storeDomain, clientId, clientSecret, apiVersion);
   }
 
   async searchVariants(query: string, limit: number): Promise<ShopifyVariant[]> {
@@ -44,7 +64,7 @@ export class ShopifyClient {
   }
 
   async getAccessScopes(): Promise<string[]> {
-    const response = await fetch(this.accessScopesEndpoint, { headers: { "X-Shopify-Access-Token": await this.getAccessToken() } });
+    const response = await fetch(this.accessScopesEndpoint, { headers: { "X-Shopify-Access-Token": await this.tokens.getAccessToken() } });
     const payload = await response.json() as { access_scopes?: Array<{ handle?: string }> };
     if (!response.ok || !payload.access_scopes) throw new Error(`Unable to inspect Shopify access scopes (${response.status}).`);
     return payload.access_scopes.flatMap((scope) => scope.handle ? [scope.handle] : []);
@@ -94,24 +114,41 @@ export class ShopifyClient {
   }
 
   async graphql<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
-    const response = await fetch(this.endpoint, { method: "POST", headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": await this.getAccessToken() }, body: JSON.stringify({ query, variables }) });
+    const response = await fetch(this.endpoint, { method: "POST", headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": await this.tokens.getAccessToken() }, body: JSON.stringify({ query, variables }) });
+    if (response.status === 401) throw new Error(`Shopify rejected Setareh's access token (401) using ${this.tokens.mode}. Verify that the app is still installed on ${this.storeDomain}.`);
     const payload = await response.json() as GraphQlResponse<T>;
     if (!response.ok || payload.errors?.length) throw new Error(`Shopify Admin API error (${response.status}): ${payload.errors?.map((error) => error.message).join("; ") ?? response.statusText}`);
     if (!payload.data) throw new Error("Shopify Admin API returned no data.");
     return payload.data;
   }
 
-  get domain() { return this.storeDomain; }
-
-  private async getAccessToken(): Promise<string> {
-    if (this.accessToken && Date.now() < this.tokenExpiresAt - 60_000) return this.accessToken;
-    const response = await fetch(`https://${this.storeDomain}/admin/oauth/access_token`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "client_credentials", client_id: this.clientId, client_secret: this.clientSecret }) });
-    const payload = await response.json() as { access_token?: string; expires_in?: number; error?: string; error_description?: string };
-    if (!response.ok || !payload.access_token) throw new Error(`Shopify token request failed (${response.status}): ${payload.error_description ?? payload.error ?? "unknown error"}`);
-    this.accessToken = payload.access_token;
-    this.tokenExpiresAt = Date.now() + (payload.expires_in ?? 86_399) * 1_000;
-    return this.accessToken;
+  /** Creates or repoints the app/uninstalled subscription for this store. Idempotent; returns the subscription id. */
+  async ensureUninstallWebhook(callbackUrl: string): Promise<{ id: string; action: "created" | "updated" | "unchanged" }> {
+    const existing = await this.graphql<{ webhookSubscriptions: { nodes: Array<{ id: string; endpoint: { __typename: string; callbackUrl?: string } }> } }>(
+      `query SetarehUninstallWebhook { webhookSubscriptions(first: 10, topics: [APP_UNINSTALLED]) { nodes { id endpoint { __typename ... on WebhookHttpEndpoint { callbackUrl } } } } }`,
+    );
+    const http = existing.webhookSubscriptions.nodes.filter((node) => node.endpoint.__typename === "WebhookHttpEndpoint");
+    const current = http.find((node) => node.endpoint.callbackUrl === callbackUrl);
+    if (current) return { id: current.id, action: "unchanged" };
+    if (http[0]) {
+      const data = await this.graphql<{ webhookSubscriptionUpdate: { webhookSubscription: { id: string } | null; userErrors: ShopifyUserError[] } }>(
+        `mutation UpdateSetarehUninstallWebhook($id: ID!, $webhookSubscription: WebhookSubscriptionInput!) { webhookSubscriptionUpdate(id: $id, webhookSubscription: $webhookSubscription) { webhookSubscription { id } userErrors { field message } } }`,
+        { id: http[0].id, webhookSubscription: { callbackUrl, format: "JSON" } },
+      );
+      assertNoUserErrors(data.webhookSubscriptionUpdate.userErrors, "Unable to update the app/uninstalled webhook");
+      return { id: http[0].id, action: "updated" };
+    }
+    const data = await this.graphql<{ webhookSubscriptionCreate: { webhookSubscription: { id: string } | null; userErrors: ShopifyUserError[] } }>(
+      `mutation CreateSetarehUninstallWebhook($webhookSubscription: WebhookSubscriptionInput!) { webhookSubscriptionCreate(topic: APP_UNINSTALLED, webhookSubscription: $webhookSubscription) { webhookSubscription { id } userErrors { field message } } }`,
+      { webhookSubscription: { callbackUrl, format: "JSON" } },
+    );
+    assertNoUserErrors(data.webhookSubscriptionCreate.userErrors, "Unable to create the app/uninstalled webhook");
+    if (!data.webhookSubscriptionCreate.webhookSubscription) throw new Error("Shopify did not return the app/uninstalled webhook subscription.");
+    return { id: data.webhookSubscriptionCreate.webhookSubscription.id, action: "created" };
   }
+
+  get domain() { return this.storeDomain; }
+  get authMode() { return this.tokens.mode; }
 }
 
 export function assertNoUserErrors(errors: ShopifyUserError[], action: string) { if (errors.length) throw new Error(`${action}: ${errors.map((error) => error.message).join("; ")}`); }

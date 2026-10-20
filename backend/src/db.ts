@@ -31,6 +31,18 @@ export type OrderRecord = {
   createdAt: string;
 };
 
+export type ShopifyInstallationRecord = {
+  shop: string;
+  scope: string;
+  status: "active" | "uninstalled";
+  accessTokenEnc: string | null;
+  accessTokenExpiresAt: string | null;
+  refreshTokenEnc: string | null;
+  refreshTokenExpiresAt: string | null;
+  installedAt: string;
+  updatedAt: string;
+};
+
 function now() { return new Date().toISOString(); }
 
 export class SetarehDatabase {
@@ -69,6 +81,15 @@ export class SetarehDatabase {
         id TEXT PRIMARY KEY, quote_id TEXT NOT NULL UNIQUE, shopify_order_id TEXT NOT NULL,
         shopify_order_name TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL,
         FOREIGN KEY (quote_id) REFERENCES quote(id)
+      ) STRICT;
+      CREATE TABLE IF NOT EXISTS shopify_oauth_state (
+        state TEXT PRIMARY KEY, shop TEXT NOT NULL, expires_at TEXT NOT NULL
+      ) STRICT;
+      CREATE TABLE IF NOT EXISTS shopify_installation (
+        shop TEXT PRIMARY KEY, scope TEXT NOT NULL, status TEXT NOT NULL,
+        access_token_enc TEXT, access_token_expires_at TEXT,
+        refresh_token_enc TEXT, refresh_token_expires_at TEXT,
+        installed_at TEXT NOT NULL, updated_at TEXT NOT NULL
       ) STRICT;
     `);
     const merchantColumns = this.db.prepare("PRAGMA table_info(merchant)").all() as Array<{ name: string }>;
@@ -158,6 +179,41 @@ export class SetarehDatabase {
 
   getPayment(quoteId: string) {
     return this.db.prepare("SELECT network, asset, amount, pay_to, stellar_transaction_hash, facilitator_receipt_json, status, settled_at FROM payment WHERE quote_id = ?").get(quoteId) as Record<string, unknown> | undefined;
+  }
+
+  createOAuthState(state: string, shop: string, expiresAt: string) {
+    this.db.prepare("DELETE FROM shopify_oauth_state WHERE expires_at <= ?").run(now());
+    this.db.prepare("INSERT INTO shopify_oauth_state (state, shop, expires_at) VALUES (?, ?, ?)").run(state, shop, expiresAt);
+  }
+
+  /** Deletes the nonce in the same statement that reads it, so a callback can be accepted at most once. */
+  consumeOAuthState(state: string): { shop: string } | undefined {
+    const row = this.db.prepare("DELETE FROM shopify_oauth_state WHERE state = ? RETURNING shop, expires_at").get(state) as { shop: string; expires_at: string } | undefined;
+    if (!row || new Date(row.expires_at).getTime() <= Date.now()) return undefined;
+    return { shop: row.shop };
+  }
+
+  saveShopifyInstallation(input: { shop: string; scope: string; accessTokenEnc: string; accessTokenExpiresAt: string | null; refreshTokenEnc: string | null; refreshTokenExpiresAt: string | null }) {
+    const at = now();
+    this.db.prepare(`INSERT INTO shopify_installation (shop, scope, status, access_token_enc, access_token_expires_at, refresh_token_enc, refresh_token_expires_at, installed_at, updated_at)
+      VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(shop) DO UPDATE SET scope = excluded.scope, status = 'active', access_token_enc = excluded.access_token_enc, access_token_expires_at = excluded.access_token_expires_at,
+        refresh_token_enc = excluded.refresh_token_enc, refresh_token_expires_at = excluded.refresh_token_expires_at, updated_at = excluded.updated_at,
+        installed_at = CASE WHEN shopify_installation.status = 'active' THEN shopify_installation.installed_at ELSE excluded.installed_at END`)
+      .run(input.shop, input.scope, input.accessTokenEnc, input.accessTokenExpiresAt, input.refreshTokenEnc, input.refreshTokenExpiresAt, at, at);
+  }
+
+  getShopifyInstallation(shop: string): ShopifyInstallationRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM shopify_installation WHERE shop = ?").get(shop) as Record<string, unknown> | undefined;
+    if (!row) return undefined;
+    const text = (value: unknown) => (value === null || value === undefined ? null : String(value));
+    return { shop: String(row.shop), scope: String(row.scope), status: row.status as ShopifyInstallationRecord["status"], accessTokenEnc: text(row.access_token_enc), accessTokenExpiresAt: text(row.access_token_expires_at), refreshTokenEnc: text(row.refresh_token_enc), refreshTokenExpiresAt: text(row.refresh_token_expires_at), installedAt: String(row.installed_at), updatedAt: String(row.updated_at) };
+  }
+
+  /** Keeps the row for audit but erases every token. */
+  revokeShopifyInstallation(shop: string) {
+    const result = this.db.prepare("UPDATE shopify_installation SET status = 'uninstalled', access_token_enc = NULL, access_token_expires_at = NULL, refresh_token_enc = NULL, refresh_token_expires_at = NULL, updated_at = ? WHERE shop = ?").run(now(), shop);
+    return result.changes === 1;
   }
 
   markManualReview(quoteId: string) { this.updateQuoteStatus(quoteId, "manual_review"); }

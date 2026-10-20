@@ -14,6 +14,32 @@ Parte desde `backend/.env.example`; nunca publiques el archivo `.env` real.
 | `SHOPIFY_CLIENT_SECRET` | Sí | Secreto de la app; nunca se registra ni se expone. |
 | `SHOPIFY_API_VERSION` | No | Versión Admin API; el ejemplo define `2026-10`. |
 | `SHOPIFY_CREDENTIALS_REF` | No | Etiqueta de auditoría para la fuente de credenciales. |
+| `SHOPIFY_AUTH_MODE` | No | `client_credentials` (por defecto) o `authorization_code`. Ver abajo. |
+| `SETAREH_TOKEN_ENCRYPTION_KEY` | Para OAuth | 32 bytes aleatorios en base64; cifra con AES-256-GCM los tokens que Shopify entrega al instalar. |
+
+### Modos de autenticación con Shopify
+
+- `client_credentials` pide un token con el client ID y el secreto de la app.
+  Shopify sólo lo permite cuando la app y la tienda pertenecen a la misma
+  organización, por lo que sirve para la tienda propia de referencia.
+- `authorization_code` usa el token que Shopify entrega cuando la tienda
+  instala la app. Es el modo para tiendas de terceros: la tienda aprueba los
+  permisos en Shopify y no comparte credenciales.
+
+Las rutas de instalación se activan cuando existen `SHOPIFY_CLIENT_ID`,
+`SHOPIFY_CLIENT_SECRET`, `SETAREH_TOKEN_ENCRYPTION_KEY` y `SETAREH_BASE_URL`,
+aunque el modo siga en `client_credentials`. Así se puede instalar primero y
+cambiar de modo después. Setareh solicita tokens offline que expiran: renueva
+el token de acceso antes de su vencimiento y guarda el refresh token rotado.
+Si el refresh token vence, la tienda debe volver a abrir la instalación.
+
+En la configuración de la app en el Dev Dashboard de Shopify:
+
+| Campo | Valor |
+| --- | --- |
+| App URL | `SETAREH_BASE_URL/shopify/install` |
+| Allowed redirection URL | `SETAREH_BASE_URL/shopify/oauth/callback` |
+| Webhook `app/uninstalled` | Lo registra Setareh por API al completar cada instalación; para la tienda propia, `npm run webhooks:ensure`. |
 
 ## Setareh y quotes
 
@@ -29,6 +55,8 @@ Parte desde `backend/.env.example`; nunca publiques el archivo `.env` real.
 | `SETAREH_SHIPPING_TITLE` | No | Nombre del despacho en Shopify. |
 | `SETAREH_MAX_QUOTE_USDC` | No | Tope de gasto del servidor; por defecto `30`. |
 | `QUOTE_TTL_MINUTES` | No | Vida del quote; por defecto `10` minutos. |
+| `SETAREH_QUOTES_PER_CLIENT_PER_HOUR` | No | Máximo de `POST /v1/quotes` por cliente y hora; por defecto `10`. |
+| `SETAREH_QUOTES_PER_HOUR` | No | Máximo global de `POST /v1/quotes` por hora; por defecto `60`. Cada quote crea un draft real en Shopify. |
 
 La tasa y el total USDC se congelan dentro de cada quote. Si cambian artículos,
 cantidad, dirección, despacho o presupuesto, descarta el quote y crea otro.

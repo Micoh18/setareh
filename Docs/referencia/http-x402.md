@@ -15,6 +15,15 @@ Con `PORT=4020`, Setareh expone estos endpoints HTTP:
 | `POST` | `/v1/quotes/:quoteId/pay-and-place` | Pagar con x402 y crear una orden. |
 | `GET` | `/v1/orders/:orderId` | Estado de quote u orden. |
 
+Si la instancia tiene configurada la instalación OAuth de Shopify, expone
+además estas rutas, usadas por Shopify y no por agentes:
+
+| Método | Ruta | Uso |
+| --- | --- | --- |
+| `GET` | `/shopify/install?shop=<tienda>.myshopify.com` | Inicia la autorización y redirige a Shopify. |
+| `GET` | `/shopify/oauth/callback` | Recibe el código, verifica HMAC y `state`, y guarda tokens cifrados. |
+| `POST` | `/shopify/webhooks/app-uninstalled` | Verifica la firma del webhook y borra los tokens de la tienda. |
+
 ## Crear un quote
 
 El cuerpo de `POST /v1/quotes` corresponde al de `create_quote` en MCP. Los
@@ -65,9 +74,18 @@ decisión de confianza y debe revisarse antes de cualquier uso fuera del demo.
 | `409` | Quote vencido, no pagable, sobre límite o stock no disponible. |
 | `500` | Error inesperado; no reintentes un pago a ciegas. Consulta estado y concilia. |
 
-## Exposición pública
+## Entorno de piloto publicado
 
-Esta API pertenece al MVP y no implementa autenticación ni rate limiting de
-producción. Déjala en loopback durante desarrollo. Antes de exponerla detrás
-de `api.setareh.site`, agrega HTTPS, autenticación, límites de tasa, registros,
-protección de datos y una revisión de seguridad.
+Desde el 20 de octubre de 2026 la API del piloto está publicada en
+`https://api.setareh.site`. Qué existe y qué no:
+
+- HTTPS con certificado válido; HTTP redirige con `301`.
+- Una sola instancia con base SQLite en volumen persistente; ver
+  [despliegue y release](/operaciones/despliegue/).
+- `POST /v1/quotes` está limitado a 10 por cliente y 60 en total por hora,
+  porque cada quote crea un draft real en Shopify. Al superar el límite responde
+  `429` con `Retry-After`.
+- No hay autenticación de agentes, WAF ni control de acceso por comercio.
+  Sigue siendo un entorno de piloto en `stellar:testnet`; no acepta dinero real.
+
+Durante el desarrollo local, mantén la API en loopback (`127.0.0.1`).
