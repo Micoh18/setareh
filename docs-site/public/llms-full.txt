@@ -215,6 +215,22 @@ Ese cliente obtiene primero el desafío, verifica red, activo y límite, y sólo
 entonces configura el firmante Ed25519 para el reintento x402. Es una referencia
 de seguridad para integrar otra wallet; no es una custodia de producción.
 
+## Usar el entorno publicado
+
+El cliente de referencia y cualquier wallet pueden apuntar al piloto publicado
+en lugar de una instancia local. En `backend/agent.env`:
+
+```ini
+SETAREH_API_URL=https://api.setareh.site
+AGENT_MAX_USDC=5
+# AGENT_STELLAR_PRIVATE_KEY se queda en este archivo local; nunca viaja al servidor.
+```
+
+El servidor nunca recibe la clave privada: la wallet firma el reintento x402 en
+local y Setareh sólo ve la prueba de pago que el facilitador liquida. Mantén
+`AGENT_MAX_USDC` igual o por debajo del tope del servidor (`30` USDC por quote
+en el piloto) y usa únicamente fondos de `stellar:testnet`.
+
 ## Resultado y lenguaje seguro
 
 Di “orden creada” solamente si Setareh devuelve `created` y un identificador de
@@ -317,6 +333,16 @@ encargo. Para el piloto usa una tienda de desarrollo y Stellar testnet.
 Setareh no necesita la contraseña de la tienda ni una clave privada de wallet.
 Las credenciales de la app pertenecen al entorno seguro del backend.
 
+## Instalar la app
+
+La tienda recibe un enlace de instalación del equipo de Setareh, lo abre con
+su sesión de Shopify y aprueba los permisos. Shopify devuelve el control a
+Setareh, que verifica la firma de Shopify y un identificador de un solo uso
+antes de guardar el acceso. La tienda no envía credenciales por chat ni correo.
+
+El acceso queda guardado cifrado y se renueva solo. Si la tienda desinstala la
+app, Shopify avisa a Setareh y este borra sus tokens.
+
 ## Permisos solicitados
 
 | Scope | Motivo |
@@ -398,6 +424,24 @@ evidencia duradera de fondos reales.
   sitio desplegado. Tras cada subida se debe comprobar que coincida con la
   revisión revisada en GitHub.
 
+## Entorno de piloto y CI
+
+Semana 1 del sprint: servicio desplegable, configuración por entorno, guía de
+release y CI. Estado al 20 de octubre de 2026:
+
+| Evidencia | Dónde comprobarla |
+| --- | --- |
+| URL del entorno HTTPS | `https://api.setareh.site/health` responde `{"ok":true,"service":"setareh","network":"stellar:testnet"}`; `http://` redirige con `301` |
+| Guía de despliegue sin secretos | [Despliegue y release](/operaciones/despliegue/) |
+| Configuración para agentes | [Usar el entorno publicado](/agentes/checkout/#usar-el-entorno-publicado) |
+| CI por cambio | [Pull request #1](https://github.com/Micoh18/setareh/pull/1); ejecuciones en verde para `400fc93` ([run](https://github.com/Micoh18/setareh/actions/runs/39361385460)), `3b8e77a` ([run](https://github.com/Micoh18/setareh/actions/runs/39361595515)), `2082d9c` ([run](https://github.com/Micoh18/setareh/actions/runs/39445624748)) y `c64e061` ([run](https://github.com/Micoh18/setareh/actions/runs/39468296438)) |
+| Pruebas automatizadas | 35 pruebas en `backend/src/*.test.ts`, incluidas OAuth (firma, dominio, cifrado, replay, renovación) y límite de peticiones |
+| Instalación Shopify sin compartir secretos | La tienda de referencia instaló la app por OAuth el 20 de octubre de 2026; tokens cifrados y renovación automática verificados con el preflight dentro de la instancia |
+
+Lo que esta evidencia no demuestra: ninguna compra de un evaluador externo,
+ningún uso en mainnet y ninguna garantía de disponibilidad. El proveedor de
+infraestructura y sus consolas no se publican.
+
 ## Criterio para declarar un piloto externo
 
 Un piloto con un comercio de un tercero se publicará como tal sólo cuando se
@@ -451,6 +495,88 @@ como capacidad disponible antes de implementarla.
 - [Estados y recuperación](/operaciones/estados-y-recuperacion/)
 - [Uso por agentes](/agentes/)
 - [Evidencia pública de referencia](/evidencia/)
+
+## Despliegue y release
+
+URL canónica: /operaciones/despliegue/
+
+Esta guía describe el proceso de release del entorno de piloto. No nombra al
+proveedor de infraestructura ni sus consolas de administración: esos datos son
+operativos y se conservan en documentación privada. Con ella, una persona
+técnica puede desplegar el servicio sin recibir ningún secreto.
+
+## Qué se despliega
+
+- La imagen de `backend/Dockerfile`: Node 24, compilación en dos etapas, modo
+  `SETAREH_TRANSPORT=http`. No inicia MCP por `stdio`; el MCP sigue siendo
+  local al runtime del agente.
+- Una sola instancia. SQLite guarda quotes, pagos, órdenes e instalaciones
+  Shopify, y no se comparte entre réplicas. Mientras la base sea SQLite, no se
+  habilita alta disponibilidad ni escalado horizontal.
+- Un volumen persistente montado en `/data`, con
+  `SETAREH_DATABASE_PATH=/data/setareh.db`. Un sistema de archivos efímero
+  perdería la idempotencia y la evidencia de conciliación en cada reinicio.
+- Terminación HTTPS delante del contenedor, con redirección de HTTP a HTTPS y
+  un health check de plataforma sobre `GET /health`.
+
+## Dónde vive cada dato
+
+| Dato | Lugar | Regla |
+| --- | --- | --- |
+| Configuración no secreta (red, activo, dirección pública receptora, tasa, topes, dominio de tienda, versión de API, `SETAREH_BASE_URL`) | Variables de entorno del despliegue | Versionadas fuera del repositorio público; sin valores sensibles |
+| `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET`, `SETAREH_TOKEN_ENCRYPTION_KEY` | Gestor de secretos del proveedor | Se cargan desde `stdin` o desde el panel; nunca en archivos del repo, logs ni capturas |
+| Tokens OAuth de cada tienda | SQLite en el volumen, cifrados con AES-256-GCM | Se renuevan solos; se borran al desinstalar |
+| `AGENT_STELLAR_PRIVATE_KEY`, `STELLAR_MERCHANT_PRIVATE_KEY`, `agent.env`, `merchant-wallet.env` | Fuera del servidor | El servidor sólo conoce la dirección pública receptora |
+
+`SETAREH_TOKEN_ENCRYPTION_KEY` son 32 bytes aleatorios en base64. Si se pierde,
+los tokens guardados dejan de poder descifrarse y las tiendas deben volver a
+instalar la app. Trátala como el secreto más sensible del despliegue.
+
+## Procedimiento de release
+
+1. Trabaja en una rama. En `backend/`: `npm ci`, `npm run check`, `npm test`.
+2. Abre o actualiza el pull request y espera el CI en verde. El workflow
+   instala dependencias bloqueadas, audita las de producción, verifica
+   TypeScript, ejecuta las pruebas, revisa que `Docs/` no contenga secretos y
+   construye este portal.
+3. Despliega la imagen desde `backend/` con la herramienta del proveedor. La
+   construcción debe hacerse desde el Dockerfile; no se suben `.env`,
+   `agent.env` ni archivos SQLite.
+4. Verifica:
+   - `GET https://api.setareh.site/health` devuelve `200` con `ok: true`,
+     `service: setareh` y `network: stellar:testnet`.
+   - `http://` redirige a `https://` con `301`.
+   - El log de arranque indica el modo de autenticación Shopify esperado y si
+     las rutas de instalación OAuth están habilitadas.
+5. Ejecuta el preflight dentro de la instancia desplegada:
+   `node dist/doctor.js --verify`. Debe confirmar conexión Shopify, scopes,
+   estado de la instalación OAuth y capacidad `exact` del facilitador en
+   `stellar:testnet`.
+6. Si cambiaste configuración no secreta, edítala en el entorno del despliegue
+   y vuelve a desplegar. Si cambiaste un secreto, cárgalo en el gestor del
+   proveedor y vuelve a desplegar; nunca lo pegues en el repositorio.
+7. Para volver atrás, redepliega la imagen de la release anterior. El volumen
+   no se toca.
+
+## Rotación de credenciales
+
+- **Client secret de Shopify:** regenéralo en el Dev Dashboard, actualiza el
+  secreto en el proveedor y redepliega. Los tokens OAuth guardados siguen
+  siendo válidos; sólo la renovación usa el secreto nuevo.
+- **Clave de cifrado de tokens:** cambiarla invalida los tokens guardados.
+  Planifica una reinstalación de cada tienda antes de rotarla.
+- **Dirección receptora Stellar:** es configuración no secreta, pero cambia el
+  destinatario de todos los quotes nuevos. Verifica el preflight y una compra
+  de prueba después de cambiarla.
+
+## Verificación de cierre
+
+- [ ] Imagen construida desde el Dockerfile del commit revisado.
+- [ ] Una sola instancia, con volumen montado y reinicio sin pérdida de datos.
+- [ ] HTTPS válido, redirección desde HTTP y `GET /health` público.
+- [ ] Preflight `--verify` en verde dentro de la instancia.
+- [ ] Secretos sólo en el gestor del proveedor; ninguno en Git, logs ni docs.
+- [ ] CI en verde sobre el commit desplegado y enlace registrado en la evidencia.
 
 ## Estados y recuperación
 
@@ -592,6 +718,32 @@ Parte desde `backend/.env.example`; nunca publiques el archivo `.env` real.
 | `SHOPIFY_CLIENT_SECRET` | Sí | Secreto de la app; nunca se registra ni se expone. |
 | `SHOPIFY_API_VERSION` | No | Versión Admin API; el ejemplo define `2026-10`. |
 | `SHOPIFY_CREDENTIALS_REF` | No | Etiqueta de auditoría para la fuente de credenciales. |
+| `SHOPIFY_AUTH_MODE` | No | `client_credentials` (por defecto) o `authorization_code`. Ver abajo. |
+| `SETAREH_TOKEN_ENCRYPTION_KEY` | Para OAuth | 32 bytes aleatorios en base64; cifra con AES-256-GCM los tokens que Shopify entrega al instalar. |
+
+### Modos de autenticación con Shopify
+
+- `client_credentials` pide un token con el client ID y el secreto de la app.
+  Shopify sólo lo permite cuando la app y la tienda pertenecen a la misma
+  organización, por lo que sirve para la tienda propia de referencia.
+- `authorization_code` usa el token que Shopify entrega cuando la tienda
+  instala la app. Es el modo para tiendas de terceros: la tienda aprueba los
+  permisos en Shopify y no comparte credenciales.
+
+Las rutas de instalación se activan cuando existen `SHOPIFY_CLIENT_ID`,
+`SHOPIFY_CLIENT_SECRET`, `SETAREH_TOKEN_ENCRYPTION_KEY` y `SETAREH_BASE_URL`,
+aunque el modo siga en `client_credentials`. Así se puede instalar primero y
+cambiar de modo después. Setareh solicita tokens offline que expiran: renueva
+el token de acceso antes de su vencimiento y guarda el refresh token rotado.
+Si el refresh token vence, la tienda debe volver a abrir la instalación.
+
+En la configuración de la app en el Dev Dashboard de Shopify:
+
+| Campo | Valor |
+| --- | --- |
+| App URL | `SETAREH_BASE_URL/shopify/install` |
+| Allowed redirection URL | `SETAREH_BASE_URL/shopify/oauth/callback` |
+| Webhook `app/uninstalled` | Lo registra Setareh por API al completar cada instalación; para la tienda propia, `npm run webhooks:ensure`. |
 
 ## Setareh y quotes
 
@@ -607,6 +759,8 @@ Parte desde `backend/.env.example`; nunca publiques el archivo `.env` real.
 | `SETAREH_SHIPPING_TITLE` | No | Nombre del despacho en Shopify. |
 | `SETAREH_MAX_QUOTE_USDC` | No | Tope de gasto del servidor; por defecto `30`. |
 | `QUOTE_TTL_MINUTES` | No | Vida del quote; por defecto `10` minutos. |
+| `SETAREH_QUOTES_PER_CLIENT_PER_HOUR` | No | Máximo de `POST /v1/quotes` por cliente y hora; por defecto `10`. |
+| `SETAREH_QUOTES_PER_HOUR` | No | Máximo global de `POST /v1/quotes` por hora; por defecto `60`. Cada quote crea un draft real en Shopify. |
 
 La tasa y el total USDC se congelan dentro de cada quote. Si cambian artículos,
 cantidad, dirección, despacho o presupuesto, descarta el quote y crea otro.
@@ -675,6 +829,15 @@ Con `PORT=4020`, Setareh expone estos endpoints HTTP:
 | `POST` | `/v1/quotes/:quoteId/pay-and-place` | Pagar con x402 y crear una orden. |
 | `GET` | `/v1/orders/:orderId` | Estado de quote u orden. |
 
+Si la instancia tiene configurada la instalación OAuth de Shopify, expone
+además estas rutas, usadas por Shopify y no por agentes:
+
+| Método | Ruta | Uso |
+| --- | --- | --- |
+| `GET` | `/shopify/install?shop=<tienda>.myshopify.com` | Inicia la autorización y redirige a Shopify. |
+| `GET` | `/shopify/oauth/callback` | Recibe el código, verifica HMAC y `state`, y guarda tokens cifrados. |
+| `POST` | `/shopify/webhooks/app-uninstalled` | Verifica la firma del webhook y borra los tokens de la tienda. |
+
 ## Crear un quote
 
 El cuerpo de `POST /v1/quotes` corresponde al de `create_quote` en MCP. Los
@@ -725,12 +888,21 @@ decisión de confianza y debe revisarse antes de cualquier uso fuera del demo.
 | `409` | Quote vencido, no pagable, sobre límite o stock no disponible. |
 | `500` | Error inesperado; no reintentes un pago a ciegas. Consulta estado y concilia. |
 
-## Exposición pública
+## Entorno de piloto publicado
 
-Esta API pertenece al MVP y no implementa autenticación ni rate limiting de
-producción. Déjala en loopback durante desarrollo. Antes de exponerla detrás
-de `api.setareh.site`, agrega HTTPS, autenticación, límites de tasa, registros,
-protección de datos y una revisión de seguridad.
+Desde el 20 de octubre de 2026 la API del piloto está publicada en
+`https://api.setareh.site`. Qué existe y qué no:
+
+- HTTPS con certificado válido; HTTP redirige con `301`.
+- Una sola instancia con base SQLite en volumen persistente; ver
+  [despliegue y release](/operaciones/despliegue/).
+- `POST /v1/quotes` está limitado a 10 por cliente y 60 en total por hora,
+  porque cada quote crea un draft real en Shopify. Al superar el límite responde
+  `429` con `Retry-After`.
+- No hay autenticación de agentes, WAF ni control de acceso por comercio.
+  Sigue siendo un entorno de piloto en `stellar:testnet`; no acepta dinero real.
+
+Durante el desarrollo local, mantén la API en loopback (`127.0.0.1`).
 
 ## Referencia MCP
 
@@ -854,6 +1026,7 @@ URL canónica: /seguridad/
 | Quote, estado de pago e idempotencia | Setareh | Se persisten para impedir que un reintento cree dos órdenes. |
 | Autorización/settlement x402 | Wallet y facilitador | Setareh verifica requisitos del pago antes de crear la orden. |
 | Secretos Shopify y operación | Comercio/operador | Nunca se publican en docs, logs ni respuestas MCP. |
+| Tokens OAuth de cada tienda | Setareh | Se guardan cifrados con AES-256-GCM ligados a la tienda y se borran al desinstalar. |
 
 ### Amenazas, controles y riesgo residual
 
@@ -864,7 +1037,8 @@ URL canónica: /seguridad/
 | Shopify falla después de un settlement válido | Se conserva evidencia y el estado pasa a `manual_review`; el runbook impide reintentar el pago a ciegas. | No hay reembolso automático ni resolución comercial automatizada. |
 | Facilitador o respuesta x402 no coincide con el quote | Se valida el requisito de pago y su settlement antes de completar Shopify. | El facilitador sigue siendo una dependencia externa que debe evaluarse para producción. |
 | Se filtran claves, PII o receipts | `.env` está ignorado, `get_order_status` entrega un resumen y los docs prohíben publicar datos sensibles. | No hay gestor centralizado de secretos, DLP ni auditoría externa en el MVP. |
-| Endpoint público recibe abuso o tráfico no autorizado | No se debe exponer el servidor local; producción requeriría HTTPS, control de acceso y rate limiting. | Esos controles aún no están implementados como servicio público. |
+| Instalación OAuth falsificada o repetida | El callback exige firma HMAC de Shopify, dominio `*.myshopify.com` anclado y un `state` de un solo uso que vence en 10 minutos; el webhook de desinstalación exige firma sobre el cuerpo crudo. | La clave de cifrado vive en el entorno del servidor; quien controle ese entorno puede descifrar los tokens. |
+| Endpoint público recibe abuso o tráfico no autorizado | La creación de quotes, que genera drafts reales en Shopify, está limitada por cliente y en total por hora (`429` con `Retry-After`); el despliegue termina HTTPS. | El límite vive en memoria de una sola instancia; no hay autenticación de agentes, WAF ni control de acceso por comercio. |
 
 ## Datos que nunca deben aparecer en este sitio
 
@@ -880,8 +1054,8 @@ genera únicamente desde `Docs/`.
 ## Límites del MVP
 
 Setareh no es todavía un servicio de producción. No incluye autenticación,
-autorización multi-tenant, rate limiting, gestión de secretos, webhooks de
-Shopify, monitoreo centralizado, reembolsos automáticos, soporte mainnet ni
+autorización multi-tenant, rate limiting más allá de la creación de quotes, gestión de secretos, webhooks de
+Shopify distintos de la desinstalación, monitoreo centralizado, reembolsos automáticos, soporte mainnet ni
 políticas avanzadas por colección o zona.
 
 No publiques el HTTP local directamente. Una exposición productiva requiere,
