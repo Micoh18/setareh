@@ -38,6 +38,7 @@ export default defineConfig({
           label: 'Operar',
           items: [
             { slug: 'operaciones/estados-y-recuperacion' },
+            { slug: 'operaciones/despliegue' },
             { slug: 'seguridad' },
             { slug: 'agentes' },
             { slug: 'evidencia' },
