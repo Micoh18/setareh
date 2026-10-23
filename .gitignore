@@ -6,3 +6,8 @@ docs-site/node_modules/
 docs-site/dist/
 docs-site/.astro/
 docs-site/src/content/docs/
+
+# Archivos comprimidos en la raíz: suelen ser copias de documentos privados.
+/*.rar
+/*.zip
+/*.7z
