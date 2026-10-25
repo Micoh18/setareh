@@ -102,13 +102,13 @@ test("a settled x402 payment creates one Shopify order and records its receipt",
   }
 });
 
-test("a facilitator settlement failure marks the submitted quote as payment_failed", async () => {
+test("an explicit facilitator rejection marks the submitted quote as payment_failed", async () => {
   const directory = mkdtempSync(join(tmpdir(), "setareh-settlement-failure-"));
   const facilitator = createServer((request, response) => {
     response.setHeader("Content-Type", "application/json");
     if (request.url === "/supported") return response.end(JSON.stringify({ kinds: [{ x402Version: 2, scheme: "exact", network: "stellar:testnet", extra: { areFeesSponsored: true } }], extensions: [], signers: {} }));
     if (request.url === "/verify") return response.end(JSON.stringify({ isValid: true, payer: "GBUYER" }));
-    if (request.url === "/settle") return response.end(JSON.stringify({ success: false, errorReason: "settlement_unavailable", errorMessage: "test facilitator failure" }));
+    if (request.url === "/settle") return response.end(JSON.stringify({ success: false, errorReason: "invalid_exact_stellar_payload_amount_mismatch", errorMessage: "test facilitator rejection", transaction: "", network: "stellar:testnet" }));
     response.statusCode = 404;
     response.end();
   });

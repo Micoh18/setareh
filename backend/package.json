@@ -9,10 +9,12 @@
     "check": "node ./node_modules/typescript/bin/tsc --noEmit",
     "start": "node ./node_modules/tsx/dist/cli.mjs src/index.ts",
     "test": "node ./node_modules/tsx/dist/cli.mjs --test src/**/*.test.ts",
+    "audit:prod": "node scripts/audit-prod.mjs",
     "demo:pay": "node ./node_modules/tsx/dist/cli.mjs src/demo-agent.ts",
     "doctor": "node ./node_modules/tsx/dist/cli.mjs src/doctor.ts",
     "reconcile:draft": "node ./node_modules/tsx/dist/cli.mjs src/reconcile-draft.ts",
     "reconcile:order": "node ./node_modules/tsx/dist/cli.mjs src/reconcile-order.ts",
+    "reconcile:payment": "node ./node_modules/tsx/dist/cli.mjs src/reconcile-payment.ts",
     "webhooks:ensure": "node ./node_modules/tsx/dist/cli.mjs src/webhooks-ensure.ts"
   },
   "dependencies": {
@@ -24,7 +26,7 @@
     "@x402/stellar": "^2.28.0",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
-    "zod": "^4.1.12"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "^2.2.0",

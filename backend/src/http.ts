@@ -1,6 +1,7 @@
 import express, { type ErrorRequestHandler } from "express";
 import { HTTPFacilitatorClient, x402ResourceServer } from "@x402/core/server";
 import { paymentMiddleware } from "@x402/express";
+import { FacilitatorTimeoutError, SettleError } from "@x402/core/types";
 import { ExactStellarScheme } from "@x402/stellar/exact/server";
 import * as z from "zod/v4";
 import { CommerceService } from "./commerce.js";
@@ -22,6 +23,23 @@ function transactionHash(value: unknown): string | undefined {
   for (const key of ["transactionHash", "txHash", "transaction"]) if (typeof record[key] === "string") return record[key];
   for (const child of Object.values(record)) { const found = transactionHash(child); if (found) return found; }
   return undefined;
+}
+
+/** Reasons a facilitator may return even though a transaction reached, or may still reach, the network. */
+const AMBIGUOUS_SETTLE_REASONS = new Set(["settlement_pending", "unexpected_settle_error"]);
+
+/**
+ * Only an explicit facilitator rejection with no submitted transaction proves nothing was charged.
+ * Timeouts, transport errors and malformed responses leave the outcome unknown.
+ */
+export function classifySettlementFailure(error: unknown): { definite: boolean; reason: string; transaction?: string } {
+  if (error instanceof SettleError) {
+    const reason = error.errorReason || "settle_failed";
+    const transaction = typeof error.transaction === "string" && error.transaction ? error.transaction : undefined;
+    return { definite: !transaction && !AMBIGUOUS_SETTLE_REASONS.has(reason), reason, transaction };
+  }
+  if (error instanceof FacilitatorTimeoutError) return { definite: false, reason: "facilitator_timeout" };
+  return { definite: false, reason: error instanceof Error ? error.name || "facilitator_error" : "facilitator_error" };
 }
 
 function queryParams(request: { originalUrl: string }) {
@@ -94,20 +112,38 @@ export function createHttpApp(service: CommerceService, options: { shopifyOAuth?
 
   const resourceServer = new x402ResourceServer(new HTTPFacilitatorClient({ url: service.config.facilitatorUrl }))
     .register(service.config.stellarNetwork, new ExactStellarScheme())
+    // x402 only logs exceptions thrown by settle hooks, so a refusal must be returned as an abort.
     .onBeforeSettle(async (context) => {
       const path = (context.transportContext as { request?: { path?: string } } | undefined)?.request?.path;
-      if (path) service.markPaymentSubmitted(quoteIdFromPath(path));
+      try {
+        if (!path) throw new Error("Unable to resolve quote for this payment route.");
+        service.markPaymentSubmitted(quoteIdFromPath(path));
+        return undefined;
+      } catch (error) {
+        return { abort: true as const, reason: "quote_not_payable", message: error instanceof Error ? error.message : "Quote is not payable." };
+      }
     })
     .onAfterSettle(async (context) => {
       if (context.phase !== "before-handler") return;
       const path = (context.transportContext as { request?: { path?: string } } | undefined)?.request?.path;
       if (!path) return;
       const quoteId = quoteIdFromPath(path);
-      service.recordSettlement(quoteId, { payload: context.paymentPayload, receipt: context.result, transactionHash: transactionHash(context.result) });
+      const hash = transactionHash(context.result);
+      try {
+        service.recordSettlement(quoteId, { payload: context.paymentPayload, receipt: context.result, transactionHash: hash });
+      } catch (error) {
+        // Funds moved but the settlement could not be recorded; the order handler will refuse this quote.
+        service.markSettlementUnrecorded(quoteId);
+        console.error(`Settlement for quote ${quoteId} (tx ${hash ?? "unknown"}) was not recorded: ${error instanceof Error ? error.message : "unknown error"}`);
+      }
     })
     .onSettleFailure(async (context) => {
       const path = (context.transportContext as { request?: { path?: string } } | undefined)?.request?.path;
-      if (path) service.markPaymentFailed(quoteIdFromPath(path));
+      if (!path) return;
+      const quoteId = quoteIdFromPath(path);
+      const failure = classifySettlementFailure(context.error);
+      const attempt = service.recordSettlementFailure(quoteId, failure, context.paymentPayload);
+      if (attempt?.outcome === "unknown") console.error(`Settlement outcome unknown for quote ${quoteId} (${failure.reason}); run reconcile:payment before any retry.`);
     });
   const routes = {
     "POST /v1/quotes/:quoteId/pay-and-place": {

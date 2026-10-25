@@ -65,9 +65,14 @@ quoted
   → created
 ```
 
-Los estados de excepción son `expired`, `out_of_stock`, `payment_failed` y
-`manual_review`. Un estado de revisión nunca es éxito: se detienen los
-reintentos y se concilia la orden con el mismo `quoteId`.
+El paso a `payment_submitted` es atómico: sólo un intento de pago puede
+reclamar el quote, y el facilitador no recibe ningún otro.
+
+Los estados de excepción son `expired`, `out_of_stock`, `payment_failed`,
+`payment_unknown` y `manual_review`. Un estado de revisión nunca es éxito: se
+detienen los reintentos y se concilia con el mismo `quoteId`. `payment_unknown`
+significa que el settlement no tuvo una respuesta definitiva y se resuelve
+consultando la red con `reconcile:payment`.
 
 Consulta [Estados y recuperación](/operaciones/estados-y-recuperacion/) para
 el significado operativo de cada uno.

@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { USDC_TESTNET_ADDRESS } from "@x402/stellar";
 import type { SetarehConfig } from "./config.js";
 import { SetarehDatabase, type QuoteRecord } from "./db.js";
+import { describeSignedTransfer, usdcUnits } from "./stellar-settlement.js";
 import { availability, type ShopifyAddress, type ShopifyLineItem, ShopifyClient } from "./shopify.js";
 
 export type QuoteInput = { merchantId: string; items: ShopifyLineItem[]; email: string; shippingAddress: ShopifyAddress; userConfirmed: true };
@@ -57,23 +58,51 @@ export class CommerceService {
   }
 
   markPaymentSubmitted(quoteId: string) {
-    const quote = this.db.getUsableQuote(quoteId);
-    if (quote.status !== "payment_required" && quote.status !== "payment_submitted") {
-      throw new Error("Quote is not ready for payment settlement.");
-    }
-    if (quote.status === "payment_required") this.db.updateQuoteStatus(quoteId, "payment_submitted");
+    if (!this.db.claimPaymentSubmission(quoteId)) throw new Error("Quote is not ready for payment settlement.");
   }
 
-  markPaymentFailed(quoteId: string) {
+  /**
+   * Records a settlement that did not succeed. Only a definite facilitator rejection frees the quote as
+   * payment_failed; anything else (timeout, lost response, submitted transaction) may still have moved
+   * funds, so the quote is held as payment_unknown until reconcile:payment checks the network.
+   */
+  recordSettlementFailure(quoteId: string, failure: { definite: boolean; reason: string; transaction?: string }, paymentPayload: unknown) {
+    if (!this.db.transitionQuote(quoteId, "payment_submitted", failure.definite ? "payment_failed" : "payment_unknown")) return undefined;
+    const transfer = describeSignedTransfer(paymentPayload);
+    return this.db.recordPaymentAttempt({
+      quoteId, outcome: failure.definite ? "failed" : "unknown", errorReason: failure.reason.slice(0, 200), facilitatorTransaction: failure.transaction ?? null,
+      payer: transfer?.from ?? null, amount: transfer ? transfer.amount.toString() : null, payTo: transfer?.to ?? null,
+      signatureExpirationLedger: transfer?.signatureExpirationLedger ?? null,
+    });
+  }
+
+  /** Records a payment_unknown quote's settlement once reconcile:payment has found it on-chain. */
+  recordReconciledSettlement(quoteId: string, transactionHash: string) {
     const quote = this.db.getQuote(quoteId);
-    if (quote?.status === "payment_submitted") this.db.updateQuoteStatus(quoteId, "payment_failed");
+    if (!quote) throw new Error("Quote not found.");
+    if (quote.status !== "payment_unknown") throw new Error(`Quote is ${quote.status}, not payment_unknown.`);
+    const owner = this.db.getQuoteIdByTransaction(transactionHash);
+    if (owner && owner !== quoteId) throw new Error(`Transaction already settles quote ${owner}.`);
+    this.db.recordPaymentSettled({ quoteId, network: this.config.stellarNetwork, asset: this.config.stellarAsset, amount: quote.totalUsdc, payTo: this.config.stellarMerchantAddress, paymentPayloadHash: "reconciled", transactionHash, receipt: { source: "reconcile:payment", transactionHash } });
+  }
+
+  /** Closes a payment_unknown quote after reconcile:payment proved nothing was, or can still be, settled. */
+  markReconciledUnpaid(quoteId: string) {
+    if (!this.db.transitionQuote(quoteId, "payment_unknown", "payment_failed")) throw new Error("Quote is not payment_unknown.");
   }
 
   recordSettlement(quoteId: string, payment: { payload: unknown; receipt: unknown; transactionHash?: string }) {
-    const quote = this.db.getUsableQuote(quoteId);
+    // Deliberately not getUsableQuote: a quote may expire while its claimed settlement is in flight.
+    const quote = this.db.getQuote(quoteId);
+    if (!quote) throw new Error("Quote not found.");
     this.assertSettlementMatchesQuote(quote, payment.payload);
     if (quote.status !== "payment_submitted") throw new Error("Quote is not in a submitted payment state.");
     this.db.recordPaymentSettled({ quoteId, network: this.config.stellarNetwork, asset: this.config.stellarAsset, amount: quote.totalUsdc, payTo: this.config.stellarMerchantAddress, paymentPayloadHash: createHash("sha256").update(JSON.stringify(payment.payload)).digest("hex"), transactionHash: payment.transactionHash, receipt: payment.receipt });
+  }
+
+  /** A settlement succeeded on-chain but could not be recorded; keep the quote out of every automatic path. */
+  markSettlementUnrecorded(quoteId: string) {
+    if (this.db.getQuote(quoteId)) this.db.markManualReview(quoteId);
   }
 
   async placePaidOrder(quoteId: string, userConfirmed: true) {
@@ -178,8 +207,7 @@ export class CommerceService {
     if (!accepted || typeof accepted !== "object") throw new Error("Payment payload is missing its accepted requirements.");
     const requirements = accepted as Record<string, unknown>;
     const expectedAsset = USDC_TESTNET_ADDRESS;
-    const [whole, fraction = ""] = quote.totalUsdc.split(".");
-    const expectedAmount = BigInt(`${whole}${fraction.padEnd(7, "0")}`);
+    const expectedAmount = usdcUnits(quote.totalUsdc);
     const matches = requirements.network === this.config.stellarNetwork
       && requirements.asset === expectedAsset
       && requirements.payTo === this.config.stellarMerchantAddress
