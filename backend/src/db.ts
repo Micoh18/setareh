@@ -162,6 +162,12 @@ export class SetarehDatabase {
     this.db.prepare("UPDATE orders SET status = ? WHERE id = ?").run(status, id);
   }
 
+  /** Moves a live quote to payment_submitted in one statement, so only one settlement can start per quote. */
+  claimPaymentSubmission(quoteId: string) {
+    const result = this.db.prepare("UPDATE quote SET status = 'payment_submitted' WHERE id = ? AND status = 'payment_required' AND expires_at > ?").run(quoteId, now());
+    return result.changes === 1;
+  }
+
   claimShopifyOrderCreation(quoteId: string) {
     const result = this.db.prepare("UPDATE quote SET status = 'creating_shopify_order' WHERE id = ? AND status = 'payment_settled'").run(quoteId);
     return result.changes === 1;

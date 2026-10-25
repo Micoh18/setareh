@@ -94,9 +94,16 @@ export function createHttpApp(service: CommerceService, options: { shopifyOAuth?
 
   const resourceServer = new x402ResourceServer(new HTTPFacilitatorClient({ url: service.config.facilitatorUrl }))
     .register(service.config.stellarNetwork, new ExactStellarScheme())
+    // x402 only logs exceptions thrown by settle hooks, so a refusal must be returned as an abort.
     .onBeforeSettle(async (context) => {
       const path = (context.transportContext as { request?: { path?: string } } | undefined)?.request?.path;
-      if (path) service.markPaymentSubmitted(quoteIdFromPath(path));
+      try {
+        if (!path) throw new Error("Unable to resolve quote for this payment route.");
+        service.markPaymentSubmitted(quoteIdFromPath(path));
+        return undefined;
+      } catch (error) {
+        return { abort: true as const, reason: "quote_not_payable", message: error instanceof Error ? error.message : "Quote is not payable." };
+      }
     })
     .onAfterSettle(async (context) => {
       if (context.phase !== "before-handler") return;

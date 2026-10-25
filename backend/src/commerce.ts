@@ -57,11 +57,7 @@ export class CommerceService {
   }
 
   markPaymentSubmitted(quoteId: string) {
-    const quote = this.db.getUsableQuote(quoteId);
-    if (quote.status !== "payment_required" && quote.status !== "payment_submitted") {
-      throw new Error("Quote is not ready for payment settlement.");
-    }
-    if (quote.status === "payment_required") this.db.updateQuoteStatus(quoteId, "payment_submitted");
+    if (!this.db.claimPaymentSubmission(quoteId)) throw new Error("Quote is not ready for payment settlement.");
   }
 
   markPaymentFailed(quoteId: string) {
