@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { USDC_TESTNET_ADDRESS } from "@x402/stellar";
 import type { SetarehConfig } from "./config.js";
 import { SetarehDatabase, type QuoteRecord } from "./db.js";
+import { describeSignedTransfer, usdcUnits } from "./stellar-settlement.js";
 import { availability, type ShopifyAddress, type ShopifyLineItem, ShopifyClient } from "./shopify.js";
 
 export type QuoteInput = { merchantId: string; items: ShopifyLineItem[]; email: string; shippingAddress: ShopifyAddress; userConfirmed: true };
@@ -60,9 +61,19 @@ export class CommerceService {
     if (!this.db.claimPaymentSubmission(quoteId)) throw new Error("Quote is not ready for payment settlement.");
   }
 
-  markPaymentFailed(quoteId: string) {
-    const quote = this.db.getQuote(quoteId);
-    if (quote?.status === "payment_submitted") this.db.updateQuoteStatus(quoteId, "payment_failed");
+  /**
+   * Records a settlement that did not succeed. Only a definite facilitator rejection frees the quote as
+   * payment_failed; anything else (timeout, lost response, submitted transaction) may still have moved
+   * funds, so the quote is held as payment_unknown until reconcile:payment checks the network.
+   */
+  recordSettlementFailure(quoteId: string, failure: { definite: boolean; reason: string; transaction?: string }, paymentPayload: unknown) {
+    if (!this.db.transitionQuote(quoteId, "payment_submitted", failure.definite ? "payment_failed" : "payment_unknown")) return undefined;
+    const transfer = describeSignedTransfer(paymentPayload);
+    return this.db.recordPaymentAttempt({
+      quoteId, outcome: failure.definite ? "failed" : "unknown", errorReason: failure.reason.slice(0, 200), facilitatorTransaction: failure.transaction ?? null,
+      payer: transfer?.from ?? null, amount: transfer ? transfer.amount.toString() : null, payTo: transfer?.to ?? null,
+      signatureExpirationLedger: transfer?.signatureExpirationLedger ?? null,
+    });
   }
 
   recordSettlement(quoteId: string, payment: { payload: unknown; receipt: unknown; transactionHash?: string }) {
@@ -181,8 +192,7 @@ export class CommerceService {
     if (!accepted || typeof accepted !== "object") throw new Error("Payment payload is missing its accepted requirements.");
     const requirements = accepted as Record<string, unknown>;
     const expectedAsset = USDC_TESTNET_ADDRESS;
-    const [whole, fraction = ""] = quote.totalUsdc.split(".");
-    const expectedAmount = BigInt(`${whole}${fraction.padEnd(7, "0")}`);
+    const expectedAmount = usdcUnits(quote.totalUsdc);
     const matches = requirements.network === this.config.stellarNetwork
       && requirements.asset === expectedAsset
       && requirements.payTo === this.config.stellarMerchantAddress

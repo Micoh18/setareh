@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 
-export type QuoteStatus = "quoted" | "payment_required" | "payment_submitted" | "payment_settled" | "creating_shopify_order" | "created" | "expired" | "out_of_stock" | "payment_failed" | "shopify_failed" | "manual_review";
+export type QuoteStatus = "quoted" | "payment_required" | "payment_submitted" | "payment_settled" | "creating_shopify_order" | "created" | "expired" | "out_of_stock" | "payment_failed" | "payment_unknown" | "shopify_failed" | "manual_review";
 
 export type QuoteRecord = {
   id: string;
@@ -28,6 +28,20 @@ export type OrderRecord = {
   shopifyOrderId: string;
   shopifyOrderName: string;
   status: string;
+  createdAt: string;
+};
+
+/** A settlement that did not succeed. Holds only values derived from the signed payload, never the payload. */
+export type PaymentAttemptRecord = {
+  id: string;
+  quoteId: string;
+  outcome: "failed" | "unknown";
+  errorReason: string;
+  facilitatorTransaction: string | null;
+  payer: string | null;
+  amount: string | null;
+  payTo: string | null;
+  signatureExpirationLedger: number | null;
   createdAt: string;
 };
 
@@ -80,6 +94,12 @@ export class SetarehDatabase {
       CREATE TABLE IF NOT EXISTS orders (
         id TEXT PRIMARY KEY, quote_id TEXT NOT NULL UNIQUE, shopify_order_id TEXT NOT NULL,
         shopify_order_name TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL,
+        FOREIGN KEY (quote_id) REFERENCES quote(id)
+      ) STRICT;
+      CREATE TABLE IF NOT EXISTS payment_attempt (
+        id TEXT PRIMARY KEY, quote_id TEXT NOT NULL, outcome TEXT NOT NULL, error_reason TEXT NOT NULL,
+        facilitator_transaction TEXT, payer TEXT, amount TEXT, pay_to TEXT, signature_expiration_ledger INTEGER,
+        created_at TEXT NOT NULL,
         FOREIGN KEY (quote_id) REFERENCES quote(id)
       ) STRICT;
       CREATE TABLE IF NOT EXISTS shopify_oauth_state (
@@ -167,6 +187,25 @@ export class SetarehDatabase {
   claimPaymentSubmission(quoteId: string) {
     const result = this.db.prepare("UPDATE quote SET status = 'payment_submitted' WHERE id = ? AND status = 'payment_required' AND expires_at > ?").run(quoteId, now());
     return result.changes === 1;
+  }
+
+  /** Conditional status change; returns false when the quote was not in the expected status. */
+  transitionQuote(quoteId: string, from: QuoteStatus, to: QuoteStatus) {
+    return this.db.prepare("UPDATE quote SET status = ? WHERE id = ? AND status = ?").run(to, quoteId, from).changes === 1;
+  }
+
+  recordPaymentAttempt(input: Omit<PaymentAttemptRecord, "id" | "createdAt">): PaymentAttemptRecord {
+    const attempt: PaymentAttemptRecord = { ...input, id: randomUUID(), createdAt: now() };
+    this.db.prepare("INSERT INTO payment_attempt (id, quote_id, outcome, error_reason, facilitator_transaction, payer, amount, pay_to, signature_expiration_ledger, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(attempt.id, attempt.quoteId, attempt.outcome, attempt.errorReason, attempt.facilitatorTransaction, attempt.payer, attempt.amount, attempt.payTo, attempt.signatureExpirationLedger, attempt.createdAt);
+    return attempt;
+  }
+
+  getLatestPaymentAttempt(quoteId: string): PaymentAttemptRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM payment_attempt WHERE quote_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1").get(quoteId) as Record<string, unknown> | undefined;
+    if (!row) return undefined;
+    const text = (value: unknown) => (value === null || value === undefined ? null : String(value));
+    return { id: String(row.id), quoteId: String(row.quote_id), outcome: row.outcome as PaymentAttemptRecord["outcome"], errorReason: String(row.error_reason), facilitatorTransaction: text(row.facilitator_transaction), payer: text(row.payer), amount: text(row.amount), payTo: text(row.pay_to), signatureExpirationLedger: row.signature_expiration_ledger === null ? null : Number(row.signature_expiration_ledger), createdAt: String(row.created_at) };
   }
 
   claimShopifyOrderCreation(quoteId: string) {
