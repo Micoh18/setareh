@@ -25,7 +25,7 @@ duda, el agente no paga. Crea un quote nuevo y vuelve a presentar el resumen.
    firma localmente sólo si lo acepta.
 7. Reintenta el `POST` con x402 y conserva `quoteId` para seguimiento.
 8. `get_order_status` para comunicar el resultado sólo cuando la orden fue
-   creada, o para detectar `manual_review`.
+   creada, o para detectar `payment_unknown` o `manual_review`.
 
 ## Controles mínimos de la wallet
 
@@ -80,3 +80,8 @@ Di “orden creada” solamente si Setareh devuelve `created` y un identificador
 orden Shopify. Si el resultado es `payment_failed`, `out_of_stock` o
 `manual_review`, explica el estado sin prometer una compra y deriva al proceso
 de [recuperación](/operaciones/estados-y-recuperacion/).
+
+Si el pago devuelve un error o un timeout, no firmes otro pago: consulta
+`get_order_status`. Si el estado es `payment_unknown`, el cobro puede haber
+ocurrido; Setareh rechaza cualquier nuevo pago de ese quote hasta conciliarlo.
+Explícalo así y no crees un quote nuevo para el mismo pedido.

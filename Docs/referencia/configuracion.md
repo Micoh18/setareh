@@ -69,6 +69,7 @@ cantidad, dirección, despacho o presupuesto, descarta el quote y crea otro.
 | `STELLAR_PAYMENT_ASSET` | Sí | Debe ser `USDC`. |
 | `STELLAR_MERCHANT_ADDRESS` | Sí | Dirección pública Stellar receptora; Setareh valida su formato. |
 | `X402_FACILITATOR_URL` | No | URL del facilitador; por defecto `https://x402.org/facilitator`. |
+| `STELLAR_RPC_URL` | No | RPC Soroban que usa `reconcile:payment`; por defecto el RPC público de testnet. |
 | `PORT` | No | Puerto de la superficie HTTP, normalmente `4020`. |
 | `SETAREH_TRANSPORT` | No | `stdio` para MCP local, `http` para un contenedor desplegado o `both` para desarrollo. Sin valor, infiere `stdio` sin `PORT` y `both` con `PORT`. |
 

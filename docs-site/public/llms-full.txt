@@ -138,6 +138,7 @@ límite local antes de firmar.
 | Pago liquidado pero orden en revisión | Detén nuevos intentos para ese quote y concilia antes de actuar manualmente. |
 | Duda sobre estado de un draft | Ejecuta `npm.cmd run reconcile:draft -- gid://shopify/DraftOrder/<id>`. |
 | Duda sobre una orden pagada | Ejecuta `npm.cmd run reconcile:order -- <quoteId>`. |
+| Quote en `payment_unknown` (timeout o error del facilitador) | No pagues de nuevo. Ejecuta `npm.cmd run reconcile:payment -- <quoteId>` y, si el veredicto es `paid` o `unpaid`, repite con `--apply`. |
 
 Un quote admite un pago y una orden. Ante reintentos, usa siempre el mismo
 `quoteId` para consultar o conciliar, nunca para iniciar una compra paralela.
@@ -182,7 +183,7 @@ duda, el agente no paga. Crea un quote nuevo y vuelve a presentar el resumen.
    firma localmente sólo si lo acepta.
 7. Reintenta el `POST` con x402 y conserva `quoteId` para seguimiento.
 8. `get_order_status` para comunicar el resultado sólo cuando la orden fue
-   creada, o para detectar `manual_review`.
+   creada, o para detectar `payment_unknown` o `manual_review`.
 
 ## Controles mínimos de la wallet
 
@@ -237,6 +238,11 @@ Di “orden creada” solamente si Setareh devuelve `created` y un identificador
 orden Shopify. Si el resultado es `payment_failed`, `out_of_stock` o
 `manual_review`, explica el estado sin prometer una compra y deriva al proceso
 de [recuperación](/operaciones/estados-y-recuperacion/).
+
+Si el pago devuelve un error o un timeout, no firmes otro pago: consulta
+`get_order_status`. Si el estado es `payment_unknown`, el cobro puede haber
+ocurrido; Setareh rechaza cualquier nuevo pago de ese quote hasta conciliarlo.
+Explícalo así y no crees un quote nuevo para el mismo pedido.
 
 ## Arquitectura y modelo de compra
 
@@ -304,9 +310,14 @@ quoted
   → created
 ```
 
-Los estados de excepción son `expired`, `out_of_stock`, `payment_failed` y
-`manual_review`. Un estado de revisión nunca es éxito: se detienen los
-reintentos y se concilia la orden con el mismo `quoteId`.
+El paso a `payment_submitted` es atómico: sólo un intento de pago puede
+reclamar el quote, y el facilitador no recibe ningún otro.
+
+Los estados de excepción son `expired`, `out_of_stock`, `payment_failed`,
+`payment_unknown` y `manual_review`. Un estado de revisión nunca es éxito: se
+detienen los reintentos y se concilia con el mismo `quoteId`. `payment_unknown`
+significa que el settlement no tuvo una respuesta definitiva y se resuelve
+consultando la red con `reconcile:payment`.
 
 Consulta [Estados y recuperación](/operaciones/estados-y-recuperacion/) para
 el significado operativo de cada uno.
@@ -434,7 +445,7 @@ release y CI. Estado al 20 de octubre de 2026:
 | URL del entorno HTTPS | `https://api.setareh.site/health` responde `{"ok":true,"service":"setareh","network":"stellar:testnet"}`; `http://` redirige con `301` |
 | Guía de despliegue sin secretos | [Despliegue y release](/operaciones/despliegue/) |
 | Configuración para agentes | [Usar el entorno publicado](/agentes/checkout/#usar-el-entorno-publicado) |
-| CI por cambio | [Pull request #1](https://github.com/Micoh18/setareh/pull/1); ejecuciones en verde para `400fc93` ([run](https://github.com/Micoh18/setareh/actions/runs/39361385460)), `3b8e77a` ([run](https://github.com/Micoh18/setareh/actions/runs/39361595515)), `2082d9c` ([run](https://github.com/Micoh18/setareh/actions/runs/39445624748)) y `c64e061` ([run](https://github.com/Micoh18/setareh/actions/runs/39468296438)) |
+| CI por cambio | [Pull request #1](https://github.com/Micoh18/setareh/pull/1); ejecuciones en verde para `400fc93` ([run](https://github.com/Micoh18/setareh/actions/runs/39361385460)), `3b8e77a` ([run](https://github.com/Micoh18/setareh/actions/runs/39361595515)), `2082d9c` ([run](https://github.com/Micoh18/setareh/actions/runs/39445624748)), `c64e061` ([run](https://github.com/Micoh18/setareh/actions/runs/39468296438)) y `f92a28e` ([run](https://github.com/Micoh18/setareh/actions/runs/39477544196)); `main` cerró la semana en `27d9341` con CI en verde y sin advertencias ([run](https://github.com/Micoh18/setareh/actions/runs/39969922445)) |
 | Pruebas automatizadas | 35 pruebas en `backend/src/*.test.ts`, incluidas OAuth (firma, dominio, cifrado, replay, renovación) y límite de peticiones |
 | Instalación Shopify sin compartir secretos | La tienda de referencia instaló la app por OAuth el 20 de octubre de 2026; tokens cifrados y renovación automática verificados con el preflight dentro de la instancia |
 
@@ -588,7 +599,7 @@ URL canónica: /operaciones/estados-y-recuperacion/
 | --- | --- | --- |
 | `quoted` | Draft y quote creados. | Presentar detalles; todavía no se ha pedido pago. |
 | `payment_required` | Quote listo para entregar a la wallet. | Esperar una confirmación explícita. |
-| `payment_submitted` | El facilitador está procesando. | No iniciar una segunda compra. |
+| `payment_submitted` | Un único intento de pago reclamó el quote y el facilitador lo procesa. | No iniciar una segunda compra; cualquier otro pago del mismo quote se rechaza sin llegar al facilitador. |
 | `payment_settled` | Settlement validado por Setareh. | El backend intenta completar Shopify. |
 | `creating_shopify_order` | Un proceso posee la creación de orden. | Esperar o consultar estado. |
 | `created` | Orden Shopify creada y evidencia adjuntada. | Comunicar éxito y guardar IDs operativos. |
@@ -598,12 +609,45 @@ URL canónica: /operaciones/estados-y-recuperacion/
 | Estado | Motivo | Respuesta segura |
 | --- | --- | --- |
 | `expired` | El quote venció. | Crear un quote nuevo; no pagar el anterior. |
-| `payment_failed` | Settlement no se completó. | Revisar challenge, red, activo, fondos y trustline. |
+| `payment_failed` | El facilitador rechazó el pago de forma explícita y sin enviar transacción, o la conciliación probó que no hubo cobro. | Revisar challenge, red, activo, fondos y trustline; crear un quote nuevo. |
+| `payment_unknown` | El settlement no terminó con una respuesta definitiva: timeout, error de red, respuesta inválida o transacción enviada sin confirmar. Los fondos pueden haberse movido. | No pagar de nuevo ni crear otro quote. Ejecutar `reconcile:payment`. |
 | `out_of_stock` | Inventario cambió tras el pago. | Detener reintentos y revisar manualmente. |
-| `manual_review` | Fallo después de un efecto irreversible o evidencia incompleta. | Conciliar antes de cualquier acción. |
+| `manual_review` | Fallo después de un efecto irreversible (por ejemplo, Shopify falla tras el pago o el settlement no pudo registrarse) o evidencia incompleta. | Conciliar antes de cualquier acción. |
 | `shopify_failed` | Estado reservado para fallos de Shopify. | Tratarlo como revisión manual hasta tener evidencia. |
 
-## Conciliar
+## Vencimiento durante el pago
+
+El vencimiento del quote sólo impide iniciar pagos nuevos. Si el quote vence
+mientras su settlement ya está en curso, el pago se registra igual y la orden
+continúa; un pago confirmado nunca se descarta por haber llegado tarde.
+
+## Conciliar un pago incierto (`payment_unknown`)
+
+Setareh guarda de cada intento fallido sólo datos derivados de la autorización
+firmada: pagador, destinatario, monto y ledger de expiración. Con ellos el
+comando consulta la red Stellar y decide sin adivinar:
+
+```powershell
+cd backend
+npm.cmd run reconcile:payment -- <quoteId>            # sólo informa
+npm.cmd run reconcile:payment -- <quoteId> --apply    # aplica paid/unpaid
+npm.cmd run reconcile:payment -- <quoteId> --tx <hash>
+```
+
+| Veredicto | Significado | Con `--apply` |
+| --- | --- | --- |
+| `paid` | Hay una transacción exitosa con una transferencia USDC del monto exacto al comercio. | Registra el pago y crea la orden Shopify por el camino idempotente. |
+| `unpaid` | No hay transferencia y la autorización del comprador ya expiró en la red, así que ya no puede cobrarse. | Cierra el quote como `payment_failed`. |
+| `pending` | Todavía no hay transferencia, pero la autorización sigue vigente (normalmente alrededor de un minuto). | Nada; repetir después del ledger indicado. |
+| `ambiguous` | Más de una transferencia coincide. | Nada; elegir la correcta y repetir con `--tx`. |
+| `needs_operator` | Datos inconsistentes, hash que no coincide o intento fuera de la retención del RPC. | Nada; buscar la transacción en un explorador y repetir con `--tx`. |
+
+Cualquier veredicto distinto de `paid` o `unpaid` termina con código de salida 2
+y no modifica nada. Una transacción nunca se asigna a dos quotes. La retención
+de eventos del RPC público de testnet es de unos 7 días; para intentos más
+antiguos hace falta `--tx`.
+
+## Conciliar una orden
 
 Para conocer un draft de Shopify:
 
@@ -626,7 +670,8 @@ para ese quote.
 ## Regla de no duplicación
 
 Nunca crees un segundo quote para “reintentar” un pago que podría haber sido
-liquidado. Primero consulta `get_order_status` o concilia el `quoteId` original.
+liquidado. Primero consulta `get_order_status` o concilia el `quoteId` original;
+si el estado es `payment_unknown`, usa `reconcile:payment` antes que nada.
 Setareh vincula un pago y una orden a cada quote para mantener idempotencia,
 pero las personas que operan el sistema deben conservar esa misma disciplina.
 
@@ -773,6 +818,7 @@ cantidad, dirección, despacho o presupuesto, descarta el quote y crea otro.
 | `STELLAR_PAYMENT_ASSET` | Sí | Debe ser `USDC`. |
 | `STELLAR_MERCHANT_ADDRESS` | Sí | Dirección pública Stellar receptora; Setareh valida su formato. |
 | `X402_FACILITATOR_URL` | No | URL del facilitador; por defecto `https://x402.org/facilitator`. |
+| `STELLAR_RPC_URL` | No | RPC Soroban que usa `reconcile:payment`; por defecto el RPC público de testnet. |
 | `PORT` | No | Puerto de la superficie HTTP, normalmente `4020`. |
 | `SETAREH_TRANSPORT` | No | `stdio` para MCP local, `http` para un contenedor desplegado o `both` para desarrollo. Sin valor, infiere `stdio` sin `PORT` y `both` con `PORT`. |
 
@@ -1033,7 +1079,8 @@ URL canónica: /seguridad/
 | Amenaza | Control actual | Riesgo que permanece |
 | --- | --- | --- |
 | Agente intenta pagar más, con otro activo/red/destino o tras expirar el quote | El backend compara red, activo, destinatario, monto y vencimiento contra el quote; la wallet tiene límites locales. | La configuración de límites y la wallet siguen siendo responsabilidad del operador/agente. |
-| Reintento concurrente crea dos órdenes o dos cargos | Una fila de pago/orden por quote y reclamación atómica de creación de orden. | Casos de infraestructura no probados deben pasar a conciliación, no asumirse como éxito. |
+| Reintento concurrente crea dos órdenes o dos cargos | Una fila de pago/orden por quote; reclamación atómica del settlement (un solo pago llega al facilitador) y de la creación de orden. | Casos de infraestructura no probados deben pasar a conciliación, no asumirse como éxito. |
+| El facilitador no responde o responde de forma ambigua tras enviar la transacción | El quote queda en `payment_unknown`, bloqueado para nuevos pagos; `reconcile:payment` lo resuelve contra la red y sólo lo declara impago cuando la autorización firmada expiró. No se guarda el payload firmado. | Fuera de la retención del RPC (~7 días en testnet) la conciliación requiere un hash aportado por el operador. |
 | Shopify falla después de un settlement válido | Se conserva evidencia y el estado pasa a `manual_review`; el runbook impide reintentar el pago a ciegas. | No hay reembolso automático ni resolución comercial automatizada. |
 | Facilitador o respuesta x402 no coincide con el quote | Se valida el requisito de pago y su settlement antes de completar Shopify. | El facilitador sigue siendo una dependencia externa que debe evaluarse para producción. |
 | Se filtran claves, PII o receipts | `.env` está ignorado, `get_order_status` entrega un resumen y los docs prohíben publicar datos sensibles. | No hay gestor centralizado de secretos, DLP ni auditoría externa en el MVP. |
