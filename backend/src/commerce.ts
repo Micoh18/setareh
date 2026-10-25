@@ -76,6 +76,21 @@ export class CommerceService {
     });
   }
 
+  /** Records a payment_unknown quote's settlement once reconcile:payment has found it on-chain. */
+  recordReconciledSettlement(quoteId: string, transactionHash: string) {
+    const quote = this.db.getQuote(quoteId);
+    if (!quote) throw new Error("Quote not found.");
+    if (quote.status !== "payment_unknown") throw new Error(`Quote is ${quote.status}, not payment_unknown.`);
+    const owner = this.db.getQuoteIdByTransaction(transactionHash);
+    if (owner && owner !== quoteId) throw new Error(`Transaction already settles quote ${owner}.`);
+    this.db.recordPaymentSettled({ quoteId, network: this.config.stellarNetwork, asset: this.config.stellarAsset, amount: quote.totalUsdc, payTo: this.config.stellarMerchantAddress, paymentPayloadHash: "reconciled", transactionHash, receipt: { source: "reconcile:payment", transactionHash } });
+  }
+
+  /** Closes a payment_unknown quote after reconcile:payment proved nothing was, or can still be, settled. */
+  markReconciledUnpaid(quoteId: string) {
+    if (!this.db.transitionQuote(quoteId, "payment_unknown", "payment_failed")) throw new Error("Quote is not payment_unknown.");
+  }
+
   recordSettlement(quoteId: string, payment: { payload: unknown; receipt: unknown; transactionHash?: string }) {
     // Deliberately not getUsableQuote: a quote may expire while its claimed settlement is in flight.
     const quote = this.db.getQuote(quoteId);

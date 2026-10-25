@@ -4,14 +4,15 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { Account, Address, Keypair, Networks, Operation, TransactionBuilder, authorizeInvocation, nativeToScVal, xdr } from "@stellar/stellar-sdk";
+import { Account, Address, Keypair, Networks, Operation, StrKey, TransactionBuilder, authorizeInvocation, nativeToScVal, rpc, xdr } from "@stellar/stellar-sdk";
 import { FacilitatorTimeoutError, SettleError } from "@x402/core/types";
 import { USDC_TESTNET_ADDRESS } from "@x402/stellar";
 import { CommerceService } from "./commerce.js";
 import type { SetarehConfig } from "./config.js";
-import { SetarehDatabase } from "./db.js";
+import { SetarehDatabase, type PaymentAttemptRecord } from "./db.js";
 import { classifySettlementFailure, createHttpApp } from "./http.js";
-import { describeSignedTransfer } from "./stellar-settlement.js";
+import { reconcileUnknownPayment } from "./payment-reconciliation.js";
+import { describeSignedTransfer, type SettlementRpc } from "./stellar-settlement.js";
 
 const merchant = Keypair.random().publicKey();
 const buyer = Keypair.random();
@@ -131,4 +132,101 @@ test("a rejection that reports a submitted transaction keeps its hash for reconc
     assert.equal(run.database.getQuote(run.quote.id)?.status, "payment_unknown");
     assert.equal(run.database.getLatestPaymentAttempt(run.quote.id)?.facilitatorTransaction, hash);
   } finally { await run.close(); }
+});
+
+type ChainTransfer = { hash: string; ledger: number; from: string; to: string; amount: bigint; succeeded?: boolean };
+
+/** An RPC double that answers getTransaction and getEvents from a list of USDC transfers. */
+function chain(transfers: ChainTransfer[], latestLedger: number, oldestLedger = 1): SettlementRpc {
+  const topics = (transfer: ChainTransfer) => [nativeToScVal("transfer", { type: "symbol" }), nativeToScVal(transfer.from, { type: "address" }), nativeToScVal(transfer.to, { type: "address" }), nativeToScVal(`USDC:${merchant}`)];
+  return {
+    getHealth: async () => ({ status: "healthy", latestLedger, oldestLedger, ledgerRetentionWindow: latestLedger - oldestLedger }),
+    getTransaction: async (hash: string) => {
+      const transfer = transfers.find((candidate) => candidate.hash === hash);
+      if (!transfer) return { status: rpc.Api.GetTransactionStatus.NOT_FOUND, txHash: hash } as any;
+      if (transfer.succeeded === false) return { status: rpc.Api.GetTransactionStatus.FAILED, txHash: hash, ledger: transfer.ledger } as any;
+      const event = { contractId: { toXdrObject: () => StrKey.decodeContract(USDC_TESTNET_ADDRESS) }, body: { type: "v0", v0: { topics: topics(transfer), data: nativeToScVal(transfer.amount, { type: "i128" }) } } };
+      return { status: rpc.Api.GetTransactionStatus.SUCCESS, txHash: hash, ledger: transfer.ledger, events: { transactionEventsXdr: [], contractEventsXdr: [[event]] } } as any;
+    },
+    getEvents: async (request: any) => {
+      const events = transfers
+        .filter((transfer) => transfer.succeeded !== false && transfer.ledger >= request.startLedger && transfer.ledger < request.endLedger)
+        .map((transfer) => ({ txHash: transfer.hash, ledger: transfer.ledger, topic: topics(transfer), value: nativeToScVal(transfer.amount, { type: "i128" }) }))
+        // Mirrors the RPC topic filter on payer and merchant.
+        .filter((event) => request.filters[0].topics[0].slice(1, 3).every((wanted: string, index: number) => event.topic[index + 1].toXdr("base64") === wanted));
+      return { events, cursor: "", latestLedger, oldestLedger } as any;
+    },
+  } as unknown as SettlementRpc;
+}
+
+function unknownAttempt(overrides: Partial<PaymentAttemptRecord> = {}): PaymentAttemptRecord {
+  return { id: "attempt", quoteId: "q", outcome: "unknown", errorReason: "facilitator_timeout", facilitatorTransaction: null, payer: buyer.publicKey(), amount: quoteUnits.toString(), payTo: merchant, signatureExpirationLedger: 1_010, createdAt: new Date(Date.now() - 60_000).toISOString(), ...overrides };
+}
+
+const quote = { ...quoteFixture("q"), status: "payment_unknown" as const, fxSource: "configured_demo_rate", createdAt: new Date().toISOString() };
+const reconcile = (server: SettlementRpc, attempt: PaymentAttemptRecord, extra: { operatorTransaction?: string; claimed?: string[] } = {}) =>
+  reconcileUnknownPayment(server, { quote, attempt, asset: USDC_TESTNET_ADDRESS, payTo: merchant, operatorTransaction: extra.operatorTransaction, claimedElsewhere: (hash) => (extra.claimed ?? []).includes(hash) });
+
+test("reconciliation confirms the facilitator's transaction when it carries the quoted transfer", async () => {
+  const hash = "aa".repeat(32);
+  const verdict = await reconcile(chain([{ hash, ledger: 1_002, from: buyer.publicKey(), to: merchant, amount: quoteUnits }], 1_020), unknownAttempt({ facilitatorTransaction: hash }));
+  assert.deepEqual(verdict, { verdict: "paid", transactionHash: hash, ledger: 1_002, source: "facilitator_transaction" });
+});
+
+test("reconciliation finds an unreported settlement by its transfer event", async () => {
+  const transfers = [
+    { hash: "bb".repeat(32), ledger: 1_003, from: buyer.publicKey(), to: merchant, amount: quoteUnits },
+    { hash: "cc".repeat(32), ledger: 1_004, from: buyer.publicKey(), to: merchant, amount: quoteUnits + 1n },
+    { hash: "dd".repeat(32), ledger: 1_005, from: Keypair.random().publicKey(), to: merchant, amount: quoteUnits },
+  ];
+  assert.deepEqual(await reconcile(chain(transfers, 1_020), unknownAttempt()), { verdict: "paid", transactionHash: "bb".repeat(32), ledger: 1_003, source: "event_search" });
+});
+
+test("reconciliation refuses to pick between two matching transfers or reuse another quote's", async () => {
+  const transfers = [
+    { hash: "ee".repeat(32), ledger: 1_003, from: buyer.publicKey(), to: merchant, amount: quoteUnits },
+    { hash: "ff".repeat(32), ledger: 1_006, from: buyer.publicKey(), to: merchant, amount: quoteUnits },
+  ];
+  assert.equal((await reconcile(chain(transfers, 1_020), unknownAttempt())).verdict, "ambiguous");
+  assert.deepEqual(await reconcile(chain(transfers, 1_020), unknownAttempt(), { claimed: ["ee".repeat(32)] }), { verdict: "paid", transactionHash: "ff".repeat(32), ledger: 1_006, source: "event_search" });
+});
+
+test("reconciliation declares a quote unpaid only after the buyer's authorization expired", async () => {
+  const failedHash = "12".repeat(32);
+  const failed = [{ hash: failedHash, ledger: 1_002, from: buyer.publicKey(), to: merchant, amount: quoteUnits, succeeded: false }];
+  const stillValid = await reconcile(chain(failed, 1_008), unknownAttempt({ facilitatorTransaction: failedHash }));
+  assert.equal(stillValid.verdict, "pending");
+  assert.deepEqual(await reconcile(chain(failed, 1_011), unknownAttempt({ facilitatorTransaction: failedHash })), { verdict: "unpaid", reason: "authorization_expired", expiredAtLedger: 1_010, latestLedger: 1_011 });
+  assert.equal((await reconcile(chain([], 1_011), unknownAttempt({ signatureExpirationLedger: null }))).verdict, "pending");
+});
+
+test("reconciliation sends inconsistent or unverifiable cases to an operator", async () => {
+  const server = chain([], 1_020);
+  assert.equal((await reconcile(server, unknownAttempt({ amount: "1" }))).verdict, "needs_operator");
+  assert.equal((await reconcile(server, unknownAttempt({ payTo: Keypair.random().publicKey() }))).verdict, "needs_operator");
+  assert.equal((await reconcile(server, unknownAttempt({ payer: null }))).verdict, "needs_operator");
+  assert.equal((await reconcile(server, unknownAttempt(), { operatorTransaction: "34".repeat(32) })).verdict, "needs_operator");
+  assert.equal((await reconcile(chain([], 1_020, 1_000), unknownAttempt({ createdAt: new Date(Date.now() - 86_400_000).toISOString() }))).verdict, "needs_operator");
+  const mismatched = "56".repeat(32);
+  assert.equal((await reconcile(chain([{ hash: mismatched, ledger: 1_002, from: buyer.publicKey(), to: merchant, amount: 5n }], 1_020), unknownAttempt({ facilitatorTransaction: mismatched }))).verdict, "needs_operator");
+});
+
+test("a reconciled settlement completes the order once; an unpaid verdict frees nothing to charge", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "setareh-reconciled-"));
+  const database = new SetarehDatabase(join(directory, "setareh.db"));
+  try {
+    const shopify = shopifyDouble();
+    const service = new CommerceService(config(directory), database, shopify.client as any);
+    const paid = database.createQuote({ ...quoteFixture("paid"), status: "payment_unknown" });
+    const unpaid = database.createQuote({ ...quoteFixture("unpaid"), status: "payment_unknown" });
+    service.recordReconciledSettlement(paid.id, "ab".repeat(32));
+    const order = await service.placePaidOrder(paid.id, true);
+    assert.equal(order.status, "created");
+    assert.equal(order.payment?.transactionHash, "ab".repeat(32));
+    assert.equal(shopify.calls.completeDraftOrder, 1);
+    assert.throws(() => service.recordReconciledSettlement(unpaid.id, "ab".repeat(32)), /already settles quote paid/);
+    service.markReconciledUnpaid(unpaid.id);
+    assert.equal(database.getQuote(unpaid.id)?.status, "payment_failed");
+    assert.throws(() => service.getPayableQuote(unpaid.id), /not payable/);
+  } finally { database.close(); rmSync(directory, { recursive: true, force: true }); }
 });

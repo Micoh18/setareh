@@ -1,4 +1,4 @@
-import { Address, Networks, TransactionBuilder, scValToNative, type Transaction } from "@stellar/stellar-sdk";
+import { Address, Networks, TransactionBuilder, nativeToScVal, rpc, scValToNative, type Transaction, type xdr } from "@stellar/stellar-sdk";
 
 type OperationRecord = Transaction["operations"][number];
 
@@ -44,4 +44,69 @@ export function describeSignedTransfer(paymentPayload: unknown): SignedTransfer 
   } catch {
     return undefined;
   }
+}
+
+export type ExpectedSettlement = { asset: string; payTo: string; amount: bigint; payer?: string };
+
+export type SettlementLookup =
+  | { found: true; transactionHash: string; ledger: number }
+  | { found: false; reason: "transaction_failed" | "not_found" | "mismatch" };
+
+export type SettlementRpc = Pick<rpc.Server, "getTransaction" | "getEvents" | "getHealth">;
+
+/** Reads a SEP-41 transfer from an event's topics and data; undefined when the event is not one. */
+function transferFromEvent(topics: xdr.ScVal[], data: xdr.ScVal): { from: string; to: string; amount: bigint } | undefined {
+  const [name, from, to] = topics.map((topic) => scValToNative(topic));
+  if (name !== "transfer" || typeof from !== "string" || typeof to !== "string") return undefined;
+  const value = scValToNative(data);
+  // CAP-67 transfer events may carry { amount, to_muxed_id } instead of a bare i128.
+  const amount = typeof value === "bigint" ? value : typeof (value as { amount?: unknown } | null)?.amount === "bigint" ? (value as { amount: bigint }).amount : undefined;
+  return amount === undefined ? undefined : { from, to, amount };
+}
+
+function matches(transfer: { from: string; to: string; amount: bigint }, expected: ExpectedSettlement) {
+  return transfer.to === expected.payTo && transfer.amount === expected.amount && (!expected.payer || transfer.from === expected.payer);
+}
+
+/**
+ * Checks a specific transaction hash on-chain: it must have succeeded and emitted a USDC transfer of
+ * exactly the expected amount to the merchant. Events, not the envelope, are the source of truth, so a
+ * fee-bumped or contract-routed transfer is judged the same way as the event search below.
+ */
+export async function lookupTransaction(server: SettlementRpc, hash: string, expected: ExpectedSettlement): Promise<SettlementLookup> {
+  const result = await server.getTransaction(hash);
+  if (result.status === rpc.Api.GetTransactionStatus.NOT_FOUND) return { found: false, reason: "not_found" };
+  if (result.status === rpc.Api.GetTransactionStatus.FAILED) return { found: false, reason: "transaction_failed" };
+  const paid = result.events.contractEventsXdr.flat().some((event) => {
+    if (!event.contractId || event.body.type !== "v0") return false;
+    if (Address.contract(event.contractId.toXdrObject()).toString() !== expected.asset) return false;
+    const transfer = transferFromEvent(event.body.v0.topics, event.body.v0.data);
+    return transfer !== undefined && matches(transfer, expected);
+  });
+  return paid ? { found: true, transactionHash: hash, ledger: result.ledger } : { found: false, reason: "mismatch" };
+}
+
+/** Upper bound on event pages per search; reaching it is reported, never treated as "not found". */
+const MAX_EVENT_PAGES = 50;
+
+/**
+ * Searches USDC transfer events from the payer to the merchant between two ledgers (inclusive).
+ * Returns every matching transaction so the caller can refuse to guess when more than one fits.
+ */
+export async function searchTransfers(server: SettlementRpc, expected: ExpectedSettlement & { payer: string }, fromLedger: number, toLedger: number) {
+  const topic = [nativeToScVal("transfer", { type: "symbol" }), nativeToScVal(expected.payer, { type: "address" }), nativeToScVal(expected.payTo, { type: "address" })].map((value) => value.toXdr("base64"));
+  const filters = [{ type: "contract" as const, contractIds: [expected.asset], topics: [[...topic, "**"]] }];
+  const found = new Map<string, number>();
+  let cursor: string | undefined;
+  for (let page = 0; page < MAX_EVENT_PAGES; page += 1) {
+    const response = cursor ? await server.getEvents({ filters, cursor, limit: 100 }) : await server.getEvents({ filters, startLedger: fromLedger, endLedger: toLedger + 1, limit: 100 });
+    for (const event of response.events) {
+      if (event.ledger > toLedger) return [...found].map(([transactionHash, ledger]) => ({ transactionHash, ledger }));
+      const transfer = transferFromEvent(event.topic, event.value);
+      if (transfer && matches(transfer, expected)) found.set(event.txHash, event.ledger);
+    }
+    if (response.events.length < 100 || !response.cursor) return [...found].map(([transactionHash, ledger]) => ({ transactionHash, ledger }));
+    cursor = response.cursor;
+  }
+  throw new Error(`Event search exceeded ${MAX_EVENT_PAGES} pages; narrow the window or pass --tx.`);
 }

@@ -208,6 +208,12 @@ export class SetarehDatabase {
     return { id: String(row.id), quoteId: String(row.quote_id), outcome: row.outcome as PaymentAttemptRecord["outcome"], errorReason: String(row.error_reason), facilitatorTransaction: text(row.facilitator_transaction), payer: text(row.payer), amount: text(row.amount), payTo: text(row.pay_to), signatureExpirationLedger: row.signature_expiration_ledger === null ? null : Number(row.signature_expiration_ledger), createdAt: String(row.created_at) };
   }
 
+  /** Which quote, if any, already owns a Stellar transaction; one transaction can settle only one quote. */
+  getQuoteIdByTransaction(transactionHash: string): string | undefined {
+    const row = this.db.prepare("SELECT quote_id FROM payment WHERE stellar_transaction_hash = ?").get(transactionHash) as { quote_id: string } | undefined;
+    return row?.quote_id;
+  }
+
   claimShopifyOrderCreation(quoteId: string) {
     const result = this.db.prepare("UPDATE quote SET status = 'creating_shopify_order' WHERE id = ? AND status = 'payment_settled'").run(quoteId);
     return result.changes === 1;

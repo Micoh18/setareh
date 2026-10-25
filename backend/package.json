@@ -13,6 +13,7 @@
     "doctor": "node ./node_modules/tsx/dist/cli.mjs src/doctor.ts",
     "reconcile:draft": "node ./node_modules/tsx/dist/cli.mjs src/reconcile-draft.ts",
     "reconcile:order": "node ./node_modules/tsx/dist/cli.mjs src/reconcile-order.ts",
+    "reconcile:payment": "node ./node_modules/tsx/dist/cli.mjs src/reconcile-payment.ts",
     "webhooks:ensure": "node ./node_modules/tsx/dist/cli.mjs src/webhooks-ensure.ts"
   },
   "dependencies": {
