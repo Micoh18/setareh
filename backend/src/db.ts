@@ -125,7 +125,8 @@ export class SetarehDatabase {
   getUsableQuote(id: string): QuoteRecord {
     const quote = this.getQuote(id);
     if (!quote) throw new Error("Quote not found.");
-    if (new Date(quote.expiresAt).getTime() <= Date.now() && ["quoted", "payment_required", "payment_submitted"].includes(quote.status)) {
+    // Expiry only gates new payments. Once a settlement is claimed, its outcome must be recorded.
+    if (new Date(quote.expiresAt).getTime() <= Date.now() && ["quoted", "payment_required"].includes(quote.status)) {
       this.updateQuoteStatus(id, "expired");
       quote.status = "expired";
     }

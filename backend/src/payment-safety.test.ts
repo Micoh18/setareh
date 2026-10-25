@@ -107,6 +107,24 @@ test("a paid retry after success neither settles nor orders again", async () => 
   } finally { await run.close(); }
 });
 
+test("a quote that expires while its settlement is in flight keeps the payment and creates the order", async () => {
+  const run = await harness({
+    quoteTtlMs: 1_500,
+    facilitator: async (url) => {
+      if (url === "/settle") { await sleep(2_000); return { ...settled, transaction: "stellar-late-hash" }; }
+      return {};
+    },
+  });
+  try {
+    const accepted = await run.challenge();
+    const paid = await run.pay(accepted, "only-signature");
+    assert.equal(paid.status, 200);
+    assert.ok(new Date(run.quote.expiresAt).getTime() < Date.now(), "the quote must have expired during settlement");
+    assert.equal(run.database.getPayment(run.quote.id)?.stellar_transaction_hash, "stellar-late-hash");
+    assert.equal(run.database.getQuote(run.quote.id)?.status, "created");
+  } finally { await run.close(); }
+});
+
 test("an expired quote cannot be claimed for settlement", async () => {
   const run = await harness({ quoteTtlMs: 200, facilitator: () => settled });
   try {
@@ -114,5 +132,17 @@ test("an expired quote cannot be claimed for settlement", async () => {
     await sleep(300);
     assert.equal(run.database.claimPaymentSubmission(run.quote.id), false);
     assert.equal(run.database.getQuote(run.quote.id)?.status, "payment_required");
+  } finally { await run.close(); }
+});
+
+test("a settlement that cannot be recorded parks the quote in manual review without ordering", async () => {
+  const run = await harness({ quoteTtlMs: 60_000, facilitator: () => settled });
+  try {
+    const accepted = await run.challenge();
+    run.service.recordSettlement = () => { throw new Error("simulated database failure"); };
+    const paid = await run.pay(accepted, "only-signature");
+    assert.notEqual(paid.status, 200);
+    assert.equal(run.database.getQuote(run.quote.id)?.status, "manual_review");
+    assert.equal(run.shopifyCalls.completeDraftOrder, 0);
   } finally { await run.close(); }
 });

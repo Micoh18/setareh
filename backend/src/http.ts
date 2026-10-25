@@ -110,7 +110,14 @@ export function createHttpApp(service: CommerceService, options: { shopifyOAuth?
       const path = (context.transportContext as { request?: { path?: string } } | undefined)?.request?.path;
       if (!path) return;
       const quoteId = quoteIdFromPath(path);
-      service.recordSettlement(quoteId, { payload: context.paymentPayload, receipt: context.result, transactionHash: transactionHash(context.result) });
+      const hash = transactionHash(context.result);
+      try {
+        service.recordSettlement(quoteId, { payload: context.paymentPayload, receipt: context.result, transactionHash: hash });
+      } catch (error) {
+        // Funds moved but the settlement could not be recorded; the order handler will refuse this quote.
+        service.markSettlementUnrecorded(quoteId);
+        console.error(`Settlement for quote ${quoteId} (tx ${hash ?? "unknown"}) was not recorded: ${error instanceof Error ? error.message : "unknown error"}`);
+      }
     })
     .onSettleFailure(async (context) => {
       const path = (context.transportContext as { request?: { path?: string } } | undefined)?.request?.path;

@@ -66,10 +66,17 @@ export class CommerceService {
   }
 
   recordSettlement(quoteId: string, payment: { payload: unknown; receipt: unknown; transactionHash?: string }) {
-    const quote = this.db.getUsableQuote(quoteId);
+    // Deliberately not getUsableQuote: a quote may expire while its claimed settlement is in flight.
+    const quote = this.db.getQuote(quoteId);
+    if (!quote) throw new Error("Quote not found.");
     this.assertSettlementMatchesQuote(quote, payment.payload);
     if (quote.status !== "payment_submitted") throw new Error("Quote is not in a submitted payment state.");
     this.db.recordPaymentSettled({ quoteId, network: this.config.stellarNetwork, asset: this.config.stellarAsset, amount: quote.totalUsdc, payTo: this.config.stellarMerchantAddress, paymentPayloadHash: createHash("sha256").update(JSON.stringify(payment.payload)).digest("hex"), transactionHash: payment.transactionHash, receipt: payment.receipt });
+  }
+
+  /** A settlement succeeded on-chain but could not be recorded; keep the quote out of every automatic path. */
+  markSettlementUnrecorded(quoteId: string) {
+    if (this.db.getQuote(quoteId)) this.db.markManualReview(quoteId);
   }
 
   async placePaidOrder(quoteId: string, userConfirmed: true) {
