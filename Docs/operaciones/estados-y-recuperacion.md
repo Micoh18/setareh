@@ -77,6 +77,13 @@ El segundo comando consulta el draft, persiste la orden cuando existe e intenta
 adjuntar la evidencia. Úsalo sólo después de confirmar que hay un pago liquidado
 para ese quote.
 
+## Historial de estados
+
+Cada transición de un quote queda en la tabla `quote_event` con el estado
+anterior, el nuevo, la hora y el `correlationId` de la request que la causó, y
+se registra también en los logs como `quote.status`. Es la primera fuente para
+reconstruir qué pasó con una compra antes de conciliar.
+
 ## Regla de no duplicación
 
 Nunca crees un segundo quote para “reintentar” un pago que podría haber sido
