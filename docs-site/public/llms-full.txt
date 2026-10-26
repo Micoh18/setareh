@@ -143,6 +143,20 @@ límite local antes de firmar.
 Un quote admite un pago y una orden. Ante reintentos, usa siempre el mismo
 `quoteId` para consultar o conciliar, nunca para iniciar una compra paralela.
 
+### Diagnosticar con el correlationId
+
+Cada respuesta HTTP trae `X-Request-Id`. Si el cliente lo envió como un token
+opaco (8 a 128 caracteres de letras, dígitos, `.`, `_`, `:` o `-`), Setareh lo
+reutiliza; si no, genera un UUID. Los logs son JSON por línea en stderr y cada
+línea lleva ese valor como `correlationId`, así que una compra con problemas se
+reconstruye filtrando por él: `http.request`, `quote.status` (de → a),
+`payment.*`, `shopify.call` (operación, status, latencia) y `http.error`.
+
+El historial completo de estados de un quote, con el `correlationId` de la
+request que causó cada cambio, está en la tabla `quote_event` de la base
+SQLite. Los logs y esa tabla nunca contienen email, dirección, teléfono,
+tokens ni pagos firmados; se pueden compartir para diagnóstico.
+
 ## Cierre de una demo
 
 Registra de forma interna el resultado y elimina de las notas públicas
@@ -182,6 +196,9 @@ duda, el agente no paga. Crea un quote nuevo y vuelve a presentar el resumen.
 6. La wallet hace el primer `POST`, lee el desafío `402`, valida sus límites y
    firma localmente sólo si lo acepta.
 7. Reintenta el `POST` con x402 y conserva `quoteId` para seguimiento.
+   Envía un `X-Request-Id` propio (un token opaco de 8 a 128 caracteres) en
+   cada llamada: Setareh lo devuelve y lo usa para correlacionar sus logs, lo
+   que acelera cualquier revisión.
 8. `get_order_status` para comunicar el resultado sólo cuando la orden fue
    creada, o para detectar `payment_unknown` o `manual_review`.
 
@@ -667,6 +684,13 @@ El segundo comando consulta el draft, persiste la orden cuando existe e intenta
 adjuntar la evidencia. Úsalo sólo después de confirmar que hay un pago liquidado
 para ese quote.
 
+## Historial de estados
+
+Cada transición de un quote queda en la tabla `quote_event` con el estado
+anterior, el nuevo, la hora y el `correlationId` de la request que la causó, y
+se registra también en los logs como `quote.status`. Es la primera fuente para
+reconstruir qué pasó con una compra antes de conciliar.
+
 ## Regla de no duplicación
 
 Nunca crees un segundo quote para “reintentar” un pago que podría haber sido
@@ -1056,6 +1080,18 @@ URL canónica: /seguridad/
   atómicamente para evitar duplicados ante reintentos.
 - La evidencia persistida expone un resumen y hash de transacción, no el
   receipt crudo del facilitador a través de `get_order_status`.
+- Los logs son JSON estructurado y redactado: sólo se escriben campos
+  operativos de una lista permitida (`quoteId`, estado, ruta, latencia, hash
+  Stellar) y todo texto se filtra contra emails, seeds Stellar, tokens Shopify,
+  credenciales y blobs codificados como pagos firmados. Las variables de las
+  llamadas a Shopify y los argumentos de las tools MCP nunca se registran.
+- Cada request HTTP y cada tool MCP lleva un `correlationId` (el `X-Request-Id`
+  del cliente si es un token opaco, o un UUID generado) que se devuelve en la
+  respuesta y acompaña cada línea de log y cada cambio de estado del quote,
+  auditado en la tabla `quote_event`.
+- Las respuestas `500` no devuelven el texto interno del error, que puede
+  provenir de Shopify o del facilitador; el detalle queda sólo en el log
+  redactado bajo el `correlationId`.
 - El CI revisa `Docs/` contra patrones conocidos de tokens Shopify, seeds Stellar
   y asignaciones de secretos antes de compilar el portal. Es una barrera contra
   errores comunes, no un sustituto de la revisión humana o de un gestor de
@@ -1083,7 +1119,7 @@ URL canónica: /seguridad/
 | El facilitador no responde o responde de forma ambigua tras enviar la transacción | El quote queda en `payment_unknown`, bloqueado para nuevos pagos; `reconcile:payment` lo resuelve contra la red y sólo lo declara impago cuando la autorización firmada expiró. No se guarda el payload firmado. | Fuera de la retención del RPC (~7 días en testnet) la conciliación requiere un hash aportado por el operador. |
 | Shopify falla después de un settlement válido | Se conserva evidencia y el estado pasa a `manual_review`; el runbook impide reintentar el pago a ciegas. | No hay reembolso automático ni resolución comercial automatizada. |
 | Facilitador o respuesta x402 no coincide con el quote | Se valida el requisito de pago y su settlement antes de completar Shopify. | El facilitador sigue siendo una dependencia externa que debe evaluarse para producción. |
-| Se filtran claves, PII o receipts | `.env` está ignorado, `get_order_status` entrega un resumen y los docs prohíben publicar datos sensibles. | No hay gestor centralizado de secretos, DLP ni auditoría externa en el MVP. |
+| Se filtran claves, PII o receipts | `.env` está ignorado, `get_order_status` entrega un resumen, los logs se redactan con lista permitida y filtros, las respuestas `500` son genéricas y los docs prohíben publicar datos sensibles. | No hay gestor centralizado de secretos, DLP ni auditoría externa en el MVP; la retención de logs depende del proveedor. |
 | Instalación OAuth falsificada o repetida | El callback exige firma HMAC de Shopify, dominio `*.myshopify.com` anclado y un `state` de un solo uso que vence en 10 minutos; el webhook de desinstalación exige firma sobre el cuerpo crudo. | La clave de cifrado vive en el entorno del servidor; quien controle ese entorno puede descifrar los tokens. |
 | Endpoint público recibe abuso o tráfico no autorizado | La creación de quotes, que genera drafts reales en Shopify, está limitada por cliente y en total por hora (`429` con `Retry-After`); el despliegue termina HTTPS. | El límite vive en memoria de una sola instancia; no hay autenticación de agentes, WAF ni control de acceso por comercio. |
 

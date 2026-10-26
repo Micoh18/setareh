@@ -108,6 +108,20 @@ límite local antes de firmar.
 Un quote admite un pago y una orden. Ante reintentos, usa siempre el mismo
 `quoteId` para consultar o conciliar, nunca para iniciar una compra paralela.
 
+### Diagnosticar con el correlationId
+
+Cada respuesta HTTP trae `X-Request-Id`. Si el cliente lo envió como un token
+opaco (8 a 128 caracteres de letras, dígitos, `.`, `_`, `:` o `-`), Setareh lo
+reutiliza; si no, genera un UUID. Los logs son JSON por línea en stderr y cada
+línea lleva ese valor como `correlationId`, así que una compra con problemas se
+reconstruye filtrando por él: `http.request`, `quote.status` (de → a),
+`payment.*`, `shopify.call` (operación, status, latencia) y `http.error`.
+
+El historial completo de estados de un quote, con el `correlationId` de la
+request que causó cada cambio, está en la tabla `quote_event` de la base
+SQLite. Los logs y esa tabla nunca contienen email, dirección, teléfono,
+tokens ni pagos firmados; se pueden compartir para diagnóstico.
+
 ## Cierre de una demo
 
 Registra de forma interna el resultado y elimina de las notas públicas

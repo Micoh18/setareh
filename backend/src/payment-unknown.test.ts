@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { Account, Address, Keypair, Networks, Operation, StrKey, TransactionBuilder, authorizeInvocation, nativeToScVal, rpc, xdr } from "@stellar/stellar-sdk";
-import { FacilitatorTimeoutError, SettleError } from "@x402/core/types";
+import { FacilitatorResponseError, FacilitatorTimeoutError, SettleError } from "@x402/core/types";
 import { USDC_TESTNET_ADDRESS } from "@x402/stellar";
 import { CommerceService } from "./commerce.js";
 import type { SetarehConfig } from "./config.js";
@@ -62,7 +62,9 @@ test("only an explicit facilitator rejection without a transaction counts as a d
   assert.equal(classifySettlementFailure(new SettleError(500, { success: false, errorReason: "unexpected_settle_error", transaction: "", network: "stellar:testnet" })).definite, false);
   assert.equal(classifySettlementFailure(new SettleError(500, { success: false, errorReason: "settlement_pending", transaction: "", network: "stellar:testnet" })).definite, false);
   assert.deepEqual(classifySettlementFailure(new FacilitatorTimeoutError("settle", 90_000)), { definite: false, reason: "facilitator_timeout" });
-  assert.equal(classifySettlementFailure(new TypeError("fetch failed")).definite, false);
+  assert.deepEqual(classifySettlementFailure(new TypeError("fetch failed")), { definite: false, reason: "facilitator_unreachable" });
+  assert.deepEqual(classifySettlementFailure(new Error("Facilitator settle failed (502): <html>")), { definite: false, reason: "facilitator_http_error" });
+  assert.deepEqual(classifySettlementFailure(new FacilitatorResponseError("Facilitator settle returned invalid data")), { definite: false, reason: "facilitator_invalid_response" });
 });
 
 async function payAgainst(settle: (response: import("node:http").ServerResponse) => void) {

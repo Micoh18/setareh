@@ -1,6 +1,7 @@
 import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { SetarehDatabase, ShopifyInstallationRecord } from "./db.js";
 import { ClientCredentialsTokenProvider, ShopifyClient, shopifyEnvironment, type ShopifyAccessTokenProvider } from "./shopify.js";
+import { errorMessage, log } from "./log.js";
 
 /** Admin API scopes Setareh needs on every installed store. */
 export const SHOPIFY_REQUIRED_SCOPES = ["read_products", "read_inventory", "write_draft_orders", "read_orders", "write_orders"] as const;
@@ -150,7 +151,7 @@ export class ShopifyOAuth {
     if (missing.length) throw new ShopifyOAuthError("missing_scopes", `Shopify did not grant required scopes: ${missing.join(", ")}.`);
     this.saveTokens(shop.toLowerCase(), tokens);
     if (this.options.onInstalled) {
-      try { await this.options.onInstalled(shop.toLowerCase()); } catch (error) { console.error(`Post-install step failed for ${shop.toLowerCase()}: ${error instanceof Error ? error.message : String(error)}`); }
+      try { await this.options.onInstalled(shop.toLowerCase()); } catch (error) { log("error", "shopify.oauth.post_install_failed", { shop: shop.toLowerCase(), message: errorMessage(error) }); }
     }
     return { shop: shop.toLowerCase(), scopes: granted };
   }
@@ -262,7 +263,7 @@ export function shopifyOAuthFromEnvironment(db: SetarehDatabase, baseUrl: string
     db, cipher: new TokenCipher(encryptionKey), clientId, clientSecret, redirectUri: `${origin}${SHOPIFY_CALLBACK_PATH}`,
     onInstalled: async (shop) => {
       const result = await new ShopifyClient(shop, apiVersion, oauth.tokenProvider(shop)).ensureUninstallWebhook(`${origin}${SHOPIFY_UNINSTALLED_WEBHOOK_PATH}`);
-      console.error(`app/uninstalled webhook ${result.action} for ${shop}`);
+      log("info", "shopify.webhook.uninstalled", { shop, action: result.action });
     },
   });
   return oauth;

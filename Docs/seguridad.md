@@ -15,6 +15,18 @@ description: Controles implementados, límites del MVP, amenazas tratadas y ries
   atómicamente para evitar duplicados ante reintentos.
 - La evidencia persistida expone un resumen y hash de transacción, no el
   receipt crudo del facilitador a través de `get_order_status`.
+- Los logs son JSON estructurado y redactado: sólo se escriben campos
+  operativos de una lista permitida (`quoteId`, estado, ruta, latencia, hash
+  Stellar) y todo texto se filtra contra emails, seeds Stellar, tokens Shopify,
+  credenciales y blobs codificados como pagos firmados. Las variables de las
+  llamadas a Shopify y los argumentos de las tools MCP nunca se registran.
+- Cada request HTTP y cada tool MCP lleva un `correlationId` (el `X-Request-Id`
+  del cliente si es un token opaco, o un UUID generado) que se devuelve en la
+  respuesta y acompaña cada línea de log y cada cambio de estado del quote,
+  auditado en la tabla `quote_event`.
+- Las respuestas `500` no devuelven el texto interno del error, que puede
+  provenir de Shopify o del facilitador; el detalle queda sólo en el log
+  redactado bajo el `correlationId`.
 - El CI revisa `Docs/` contra patrones conocidos de tokens Shopify, seeds Stellar
   y asignaciones de secretos antes de compilar el portal. Es una barrera contra
   errores comunes, no un sustituto de la revisión humana o de un gestor de
@@ -42,7 +54,7 @@ description: Controles implementados, límites del MVP, amenazas tratadas y ries
 | El facilitador no responde o responde de forma ambigua tras enviar la transacción | El quote queda en `payment_unknown`, bloqueado para nuevos pagos; `reconcile:payment` lo resuelve contra la red y sólo lo declara impago cuando la autorización firmada expiró. No se guarda el payload firmado. | Fuera de la retención del RPC (~7 días en testnet) la conciliación requiere un hash aportado por el operador. |
 | Shopify falla después de un settlement válido | Se conserva evidencia y el estado pasa a `manual_review`; el runbook impide reintentar el pago a ciegas. | No hay reembolso automático ni resolución comercial automatizada. |
 | Facilitador o respuesta x402 no coincide con el quote | Se valida el requisito de pago y su settlement antes de completar Shopify. | El facilitador sigue siendo una dependencia externa que debe evaluarse para producción. |
-| Se filtran claves, PII o receipts | `.env` está ignorado, `get_order_status` entrega un resumen y los docs prohíben publicar datos sensibles. | No hay gestor centralizado de secretos, DLP ni auditoría externa en el MVP. |
+| Se filtran claves, PII o receipts | `.env` está ignorado, `get_order_status` entrega un resumen, los logs se redactan con lista permitida y filtros, las respuestas `500` son genéricas y los docs prohíben publicar datos sensibles. | No hay gestor centralizado de secretos, DLP ni auditoría externa en el MVP; la retención de logs depende del proveedor. |
 | Instalación OAuth falsificada o repetida | El callback exige firma HMAC de Shopify, dominio `*.myshopify.com` anclado y un `state` de un solo uso que vence en 10 minutos; el webhook de desinstalación exige firma sobre el cuerpo crudo. | La clave de cifrado vive en el entorno del servidor; quien controle ese entorno puede descifrar los tokens. |
 | Endpoint público recibe abuso o tráfico no autorizado | La creación de quotes, que genera drafts reales en Shopify, está limitada por cliente y en total por hora (`429` con `Retry-After`); el despliegue termina HTTPS. | El límite vive en memoria de una sola instancia; no hay autenticación de agentes, WAF ni control de acceso por comercio. |
 

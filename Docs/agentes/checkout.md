@@ -24,6 +24,9 @@ duda, el agente no paga. Crea un quote nuevo y vuelve a presentar el resumen.
 6. La wallet hace el primer `POST`, lee el desafío `402`, valida sus límites y
    firma localmente sólo si lo acepta.
 7. Reintenta el `POST` con x402 y conserva `quoteId` para seguimiento.
+   Envía un `X-Request-Id` propio (un token opaco de 8 a 128 caracteres) en
+   cada llamada: Setareh lo devuelve y lo usa para correlacionar sus logs, lo
+   que acelera cualquier revisión.
 8. `get_order_status` para comunicar el resultado sólo cuando la orden fue
    creada, o para detectar `payment_unknown` o `manual_review`.
 

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
+import { currentCorrelationId, log } from "./log.js";
 
 export type QuoteStatus = "quoted" | "payment_required" | "payment_submitted" | "payment_settled" | "creating_shopify_order" | "created" | "expired" | "out_of_stock" | "payment_failed" | "payment_unknown" | "shopify_failed" | "manual_review";
 
@@ -102,6 +103,12 @@ export class SetarehDatabase {
         created_at TEXT NOT NULL,
         FOREIGN KEY (quote_id) REFERENCES quote(id)
       ) STRICT;
+      CREATE TABLE IF NOT EXISTS quote_event (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, quote_id TEXT NOT NULL, from_status TEXT, to_status TEXT NOT NULL,
+        at TEXT NOT NULL, correlation_id TEXT,
+        FOREIGN KEY (quote_id) REFERENCES quote(id)
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS quote_event_quote ON quote_event (quote_id, id);
       CREATE TABLE IF NOT EXISTS shopify_oauth_state (
         state TEXT PRIMARY KEY, shop TEXT NOT NULL, expires_at TEXT NOT NULL
       ) STRICT;
@@ -134,6 +141,7 @@ export class SetarehDatabase {
     this.db.prepare(`INSERT INTO quote (id, merchant_id, status, currency_shopify, total_shopify, currency_payment, total_usdc, fx_rate, fx_source, expires_at, shipping_address_json, line_items_json, email, shopify_draft_order_id, idempotency_key, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(quote.id, quote.merchantId, quote.status, quote.currencyShopify, quote.totalShopify, quote.currencyPayment, quote.totalUsdc, quote.fxRate, quote.fxSource, quote.expiresAt, quote.shippingAddressJson, quote.lineItemsJson, quote.email, quote.shopifyDraftOrderId, quote.idempotencyKey, quote.createdAt);
+    this.recordTransition(quote.id, null, quote.status);
     return quote;
   }
 
@@ -158,7 +166,31 @@ export class SetarehDatabase {
   }
 
   updateQuoteStatus(id: string, status: QuoteStatus) {
-    this.db.prepare("UPDATE quote SET status = ? WHERE id = ?").run(status, id);
+    this.changeStatus(id, status);
+  }
+
+  /**
+   * Every quote status change goes through here, so each one is audited in quote_event and logged with
+   * the current correlation ID. `from`/`extraCondition` make the change conditional; the read and the
+   * update run back to back on the synchronous SQLite handle, so `from_status` is exact.
+   */
+  private changeStatus(id: string, to: QuoteStatus, from?: QuoteStatus, extraCondition = "", ...extraParams: string[]) {
+    const current = this.db.prepare("SELECT status FROM quote WHERE id = ?").get(id) as { status: QuoteStatus } | undefined;
+    if (!current || (from !== undefined && current.status !== from)) return false;
+    const changed = this.db.prepare(`UPDATE quote SET status = ? WHERE id = ? AND status = ?${extraCondition}`).run(to, id, current.status, ...extraParams).changes === 1;
+    if (changed && current.status !== to) this.recordTransition(id, current.status, to);
+    return changed;
+  }
+
+  private recordTransition(quoteId: string, from: QuoteStatus | null, to: QuoteStatus) {
+    const correlationId = currentCorrelationId() ?? null;
+    this.db.prepare("INSERT INTO quote_event (quote_id, from_status, to_status, at, correlation_id) VALUES (?, ?, ?, ?, ?)").run(quoteId, from, to, now(), correlationId);
+    log(to === "manual_review" || to === "payment_unknown" ? "warn" : "info", "quote.status", { quoteId, from: from ?? "none", to });
+  }
+
+  getQuoteEvents(quoteId: string): Array<{ from: QuoteStatus | null; to: QuoteStatus; at: string; correlationId: string | null }> {
+    const rows = this.db.prepare("SELECT from_status, to_status, at, correlation_id FROM quote_event WHERE quote_id = ? ORDER BY id").all(quoteId) as Array<Record<string, unknown>>;
+    return rows.map((row) => ({ from: (row.from_status ?? null) as QuoteStatus | null, to: row.to_status as QuoteStatus, at: String(row.at), correlationId: row.correlation_id === null ? null : String(row.correlation_id) }));
   }
 
   recordPaymentSettled(input: { quoteId: string; network: string; asset: string; amount: string; payTo: string; paymentPayloadHash: string; transactionHash?: string; receipt: unknown }) {
@@ -185,13 +217,12 @@ export class SetarehDatabase {
 
   /** Moves a live quote to payment_submitted in one statement, so only one settlement can start per quote. */
   claimPaymentSubmission(quoteId: string) {
-    const result = this.db.prepare("UPDATE quote SET status = 'payment_submitted' WHERE id = ? AND status = 'payment_required' AND expires_at > ?").run(quoteId, now());
-    return result.changes === 1;
+    return this.changeStatus(quoteId, "payment_submitted", "payment_required", " AND expires_at > ?", now());
   }
 
   /** Conditional status change; returns false when the quote was not in the expected status. */
   transitionQuote(quoteId: string, from: QuoteStatus, to: QuoteStatus) {
-    return this.db.prepare("UPDATE quote SET status = ? WHERE id = ? AND status = ?").run(to, quoteId, from).changes === 1;
+    return this.changeStatus(quoteId, to, from);
   }
 
   recordPaymentAttempt(input: Omit<PaymentAttemptRecord, "id" | "createdAt">): PaymentAttemptRecord {
@@ -215,8 +246,7 @@ export class SetarehDatabase {
   }
 
   claimShopifyOrderCreation(quoteId: string) {
-    const result = this.db.prepare("UPDATE quote SET status = 'creating_shopify_order' WHERE id = ? AND status = 'payment_settled'").run(quoteId);
-    return result.changes === 1;
+    return this.changeStatus(quoteId, "creating_shopify_order", "payment_settled");
   }
 
   getOrderByQuote(quoteId: string): OrderRecord | undefined {
