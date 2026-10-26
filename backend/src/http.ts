@@ -1,7 +1,7 @@
 import express, { type ErrorRequestHandler } from "express";
 import { HTTPFacilitatorClient, x402ResourceServer } from "@x402/core/server";
 import { paymentMiddleware } from "@x402/express";
-import { FacilitatorTimeoutError, SettleError } from "@x402/core/types";
+import { FacilitatorResponseError, FacilitatorTimeoutError, SettleError } from "@x402/core/types";
 import { ExactStellarScheme } from "@x402/stellar/exact/server";
 import * as z from "zod/v4";
 import { CommerceService } from "./commerce.js";
@@ -40,7 +40,11 @@ export function classifySettlementFailure(error: unknown): { definite: boolean; 
     return { definite: !transaction && !AMBIGUOUS_SETTLE_REASONS.has(reason), reason, transaction };
   }
   if (error instanceof FacilitatorTimeoutError) return { definite: false, reason: "facilitator_timeout" };
-  return { definite: false, reason: error instanceof Error ? error.name || "facilitator_error" : "facilitator_error" };
+  if (error instanceof FacilitatorResponseError) return { definite: false, reason: "facilitator_invalid_response" };
+  const message = error instanceof Error ? error.message : "";
+  if (/^Facilitator settle failed \(\d+\)/.test(message)) return { definite: false, reason: "facilitator_http_error" };
+  if (error instanceof TypeError) return { definite: false, reason: "facilitator_unreachable" };
+  return { definite: false, reason: "facilitator_error" };
 }
 
 const UUID_SEGMENT = /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?=\/|$)/gi;
@@ -163,7 +167,7 @@ export function createHttpApp(service: CommerceService, options: { shopifyOAuth?
       const quoteId = quoteIdFromPath(path);
       const failure = classifySettlementFailure(context.error);
       const attempt = service.recordSettlementFailure(quoteId, failure, context.paymentPayload);
-      if (attempt) log(attempt.outcome === "unknown" ? "warn" : "info", attempt.outcome === "unknown" ? "payment.unknown" : "payment.failed", { quoteId, reason: failure.reason, transactionHash: failure.transaction });
+      if (attempt) log(attempt.outcome === "unknown" ? "warn" : "info", attempt.outcome === "unknown" ? "payment.unknown" : "payment.failed", { quoteId, reason: failure.reason, transactionHash: failure.transaction, message: errorMessage(context.error) });
     });
   const routes = {
     "POST /v1/quotes/:quoteId/pay-and-place": {
