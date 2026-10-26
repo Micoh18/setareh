@@ -1,3 +1,5 @@
+import { errorMessage, log } from "./log.js";
+
 export type ShopifyUserError = { field?: string[]; message: string };
 export type ShopifyAddress = { address1: string; address2?: string; city: string; province?: string; country: string; zip: string; firstName: string; lastName: string; phone?: string };
 export type ShopifyLineItem = { variantId: string; quantity: number };
@@ -114,12 +116,23 @@ export class ShopifyClient {
   }
 
   async graphql<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
-    const response = await fetch(this.endpoint, { method: "POST", headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": await this.tokens.getAccessToken() }, body: JSON.stringify({ query, variables }) });
-    if (response.status === 401) throw new Error(`Shopify rejected Setareh's access token (401) using ${this.tokens.mode}. Verify that the app is still installed on ${this.storeDomain}.`);
-    const payload = await response.json() as GraphQlResponse<T>;
-    if (!response.ok || payload.errors?.length) throw new Error(`Shopify Admin API error (${response.status}): ${payload.errors?.map((error) => error.message).join("; ") ?? response.statusText}`);
-    if (!payload.data) throw new Error("Shopify Admin API returned no data.");
-    return payload.data;
+    // Only the operation name is logged: variables carry buyer email and shipping address.
+    const operation = /^\s*(?:query|mutation)\s+(\w+)/.exec(query)?.[1] ?? "anonymous";
+    const startedAt = performance.now();
+    let httpStatus: number | undefined;
+    try {
+      const response = await fetch(this.endpoint, { method: "POST", headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": await this.tokens.getAccessToken() }, body: JSON.stringify({ query, variables }) });
+      httpStatus = response.status;
+      if (response.status === 401) throw new Error(`Shopify rejected Setareh's access token (401) using ${this.tokens.mode}. Verify that the app is still installed on ${this.storeDomain}.`);
+      const payload = await response.json() as GraphQlResponse<T>;
+      if (!response.ok || payload.errors?.length) throw new Error(`Shopify Admin API error (${response.status}): ${payload.errors?.map((error) => error.message).join("; ") ?? response.statusText}`);
+      if (!payload.data) throw new Error("Shopify Admin API returned no data.");
+      log("info", "shopify.call", { operation, httpStatus, durationMs: Math.round(performance.now() - startedAt) });
+      return payload.data;
+    } catch (error) {
+      log("warn", "shopify.call", { operation, httpStatus, durationMs: Math.round(performance.now() - startedAt), message: errorMessage(error) });
+      throw error;
+    }
   }
 
   /** Creates or repoints the app/uninstalled subscription for this store. Idempotent; returns the subscription id. */

@@ -9,6 +9,7 @@ import { createHttpApp } from "./http.js";
 import { createMcpServer } from "./mcp.js";
 import { resolveTransport } from "./runtime.js";
 import { createShopifyRuntime } from "./shopify-oauth.js";
+import { log } from "./log.js";
 
 dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), "../.env"), quiet: true });
 
@@ -22,12 +23,12 @@ const transport = resolveTransport(process.env.SETAREH_TRANSPORT, config.port);
 if (transport === "http" || transport === "both") {
   const app = createHttpApp(commerce, { shopifyOAuth: shopify.oauth });
   const host = config.httpHost ?? "127.0.0.1";
-  app.listen(config.port!, host, () => console.error(`Setareh HTTP listening on ${config.baseUrl ?? `http://${host}:${config.port}`} (Shopify auth: ${shopify.mode}; OAuth install routes ${shopify.oauth ? "enabled" : "disabled"})`));
+  app.listen(config.port!, host, () => log("info", "server.listening", { url: config.baseUrl ?? `http://${host}:${config.port}`, authMode: shopify.mode, oauthRoutes: shopify.oauth ? "enabled" : "disabled" }));
 }
 
 if (transport === "stdio" || transport === "both") {
-  console.error("Setareh MCP running on stdio");
+  log("info", "server.started", { transport: "stdio" });
   void serveStdio(() => server);
 } else {
-  console.error("Setareh HTTP-only runtime started");
+  log("info", "server.started", { transport: "http" });
 }

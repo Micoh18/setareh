@@ -5,6 +5,7 @@ import { FacilitatorTimeoutError, SettleError } from "@x402/core/types";
 import { ExactStellarScheme } from "@x402/stellar/exact/server";
 import * as z from "zod/v4";
 import { CommerceService } from "./commerce.js";
+import { correlationIdFrom, errorMessage, log, withCorrelation } from "./log.js";
 import { DEFAULT_QUOTE_RATE_LIMITS, SlidingWindowLimiter, clientKey, type QuoteRateLimits } from "./rate-limit.js";
 import { SHOPIFY_CALLBACK_PATH, SHOPIFY_INSTALL_PATH, SHOPIFY_UNINSTALLED_WEBHOOK_PATH, ShopifyOAuth, ShopifyOAuthError, isValidShopDomain, verifyQueryHmac, verifyWebhookHmac } from "./shopify-oauth.js";
 
@@ -40,6 +41,13 @@ export function classifySettlementFailure(error: unknown): { definite: boolean; 
   }
   if (error instanceof FacilitatorTimeoutError) return { definite: false, reason: "facilitator_timeout" };
   return { definite: false, reason: error instanceof Error ? error.name || "facilitator_error" : "facilitator_error" };
+}
+
+const UUID_SEGMENT = /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?=\/|$)/gi;
+
+/** Request path with identifiers collapsed, so routes aggregate and no free-form path text is logged. */
+function routeLabel(path: string) {
+  return path.replace(UUID_SEGMENT, "/:id").split("/").map((segment) => (segment.length > 40 || segment.includes("%") ? ":param" : segment)).join("/");
 }
 
 function queryParams(request: { originalUrl: string }) {
@@ -78,7 +86,7 @@ function registerShopifyOAuthRoutes(app: ReturnType<typeof express>, oauth: Shop
     } catch (error) {
       const status = error instanceof ShopifyOAuthError ? error.status : 500;
       const code = error instanceof ShopifyOAuthError ? error.code : "internal_error";
-      console.error(`Shopify OAuth callback rejected: ${code}`);
+      log("warn", "shopify.oauth.callback_rejected", { errorCode: code });
       return response.status(status).type("html").send(installPage("No se pudo completar la instalación", `Shopify no confirmó la autorización (${code}). Vuelve a abrir el enlace de instalación.`));
     }
   });
@@ -87,6 +95,17 @@ function registerShopifyOAuthRoutes(app: ReturnType<typeof express>, oauth: Shop
 export function createHttpApp(service: CommerceService, options: { shopifyOAuth?: ShopifyOAuth; quoteRateLimits?: QuoteRateLimits } = {}) {
   const app = express();
   app.disable("x-powered-by");
+  // Every request runs under a correlation ID (the caller's X-Request-Id when well-formed), echoed back
+  // and attached to every log line and quote status change made while serving it.
+  app.use((request: any, response: any, next: any) => {
+    const correlationId = correlationIdFrom(request.get("x-request-id"));
+    const startedAt = performance.now();
+    response.set("X-Request-Id", correlationId);
+    response.on("finish", () => withCorrelation(correlationId, () => log(response.statusCode >= 500 ? "error" : "info", "http.request", {
+      method: request.method, route: routeLabel(request.path), httpStatus: response.statusCode, durationMs: Math.round(performance.now() - startedAt),
+    })));
+    withCorrelation(correlationId, next);
+  });
   // Every quote creates a real Shopify draft order, so quote creation is throttled per client and globally.
   const limits = options.quoteRateLimits ?? service.config.quoteRateLimits ?? DEFAULT_QUOTE_RATE_LIMITS;
   const perClient = new SlidingWindowLimiter(limits.perClientPerHour, 3_600_000);
@@ -131,10 +150,11 @@ export function createHttpApp(service: CommerceService, options: { shopifyOAuth?
       const hash = transactionHash(context.result);
       try {
         service.recordSettlement(quoteId, { payload: context.paymentPayload, receipt: context.result, transactionHash: hash });
+        log("info", "payment.settled", { quoteId, transactionHash: hash, network: service.config.stellarNetwork });
       } catch (error) {
         // Funds moved but the settlement could not be recorded; the order handler will refuse this quote.
         service.markSettlementUnrecorded(quoteId);
-        console.error(`Settlement for quote ${quoteId} (tx ${hash ?? "unknown"}) was not recorded: ${error instanceof Error ? error.message : "unknown error"}`);
+        log("error", "payment.unrecorded", { quoteId, transactionHash: hash, message: errorMessage(error) });
       }
     })
     .onSettleFailure(async (context) => {
@@ -143,7 +163,7 @@ export function createHttpApp(service: CommerceService, options: { shopifyOAuth?
       const quoteId = quoteIdFromPath(path);
       const failure = classifySettlementFailure(context.error);
       const attempt = service.recordSettlementFailure(quoteId, failure, context.paymentPayload);
-      if (attempt?.outcome === "unknown") console.error(`Settlement outcome unknown for quote ${quoteId} (${failure.reason}); run reconcile:payment before any retry.`);
+      if (attempt) log(attempt.outcome === "unknown" ? "warn" : "info", attempt.outcome === "unknown" ? "payment.unknown" : "payment.failed", { quoteId, reason: failure.reason, transactionHash: failure.transaction });
     });
   const routes = {
     "POST /v1/quotes/:quoteId/pay-and-place": {
@@ -166,6 +186,8 @@ export function createHttpApp(service: CommerceService, options: { shopifyOAuth?
   const errors: ErrorRequestHandler = (error: unknown, _request: any, response: any, _next: any) => {
     const message = error instanceof Error ? error.message : "Unexpected error";
     const status = error instanceof z.ZodError ? 400 : /not found/i.test(message) ? 404 : /expired|not available|limit|not payable/i.test(message) ? 409 : 500;
+    // Validation details may echo request fields; log only the class of a 400.
+    log(status === 500 ? "error" : "info", "http.error", { httpStatus: status, message: status === 400 ? "invalid_request" : message });
     response.status(status).json({ error: { code: status === 500 ? "internal_error" : "request_rejected", message } });
   };
   app.use(errors);
