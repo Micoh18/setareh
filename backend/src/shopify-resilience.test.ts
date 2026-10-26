@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+import { CommerceService } from "./commerce.js";
+import { SetarehDatabase } from "./db.js";
 import { ShopifyClient } from "./shopify.js";
 
 const variant = { id: "gid://shopify/ProductVariant/1", title: "Única", sku: null, price: "15000", inventoryQuantity: 1, inventoryPolicy: "DENY", availableForSale: true, product: { id: "gid://shopify/Product/1", title: "Souvenir", handle: "souvenir", status: "ACTIVE" } };
@@ -85,4 +90,43 @@ test("user errors and auth failures are final: no retry", async () => {
     await assert.rejects(shopify.client.getVariant(variant.id), /401/);
     assert.equal(shopify.calls(), 1);
   } finally { await shopify.close(); }
+});
+
+function paidQuote() {
+  const directory = mkdtempSync(join(tmpdir(), "setareh-matrix-"));
+  const database = new SetarehDatabase(join(directory, "test.db"));
+  database.upsertMerchant({ id: "micohstore", name: "Micohstore", shopDomain: "micohstore.myshopify.com", stellarRecipient: "GTEST" });
+  const quote = database.createQuote({ id: "paid", merchantId: "micohstore", status: "quoted", currencyShopify: "CLP", totalShopify: "15000.00", currencyPayment: "USDC", totalUsdc: "15.0000000", fxRate: "0.001", expiresAt: new Date(Date.now() + 60_000).toISOString(), shippingAddressJson: "{}", lineItemsJson: JSON.stringify([{ variantId: variant.id, quantity: 1 }]), email: "buyer@example.com", shopifyDraftOrderId: "gid://shopify/DraftOrder/1", idempotencyKey: "quote:paid" });
+  database.recordPaymentSettled({ quoteId: quote.id, network: "stellar:testnet", asset: "USDC", amount: "15.0000000", payTo: "GTEST", paymentPayloadHash: "payload", transactionHash: "cd".repeat(32), receipt: {} });
+  const config = { databasePath: join(directory, "test.db"), merchantId: "micohstore", merchantName: "Micohstore", stellarNetwork: "stellar:testnet" as const, stellarAsset: "USDC", stellarMerchantAddress: "GTEST", facilitatorUrl: "https://example.test", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 };
+  return { database, quote, config, cleanup: () => { database.close(); rmSync(directory, { recursive: true, force: true }); } };
+}
+
+test("F7: Shopify failing to complete the draft after payment leaves manual_review with the payment intact and no order row", async () => {
+  const run = paidQuote();
+  try {
+    let completions = 0;
+    const service = new CommerceService(run.config, run.database, { domain: "micohstore.myshopify.com", getVariant: async () => variant, completeDraftOrder: async () => { completions += 1; throw new Error("Shopify Admin API error (503): Service Unavailable"); } } as any);
+    await assert.rejects(service.placePaidOrder(run.quote.id, true), /503/);
+    assert.equal(completions, 1);
+    assert.equal(run.database.getQuote(run.quote.id)?.status, "manual_review");
+    assert.equal(run.database.getOrderByQuote(run.quote.id), undefined);
+    assert.equal(run.database.getPayment(run.quote.id)?.stellar_transaction_hash, "cd".repeat(32));
+    // A retry must not try Shopify again until an operator reconciles.
+    await assert.rejects(service.placePaidOrder(run.quote.id, true), /not payable in status manual_review/);
+    assert.equal(completions, 1);
+  } finally { run.cleanup(); }
+});
+
+test("F10: stock gone between payment and order ends in out_of_stock without touching Shopify", async () => {
+  const run = paidQuote();
+  try {
+    let completions = 0;
+    const service = new CommerceService(run.config, run.database, { domain: "micohstore.myshopify.com", getVariant: async () => ({ ...variant, inventoryQuantity: 0, availableForSale: false }), completeDraftOrder: async () => { completions += 1; return { id: "gid://shopify/Order/1", name: "#1001" }; } } as any);
+    await assert.rejects(service.placePaidOrder(run.quote.id, true), /Inventory changed after payment/);
+    assert.equal(completions, 0);
+    assert.equal(run.database.getQuote(run.quote.id)?.status, "out_of_stock");
+    assert.equal(run.database.getPayment(run.quote.id)?.stellar_transaction_hash, "cd".repeat(32));
+    assert.deepEqual(run.database.getQuoteEvents(run.quote.id).map((event) => event.to), ["quoted", "payment_settled", "creating_shopify_order", "out_of_stock"]);
+  } finally { run.cleanup(); }
 });

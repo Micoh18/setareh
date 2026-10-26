@@ -142,7 +142,8 @@ export class CommerceService {
     } catch (error) {
       const order = this.db.getOrderByQuote(quoteId);
       if (order) this.db.updateOrderStatus(order.id, "manual_review");
-      this.db.markManualReview(quoteId);
+      // A more specific outcome (out_of_stock) set above must not be overwritten by the generic one.
+      this.db.transitionQuote(quoteId, "creating_shopify_order", "manual_review");
       throw error;
     }
   }
