@@ -787,6 +787,7 @@ Parte desde `backend/.env.example`; nunca publiques el archivo `.env` real.
 | `SHOPIFY_CLIENT_SECRET` | Sí | Secreto de la app; nunca se registra ni se expone. |
 | `SHOPIFY_API_VERSION` | No | Versión Admin API; el ejemplo define `2026-10`. |
 | `SHOPIFY_CREDENTIALS_REF` | No | Etiqueta de auditoría para la fuente de credenciales. |
+| `SHOPIFY_TIMEOUT_MS` | No | Plazo por llamada a la Admin API (por defecto `10000`). Las lecturas reintentan hasta dos veces ante `429`, `5xx`, timeout o `THROTTLED`; crear y completar drafts nunca se reintenta. |
 | `SHOPIFY_AUTH_MODE` | No | `client_credentials` (por defecto) o `authorization_code`. Ver abajo. |
 | `SETAREH_TOKEN_ENCRYPTION_KEY` | Para OAuth | 32 bytes aleatorios en base64; cifra con AES-256-GCM los tokens que Shopify entrega al instalar. |
 
@@ -1117,6 +1118,7 @@ URL canónica: /seguridad/
 | Agente intenta pagar más, con otro activo/red/destino o tras expirar el quote | El backend compara red, activo, destinatario, monto y vencimiento contra el quote; la wallet tiene límites locales. | La configuración de límites y la wallet siguen siendo responsabilidad del operador/agente. |
 | Reintento concurrente crea dos órdenes o dos cargos | Una fila de pago/orden por quote; reclamación atómica del settlement (un solo pago llega al facilitador) y de la creación de orden. | Casos de infraestructura no probados deben pasar a conciliación, no asumirse como éxito. |
 | El facilitador no responde o responde de forma ambigua tras enviar la transacción | El quote queda en `payment_unknown`, bloqueado para nuevos pagos; `reconcile:payment` lo resuelve contra la red y sólo lo declara impago cuando la autorización firmada expiró. No se guarda el payload firmado. | Fuera de la retención del RPC (~7 días en testnet) la conciliación requiere un hash aportado por el operador. |
+| Shopify no responde o limita las llamadas | Cada llamada tiene un plazo; las lecturas reintentan con backoff acotado y `Retry-After`; crear y completar drafts no se reintenta nunca, porque una respuesta perdida puede haber creado la orden. | Un timeout al completar el draft deja el quote en `manual_review` hasta conciliar con `reconcile:order`. |
 | Shopify falla después de un settlement válido | Se conserva evidencia y el estado pasa a `manual_review`; el runbook impide reintentar el pago a ciegas. | No hay reembolso automático ni resolución comercial automatizada. |
 | Facilitador o respuesta x402 no coincide con el quote | Se valida el requisito de pago y su settlement antes de completar Shopify. | El facilitador sigue siendo una dependencia externa que debe evaluarse para producción. |
 | Se filtran claves, PII o receipts | `.env` está ignorado, `get_order_status` entrega un resumen, los logs se redactan con lista permitida y filtros, las respuestas `500` son genéricas y los docs prohíben publicar datos sensibles. | No hay gestor centralizado de secretos, DLP ni auditoría externa en el MVP; la retención de logs depende del proveedor. |

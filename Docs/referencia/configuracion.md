@@ -14,6 +14,7 @@ Parte desde `backend/.env.example`; nunca publiques el archivo `.env` real.
 | `SHOPIFY_CLIENT_SECRET` | Sí | Secreto de la app; nunca se registra ni se expone. |
 | `SHOPIFY_API_VERSION` | No | Versión Admin API; el ejemplo define `2026-10`. |
 | `SHOPIFY_CREDENTIALS_REF` | No | Etiqueta de auditoría para la fuente de credenciales. |
+| `SHOPIFY_TIMEOUT_MS` | No | Plazo por llamada a la Admin API (por defecto `10000`). Las lecturas reintentan hasta dos veces ante `429`, `5xx`, timeout o `THROTTLED`; crear y completar drafts nunca se reintenta. |
 | `SHOPIFY_AUTH_MODE` | No | `client_credentials` (por defecto) o `authorization_code`. Ver abajo. |
 | `SETAREH_TOKEN_ENCRYPTION_KEY` | Para OAuth | 32 bytes aleatorios en base64; cifra con AES-256-GCM los tokens que Shopify entrega al instalar. |
 
