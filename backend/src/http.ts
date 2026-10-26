@@ -188,7 +188,9 @@ export function createHttpApp(service: CommerceService, options: { shopifyOAuth?
     const status = error instanceof z.ZodError ? 400 : /not found/i.test(message) ? 404 : /expired|not available|limit|not payable/i.test(message) ? 409 : 500;
     // Validation details may echo request fields; log only the class of a 400.
     log(status === 500 ? "error" : "info", "http.error", { httpStatus: status, message: status === 400 ? "invalid_request" : message });
-    response.status(status).json({ error: { code: status === 500 ? "internal_error" : "request_rejected", message } });
+    // A 500 may carry upstream text (Shopify, facilitator) that echoes buyer data; the redacted log keeps it.
+    const publicMessage = status === 500 ? "Internal error. Check the quote with get_order_status before retrying." : message;
+    response.status(status).json({ error: { code: status === 500 ? "internal_error" : "request_rejected", message: publicMessage } });
   };
   app.use(errors);
   return app;

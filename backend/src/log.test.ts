@@ -92,6 +92,8 @@ test("a full paid purchase logs every step under its request ID without buyer da
     const payment = Buffer.from(JSON.stringify({ x402Version: 2, resource: challenge.resource, accepted: challenge.accepts[0], payload: { transaction: sensitive.signedBlob, secret: buyerSecret } })).toString("base64url");
     const paid = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json", "PAYMENT-SIGNATURE": payment, "X-Request-Id": "agent-pay-0002" }, body: JSON.stringify({ userConfirmed: true }) });
     assert.equal(paid.status, 500, "evidence attachment failure surfaces as an error and parks the quote");
+    const body = await paid.text();
+    assert.ok(!body.includes(sensitive.email) && !body.includes(sensitive.shopifyToken), "a 500 response must not echo upstream error text");
     assert.equal(paid.headers.get("x-request-id"), "agent-pay-0002");
     assert.equal(database.getQuote(quoteId)?.status, "manual_review");
 
