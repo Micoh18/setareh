@@ -12,7 +12,23 @@ export function quoteTags(quoteId: string): string[] {
   return ["setareh", `q:${quoteId}`];
 }
 
-type GraphQlResponse<T> = { data?: T; errors?: Array<{ message: string }> };
+type GraphQlResponse<T> = { data?: T; errors?: Array<{ message: string; extensions?: { code?: string } }> };
+
+/** Per-call deadline for the Admin API; a hung call must not hold a paid quote open indefinitely. */
+const SHOPIFY_TIMEOUT_MS = Number(process.env.SHOPIFY_TIMEOUT_MS) > 0 ? Number(process.env.SHOPIFY_TIMEOUT_MS) : 10_000;
+const MAX_BACKOFF_MS = 5_000;
+
+/** Thrown for failures that may succeed on a retry: throttling, 5xx, network errors and timeouts. */
+export class ShopifyTransientError extends Error {
+  constructor(message: string, readonly retryAfterMs?: number) { super(message); this.name = "ShopifyTransientError"; }
+}
+
+function retryAfterMs(response: Response): number | undefined {
+  const seconds = Number(response.headers.get("retry-after"));
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : undefined;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const variantFields = `id title sku price inventoryQuantity inventoryPolicy availableForSale product { id title handle status featuredMedia { preview { image { url } } } }`;
 
 export type ShopifyAccessTokenProvider = { readonly mode: string; getAccessToken(): Promise<string> };
@@ -50,18 +66,22 @@ export class ShopifyClient {
   private readonly endpoint: string;
   private readonly accessScopesEndpoint: string;
 
-  constructor(private readonly storeDomain: string, apiVersion: string, private readonly tokens: ShopifyAccessTokenProvider) {
-    this.endpoint = `https://${storeDomain}/admin/api/${apiVersion}/graphql.json`;
-    this.accessScopesEndpoint = `https://${storeDomain}/admin/oauth/access_scopes.json`;
+  private readonly timeoutMs: number;
+
+  constructor(private readonly storeDomain: string, apiVersion: string, private readonly tokens: ShopifyAccessTokenProvider, options: { baseUrl?: string; timeoutMs?: number } = {}) {
+    const base = options.baseUrl ?? `https://${storeDomain}`;
+    this.endpoint = `${base}/admin/api/${apiVersion}/graphql.json`;
+    this.accessScopesEndpoint = `${base}/admin/oauth/access_scopes.json`;
+    this.timeoutMs = options.timeoutMs ?? SHOPIFY_TIMEOUT_MS;
   }
 
   async searchVariants(query: string, limit: number): Promise<ShopifyVariant[]> {
-    const data = await this.graphql<{ productVariants: { nodes: ShopifyVariant[] } }>(`query SearchVariants($first: Int!, $query: String!) { productVariants(first: $first, query: $query) { nodes { ${variantFields} } } }`, { first: limit, query: `status:active ${query}`.trim() });
+    const data = await this.graphql<{ productVariants: { nodes: ShopifyVariant[] } }>(`query SearchVariants($first: Int!, $query: String!) { productVariants(first: $first, query: $query) { nodes { ${variantFields} } } }`, { first: limit, query: `status:active ${query}`.trim() }, { retries: 2 });
     return data.productVariants.nodes;
   }
 
   async getVariant(id: string): Promise<ShopifyVariant | null> {
-    const data = await this.graphql<{ productVariant: ShopifyVariant | null }>(`query Variant($id: ID!) { productVariant(id: $id) { ${variantFields} } }`, { id });
+    const data = await this.graphql<{ productVariant: ShopifyVariant | null }>(`query Variant($id: ID!) { productVariant(id: $id) { ${variantFields} } }`, { id }, { retries: 2 });
     return data.productVariant;
   }
 
@@ -100,40 +120,68 @@ export class ShopifyClient {
         }
       }`,
       { input: { id: orderId, metafields: [{ namespace: "setareh", key: "stellar_payment", type: "json", value }] } },
+      // Setting the same metafield twice is idempotent, so one retry cannot duplicate anything.
+      { retries: 1 },
     );
     assertNoUserErrors(data.orderUpdate.userErrors, "Unable to attach Stellar payment evidence to Shopify order");
     if (!data.orderUpdate.order) throw new Error("Shopify did not return an order after attaching payment evidence.");
   }
 
   async getDraftOrder(id: string): Promise<{ id: string; name: string; status: string; invoiceUrl: string | null; totalPrice: string; currencyCode: string; order: { id: string; name: string } | null } | null> {
-    const data = await this.graphql<{ node: { id: string; name: string; status: string; invoiceUrl: string | null; totalPrice: string; currencyCode: string; order: { id: string; name: string } | null } | null }>(`query Draft($id: ID!) { node(id: $id) { ... on DraftOrder { id name status invoiceUrl totalPrice currencyCode order { id name } } } }`, { id });
+    const data = await this.graphql<{ node: { id: string; name: string; status: string; invoiceUrl: string | null; totalPrice: string; currencyCode: string; order: { id: string; name: string } | null } | null }>(`query Draft($id: ID!) { node(id: $id) { ... on DraftOrder { id name status invoiceUrl totalPrice currencyCode order { id name } } } }`, { id }, { retries: 2 });
     return data.node;
   }
 
   async getDraftStatus(id: string): Promise<{ id: string; name: string; status: string; completedAt: string | null } | null> {
-    const data = await this.graphql<{ node: { id: string; name: string; status: string; completedAt: string | null } | null }>(`query DraftStatus($id: ID!) { node(id: $id) { ... on DraftOrder { id name status completedAt } } }`, { id });
+    const data = await this.graphql<{ node: { id: string; name: string; status: string; completedAt: string | null } | null }>(`query DraftStatus($id: ID!) { node(id: $id) { ... on DraftOrder { id name status completedAt } } }`, { id }, { retries: 2 });
     return data.node;
   }
 
-  async graphql<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
+  /**
+   * One Admin API call under a deadline. `retries` must only be set by callers whose operation is safe to
+   * repeat (reads, idempotent updates): draft creation and completion are never retried here, because a
+   * lost response may still have created the order; that case belongs to reconciliation.
+   */
+  async graphql<T>(query: string, variables: Record<string, unknown> = {}, options: { retries?: number } = {}): Promise<T> {
+    const retries = options.retries ?? 0;
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        return await this.graphqlOnce<T>(query, variables, attempt);
+      } catch (error) {
+        if (!(error instanceof ShopifyTransientError) || attempt > retries) throw error;
+        await sleep(Math.min(error.retryAfterMs ?? 500 * 2 ** (attempt - 1), MAX_BACKOFF_MS));
+      }
+    }
+  }
+
+  private async graphqlOnce<T>(query: string, variables: Record<string, unknown>, attempt: number): Promise<T> {
     // Only the operation name is logged: variables carry buyer email and shipping address.
     const operation = /^\s*(?:query|mutation)\s+(\w+)/.exec(query)?.[1] ?? "anonymous";
     const startedAt = performance.now();
     let httpStatus: number | undefined;
     try {
-      const response = await fetch(this.endpoint, { method: "POST", headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": await this.tokens.getAccessToken() }, body: JSON.stringify({ query, variables }) });
+      let response: Response;
+      try {
+        response = await fetch(this.endpoint, { method: "POST", headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": await this.tokens.getAccessToken() }, body: JSON.stringify({ query, variables }), signal: AbortSignal.timeout(this.timeoutMs) });
+      } catch (error) {
+        const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+        throw new ShopifyTransientError(timedOut ? `Shopify Admin API timed out after ${this.timeoutMs} ms.` : `Shopify Admin API unreachable: ${errorMessage(error)}`);
+      }
       httpStatus = response.status;
       if (response.status === 401) throw new Error(`Shopify rejected Setareh's access token (401) using ${this.tokens.mode}. Verify that the app is still installed on ${this.storeDomain}.`);
+      if (response.status === 429 || response.status >= 500) throw new ShopifyTransientError(`Shopify Admin API error (${response.status}): ${response.statusText}`, retryAfterMs(response));
       const payload = await response.json() as GraphQlResponse<T>;
+      if (payload.errors?.some((error) => error.extensions?.code === "THROTTLED")) throw new ShopifyTransientError("Shopify Admin API throttled the request.", retryAfterMs(response));
       if (!response.ok || payload.errors?.length) throw new Error(`Shopify Admin API error (${response.status}): ${payload.errors?.map((error) => error.message).join("; ") ?? response.statusText}`);
       if (!payload.data) throw new Error("Shopify Admin API returned no data.");
-      log("info", "shopify.call", { operation, httpStatus, durationMs: Math.round(performance.now() - startedAt) });
+      log("info", "shopify.call", { operation, httpStatus, attempt, durationMs: Math.round(performance.now() - startedAt) });
       return payload.data;
     } catch (error) {
-      log("warn", "shopify.call", { operation, httpStatus, durationMs: Math.round(performance.now() - startedAt), message: errorMessage(error) });
+      log("warn", "shopify.call", { operation, httpStatus, attempt, durationMs: Math.round(performance.now() - startedAt), message: errorMessage(error) });
       throw error;
     }
   }
+
 
   /** Creates or repoints the app/uninstalled subscription for this store. Idempotent; returns the subscription id. */
   async ensureUninstallWebhook(callbackUrl: string): Promise<{ id: string; action: "created" | "updated" | "unchanged" }> {
