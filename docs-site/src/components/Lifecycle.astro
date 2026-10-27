@@ -1,0 +1,186 @@
+---
+// Quote lifecycle as a film rail: normal states are frames, exceptions hang
+// on pins beneath the state they branch from. Mirrors the tables below.
+const branches = [
+  { state: 'quoted', note: 'Draft y quote creados; aún no se pide pago.', hung: [['expired', 'Venció: crea un quote nuevo, no pagues el anterior.']] },
+  { state: 'payment_required', note: 'Quote listo para la wallet; espera confirmación.', hung: [] },
+  {
+    state: 'payment_submitted',
+    note: 'Un único intento reclamó el quote.',
+    hung: [
+      ['payment_failed', 'Rechazo explícito sin cobro: revisa y crea otro quote.'],
+      ['payment_unknown', 'Sin respuesta definitiva: no pagues de nuevo. Concilia.'],
+    ],
+  },
+  { state: 'payment_settled', note: 'Settlement validado por Setareh.', hung: [['out_of_stock', 'El inventario cambió tras el pago: revisión manual.']] },
+  {
+    state: 'creating_shopify_order',
+    note: 'Un proceso posee la creación de la orden.',
+    hung: [
+      ['manual_review', 'Fallo tras un efecto irreversible: concilia primero.'],
+      ['shopify_failed', 'Reservado: trátalo como revisión manual.'],
+    ],
+  },
+  { state: 'created', note: 'Orden creada y evidencia adjunta.', hung: [] },
+];
+---
+
+<figure class="life" aria-labelledby="st-life-caption">
+  <figcaption id="st-life-caption">
+    <span class="st-label">Ciclo de vida de un quote</span>
+    <span class="key st-label">Fotograma: estado normal · colgado: excepción</span>
+  </figcaption>
+  <ol class="rail">
+    {
+      branches.map((b) => (
+        <li class="branch">
+          <div class="chip normal">
+            <code>{b.state}</code>
+            <span class="note">{b.note}</span>
+          </div>
+          {b.hung.length > 0 && (
+            <ul class="hung" aria-label={`Excepciones desde ${b.state}`}>
+              {b.hung.map(([s, n], i) => (
+                <li class="chip exception st-hung" style={`--st-swing:${i % 2 ? 1.2 : -1.5}deg`}>
+                  <code>{s}</code>
+                  <span class="note">{n}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </li>
+      ))
+    }
+  </ol>
+</figure>
+
+<style>
+  .life {
+    container-type: inline-size;
+    margin: 2rem 0 0;
+    padding: 0.875rem 0.875rem 1.25rem;
+    background: var(--st-void);
+  }
+  figcaption {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.25rem 1rem;
+    padding-bottom: 0.75rem;
+    color: var(--st-edge);
+  }
+  .key {
+    color: var(--st-on-void-muted);
+    font-size: 0.75rem;
+  }
+  .rail {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+  .branch {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .chip {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin: 0;
+    padding: 0.6rem 0.6rem 0.7rem;
+    color: var(--st-ink);
+  }
+  .normal {
+    min-height: 7.5rem;
+    background: var(--st-window);
+    box-shadow: 0 -0.625rem 0 var(--st-flag), 0 0.625rem 0 var(--st-flag);
+  }
+  .exception {
+    background: var(--st-edge);
+    border: 1.5px dashed var(--st-ink);
+  }
+  .m {
+    width: 0.875rem;
+    height: 0.875rem;
+    fill: none;
+    stroke: var(--st-ink);
+    stroke-width: 4;
+    stroke-linecap: round;
+  }
+  .exception .m {
+    stroke-width: 1.5;
+  }
+  .exception .m path {
+    fill: var(--st-ink);
+    stroke: none;
+  }
+  code {
+    font-family: var(--sl-font-mono);
+    font-weight: 500;
+    font-size: 0.75rem;
+    background: none;
+    padding: 0;
+    overflow-wrap: anywhere;
+  }
+  .note {
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: var(--st-ink-muted);
+  }
+  .hung {
+    list-style: none;
+    margin: 1rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 1rem;
+  }
+  .hung li {
+    margin: 0;
+  }
+  .hung li::before {
+    content: '';
+    position: absolute;
+    top: -1rem;
+    left: 50%;
+    width: 0.625rem;
+    height: 0.625rem;
+    margin-left: -0.3125rem;
+    border-radius: 50%;
+    background: var(--st-flag);
+  }
+
+  @container (max-width: 52rem) {
+    .rail {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      row-gap: 1.75rem;
+    }
+  }
+  @container (max-width: 30rem) {
+    .rail {
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+      padding: 0.75rem 1.5rem;
+      background:
+        repeating-linear-gradient(180deg, var(--st-void) 0 0.625rem, transparent 0.625rem 1.25rem) left 0.4rem top / 0.5rem 100% no-repeat,
+        repeating-linear-gradient(180deg, var(--st-void) 0 0.625rem, transparent 0.625rem 1.25rem) right 0.4rem top / 0.5rem 100% no-repeat,
+        var(--st-flag) var(--st-grain);
+    }
+    .normal {
+      box-shadow: none;
+    }
+    .hung {
+      margin: 0.75rem 0 0 1.5rem;
+      gap: 0.75rem;
+    }
+    .hung li::before {
+      top: 50%;
+      left: -1rem;
+      margin: -0.3125rem 0 0;
+    }
+  }
+</style>

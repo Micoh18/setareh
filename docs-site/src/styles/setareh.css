@@ -1,111 +1,542 @@
 /*
- * Setareh’s public palette is derived from the private brand guide:
- * lapis night, Ishtar gold, Astar violet, Babylonian clay and moon ivory.
+ * Mesa de corte: a film cutting bench flattened into a sheet.
+ * One ink. Flag orange in grain on true black owns the frame (masthead,
+ * rail, sidebar, code chrome); running copy lives only in punched white
+ * windows. State is a mark, never a hue. The site ships a single theme.
  */
-:root {
-  --sl-color-white: #f8f4ec;
-  --sl-color-gray-1: #e9e5ef;
-  --sl-color-gray-2: #c7c5d2;
-  --sl-color-gray-3: #aeb8d0;
-  --sl-color-gray-4: #70799b;
-  --sl-color-gray-5: #343f62;
-  --sl-color-gray-6: #1b2342;
-  --sl-color-black: #10152b;
 
-  --sl-color-accent-low: #3b2b11;
-  --sl-color-accent: #d9a441;
-  --sl-color-accent-high: #f6df9f;
-  --sl-color-text-accent: #f6df9f;
-  --sl-color-text-invert: #231707;
-  --sl-color-bg: #10152b;
-  --sl-color-bg-nav: #151c36;
-  --sl-color-bg-sidebar: #151c36;
-  --sl-color-bg-inline-code: #1b2342;
-  --sl-color-bg-accent: #f6df9f;
-  --sl-color-hairline-light: #343f62;
-  --sl-color-hairline: #1b2342;
-  --sl-color-hairline-shade: #10152b;
+:root,
+:root[data-theme='light'],
+:root[data-theme='dark'] {
+  color-scheme: dark;
 
-  --sl-color-purple-low: #2d2448;
-  --sl-color-purple: #8066c6;
-  --sl-color-purple-high: #d5c9f6;
-  --sl-color-orange-low: #42271f;
-  --sl-color-orange: #c86a4b;
-  --sl-color-orange-high: #f1c2af;
+  --st-void: #0b0b0a;
+  --st-charred: #171614;
+  --st-spool: #2b2926;
+  --st-flag: #e6561b;
+  --st-flag-deep: #a63a0b;
+  --st-window: #ffffff;
+  --st-edge: #f1efea;
+  --st-ink: #141311;
+  --st-ink-muted: #57534c;
+  --st-hairline: #d9d5cc;
+  --st-on-void-muted: #a8a39a;
+  --st-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+
+  --sl-font: 'Literata', Georgia, 'Times New Roman', serif;
+  --sl-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --st-font-label: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+
+  --sl-color-white: var(--st-edge);
+  --sl-color-gray-1: #e4e1da;
+  --sl-color-gray-2: #d2cec6;
+  --sl-color-gray-3: var(--st-on-void-muted);
+  --sl-color-gray-4: #6e6a63;
+  --sl-color-gray-5: var(--st-spool);
+  --sl-color-gray-6: var(--st-charred);
+  --sl-color-gray-7: #121110;
+  --sl-color-black: var(--st-void);
+
+  --sl-color-accent-low: #3a1a0c;
+  --sl-color-accent: var(--st-flag);
+  --sl-color-accent-high: #f4a57f;
+  --sl-color-text: var(--sl-color-gray-2);
+  --sl-color-text-accent: #ee6a33;
+  --sl-color-text-invert: var(--st-void);
+  --sl-color-bg: var(--st-void);
+  --sl-color-bg-nav: var(--st-void);
+  --sl-color-bg-sidebar: var(--st-void);
+  --sl-color-bg-inline-code: var(--st-charred);
+  --sl-color-bg-accent: var(--st-flag);
+  --sl-color-hairline-light: var(--st-spool);
+  --sl-color-hairline: var(--st-spool);
+  --sl-color-hairline-shade: var(--st-void);
+  --sl-color-backdrop-overlay: rgb(11 11 10 / 80%);
+
+  --sl-color-orange-low: #3a1a0c;
+  --sl-color-orange: var(--st-flag);
+  --sl-color-orange-high: #f4a57f;
+
+  --sl-text-h1: 3rem;
+  --sl-text-h2: 1.625rem;
+  --sl-text-h3: 1.3125rem;
+  --sl-text-h4: 1.125rem;
+  --sl-text-body: 1.0625rem;
+  --sl-line-height: 1.65;
+  --sl-line-height-headings: 1.15;
+  --sl-nav-height: 4.25rem;
 }
 
-:root[data-theme='light'] {
-  --sl-color-white: #24190f;
-  --sl-color-gray-1: #38291c;
-  --sl-color-gray-2: #584536;
-  --sl-color-gray-3: #766553;
-  --sl-color-gray-4: #9d8c79;
-  --sl-color-gray-5: #d9cdbc;
-  --sl-color-gray-6: #eee5d7;
-  --sl-color-gray-7: #fffaf1;
-  --sl-color-black: #f8f4ec;
-
-  --sl-color-accent-low: #f4e6bd;
-  --sl-color-accent: #a4670c;
-  --sl-color-accent-high: #5c3607;
-  --sl-color-text-accent: #7c4b09;
-  --sl-color-text-invert: #fffaf1;
-  --sl-color-bg: #f8f4ec;
-  --sl-color-bg-nav: #fffaf1;
-  --sl-color-bg-sidebar: #fbf5e9;
-  --sl-color-bg-inline-code: #eee5d7;
-  --sl-color-bg-accent: #a4670c;
-  --sl-color-hairline-light: #e6dac9;
-  --sl-color-hairline: #d9cdbc;
-  --sl-color-hairline-shade: #eee5d7;
-
-  --sl-color-purple-low: #ede7fb;
-  --sl-color-purple: #7356b6;
-  --sl-color-purple-high: #49337b;
-  --sl-color-orange-low: #f8e3da;
-  --sl-color-orange: #b65236;
-  --sl-color-orange-high: #71301f;
+::selection {
+  background: var(--st-flag);
+  color: var(--st-void);
 }
 
-:root[data-theme='dark'] body {
-  background-image:
-    radial-gradient(circle at 88% -12rem, rgb(128 102 198 / 18%), transparent 34rem),
-    radial-gradient(circle at -10% 28rem, rgb(217 164 65 / 10%), transparent 26rem);
-  background-attachment: fixed;
+html {
+  scrollbar-color: var(--st-spool) var(--st-void);
 }
 
-:root[data-theme='light'] body {
-  background-image:
-    radial-gradient(circle at 92% -14rem, rgb(217 164 65 / 16%), transparent 36rem),
-    radial-gradient(circle at -8% 34rem, rgb(128 102 198 / 10%), transparent 27rem);
-  background-attachment: fixed;
+:focus-visible {
+  outline: 2px solid var(--st-flag);
+  outline-offset: 2px;
 }
 
-.site-title {
-  gap: 0.65rem;
-  letter-spacing: 0.025em;
+body {
+  font-variant-numeric: tabular-nums;
 }
 
-.site-title img {
-  background: #f8f4ec;
-  border: 1px solid #d9a441;
-  border-radius: 0.45rem;
-  box-shadow: 0 0 0 3px rgb(217 164 65 / 12%);
-  padding: 0.1rem;
+/* ---------- Masthead ---------- */
+
+.header {
+  border-bottom: 1px solid var(--st-spool);
 }
 
-:root[data-theme='light'] .site-title img {
-  box-shadow: 0 0 0 3px rgb(128 102 198 / 10%);
+/* ---------- Sidebar: numbered folios ---------- */
+
+#starlight__sidebar .top-level {
+  counter-reset: folio -1;
 }
 
-.sl-link-button.primary {
-  box-shadow: 0 0.4rem 1.3rem rgb(217 164 65 / 22%);
+#starlight__sidebar a {
+  counter-increment: folio;
+  display: flex;
+  align-items: baseline;
+  font-family: var(--st-font-label);
+  font-weight: 600;
+  font-size: 1rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--st-edge);
+  border-radius: 0;
+  padding: 0.4rem 0.75rem;
+  gap: 0.75rem;
 }
 
-:root[data-theme='light'] .sl-link-button.primary {
-  box-shadow: 0 0.35rem 1.1rem rgb(164 103 12 / 20%);
+#starlight__sidebar a::before {
+  content: counter(folio, decimal-leading-zero);
+  font-family: var(--sl-font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0;
+  color: var(--st-on-void-muted);
+  min-width: 1.25rem;
 }
 
-main a:not(.sl-link-button) {
-  text-underline-offset: 0.18em;
+#starlight__sidebar a:hover {
+  color: var(--st-flag);
+}
+
+#starlight__sidebar a[aria-current='page'],
+#starlight__sidebar a[aria-current='page']:hover {
+  background: var(--st-flag);
+  color: var(--st-void);
+}
+
+#starlight__sidebar a[aria-current='page']::before {
+  color: var(--st-void);
+}
+
+#starlight__sidebar summary .large {
+  font-family: var(--st-font-label);
+  font-weight: 600;
+  font-size: 0.875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--st-flag);
+}
+
+#starlight__sidebar .caret {
+  color: var(--st-on-void-muted);
+}
+
+/* ---------- Right sidebar (on this page) ---------- */
+
+.right-sidebar-panel h2 {
+  font-family: var(--st-font-label);
+  font-weight: 600;
+  font-size: 0.875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--st-flag);
+}
+
+.right-sidebar-panel a {
+  font-family: var(--st-font-label);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--st-on-void-muted);
+}
+
+.right-sidebar-panel a[aria-current='true'] {
+  color: var(--st-edge);
+}
+
+/* ---------- The punched white window ---------- */
+
+/* Tokens that flip inside the reading window. Derived Starlight tokens are
+   redeclared because they resolve at :root otherwise. */
+.st-window,
+html[data-has-hero] main .sl-container,
+html:not([data-has-hero]) main {
+  --sl-color-white: var(--st-ink);
+  --sl-color-gray-1: #1e1d1a;
+  --sl-color-gray-2: #2e2c28;
+  --sl-color-gray-3: var(--st-ink-muted);
+  --sl-color-gray-4: #8a857c;
+  --sl-color-gray-5: var(--st-hairline);
+  --sl-color-gray-6: var(--st-edge);
+  --sl-color-black: var(--st-window);
+  --sl-color-text: #2e2c28;
+  --sl-color-text-accent: var(--st-flag-deep);
+  --sl-color-accent: var(--st-flag-deep);
+  --sl-color-accent-low: #fbe6dc;
+  --sl-color-accent-high: #6e2606;
+  --sl-color-bg: var(--st-window);
+  --sl-color-bg-inline-code: var(--st-edge);
+  --sl-color-hairline: var(--st-hairline);
+  --sl-color-hairline-light: var(--st-hairline);
+  --sl-color-hairline-shade: var(--st-edge);
+  --sl-color-orange-low: #fbe6dc;
+  --sl-color-orange: var(--st-flag-deep);
+  --sl-color-orange-high: #6e2606;
+  background: var(--st-window);
+  color: var(--sl-color-text);
+}
+
+html:not([data-has-hero]) main {
+  margin: 1.5rem 0 3rem;
+  padding-block: 1.5rem 2rem;
+}
+
+@media (min-width: 50rem) {
+  html:not([data-has-hero]) main {
+    margin-inline: 1.5rem;
+  }
+}
+
+html:not([data-has-hero]) main .content-panel + .content-panel {
+  border-top: 0;
+}
+
+.sl-markdown-content h1,
+main h1 {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.sl-markdown-content :is(h2, h3, h4) {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  margin-top: 2.5rem;
+}
+
+.sl-markdown-content :is(h2, h3, h4) + * {
+  margin-top: 0.75rem;
+}
+
+.sl-markdown-content p,
+.sl-markdown-content li {
+  text-wrap: pretty;
+}
+
+.sl-markdown-content a {
+  color: var(--st-flag-deep);
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
+
+.sl-markdown-content a:hover {
+  color: var(--st-ink);
+  text-decoration-thickness: 2px;
+}
+
+.sl-markdown-content :not(pre) > code {
+  font-size: 0.875em;
+  padding: 0.1em 0.35em;
+  border-radius: 0;
+  background: var(--st-edge);
+  color: var(--st-ink);
+  overflow-wrap: anywhere;
+}
+
+/* Tables become ruled ledgers */
+.sl-markdown-content table {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+  border-top: 2px solid var(--st-ink);
+  font-size: 0.9375rem;
+}
+
+.sl-markdown-content :is(th, td) {
+  border: 0;
+  border-bottom: 1px solid var(--st-hairline);
+  padding: 0.7rem 0.75rem 0.7rem 0;
+  vertical-align: top;
+  background: transparent;
+}
+
+.sl-markdown-content th {
+  font-family: var(--st-font-label);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--st-ink-muted);
+}
+
+.sl-markdown-content tr:nth-child(2n) {
+  background: transparent;
+}
+
+/* Narrow screens: rows become stacked entries, labelled by their column. */
+@media (max-width: 50rem) {
+  .sl-markdown-content table.st-stack,
+  .sl-markdown-content table.st-stack tbody,
+  .sl-markdown-content table.st-stack tr,
+  .sl-markdown-content table.st-stack td {
+    display: block;
+    width: 100%;
+  }
+  .sl-markdown-content table.st-stack thead {
+    display: none;
+  }
+  .sl-markdown-content table.st-stack {
+    border-top: 0;
+  }
+  .sl-markdown-content table.st-stack tr {
+    border-top: 2px solid var(--st-ink);
+    padding-block: 0.5rem 0.75rem;
+  }
+  .sl-markdown-content table.st-stack td {
+    border: 0;
+    padding: 0.2rem 0;
+  }
+  .sl-markdown-content table.st-stack td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-family: var(--st-font-label);
+    font-weight: 600;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--st-ink-muted);
+  }
+}
+
+/* Blockquotes and asides read as notes pinned to the sheet */
+.sl-markdown-content blockquote {
+  border: 1.5px dashed var(--st-ink);
+  background: var(--st-edge);
+  padding: 0.9rem 1.1rem;
+  font-style: normal;
+}
+
+.starlight-aside {
+  border: 0;
+  border-radius: 0;
+  background: var(--st-void);
+  color: var(--st-edge);
+  --sl-color-white: var(--st-edge);
+  --sl-color-text: #d2cec6;
+}
+
+.starlight-aside__title {
+  font-family: var(--st-font-label);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--st-flag);
+}
+
+.starlight-aside a {
+  color: var(--st-flag);
+}
+
+/* Code: void blocks inside the window */
+.expressive-code {
+  margin-block: 1.25rem;
+}
+
+/* Pagination as frames */
+.pagination-links a {
+  border: 0;
+  border-top: 2px solid var(--st-ink);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 1rem 0 0;
+  color: var(--st-ink);
+}
+
+.pagination-links .link-title {
+  font-family: var(--st-font-label);
+  font-weight: 700;
+  font-size: 1.75rem;
+  text-transform: uppercase;
+  color: var(--st-ink);
+}
+
+.pagination-links a:hover .link-title {
+  color: var(--st-flag-deep);
+}
+
+/* Mobile table of contents bar sits in the frame */
+mobile-starlight-toc nav {
+  background: var(--st-void);
+  border-bottom: 1px solid var(--st-spool);
+}
+
+/* ---------- Shared marks ---------- */
+
+.st-label {
+  font-family: var(--st-font-label);
+  font-weight: 600;
+  font-size: 0.875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.st-sprockets {
+  height: 1.25rem;
+  background:
+    radial-gradient(circle, transparent 0, transparent 0),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 0.875rem,
+      var(--st-void) 0.875rem 1.75rem,
+      transparent 1.75rem 1.875rem
+    ) center / 100% 0.625rem no-repeat,
+    var(--st-flag) var(--st-grain);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .st-hung {
+    transform-origin: 50% 0;
+    animation: st-settle 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  @keyframes st-settle {
+    from {
+      transform: rotate(var(--st-swing-from, -6deg));
+    }
+    to {
+      transform: rotate(var(--st-swing, -2deg));
+    }
+  }
+}
+
+.st-hung {
+  transform: rotate(var(--st-swing, -2deg));
+}
+
+/* Starlight's own mobile controls, rebuilt in the bench's vocabulary */
+.sl-menu-button,
+starlight-menu-button button {
+  border-radius: 0;
+  background: transparent;
+  border: 1.5px solid var(--st-flag);
+  color: var(--st-flag);
+  box-shadow: none;
+}
+
+mobile-starlight-toc summary {
+  border-radius: 0;
+  border-color: var(--st-spool);
+  background: var(--st-charred);
+  color: var(--st-edge);
+  font-family: var(--st-font-label);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Home: everything after the rail sits in one punched window. */
+:root[data-has-sidebar] {
+  --sl-content-width: 46rem;
+}
+
+:root[data-has-hero] {
+  --sl-content-width: 78rem;
+}
+
+html[data-has-hero] main .sl-container > :is(.sl-markdown-content, footer) {
+  padding-inline: clamp(1.25rem, 5vw, 4.5rem);
+}
+
+html[data-has-hero] main .sl-markdown-content {
+  padding-top: 1.5rem;
+}
+
+html[data-has-hero] main .sl-markdown-content > * {
+  max-width: 68ch;
+}
+
+html[data-has-hero] main footer {
+  padding-bottom: 2.5rem;
+}
+
+/* ---------- The frame reaches into inner pages ---------- */
+
+/* Perforated top edge on every reading window */
+html:not([data-has-hero]) main {
+  position: relative;
+}
+
+html:not([data-has-hero]) main::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1.25rem;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 0.875rem,
+      var(--st-void) 0.875rem 1.75rem,
+      transparent 1.75rem 1.875rem
+    ) center / 100% 0.5rem no-repeat,
+    var(--st-flag) var(--st-grain);
+}
+
+/* Section openers: a strip of tape before every h2 */
+.sl-markdown-content h2::before {
+  content: '';
+  display: block;
+  width: 2.5rem;
+  height: 0.375rem;
+  margin-bottom: 0.75rem;
+  background: var(--st-flag) var(--st-grain);
+}
+
+/* Table and code chrome in the frame's ink */
+.sl-markdown-content table {
+  border-top: 4px solid var(--st-flag);
+}
+
+.expressive-code .frame {
+  border-top: 0.375rem solid var(--st-flag);
+}
+
+/* Identifiers are copied, never broken mid-token */
+.sl-markdown-content td:first-child code,
+.sl-markdown-content td code:only-child {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+/* Current page: the folded tape flag marks where you stopped */
+#starlight__sidebar a[aria-current='page'] {
+  position: relative;
+}
+
+#starlight__sidebar a[aria-current='page']::after {
+  content: '';
+  position: absolute;
+  right: 0.6rem;
+  top: -0.35rem;
+  width: 0.75rem;
+  height: 1.2rem;
+  background: var(--st-void);
+  clip-path: polygon(0 0, 100% 0, 100% 75%, 50% 100%, 0 75%);
 }

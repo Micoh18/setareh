@@ -1,0 +1,45 @@
+---
+const { siteTitleHref } = Astro.locals.starlightRoute;
+---
+
+<a href={siteTitleHref} class="site-title" aria-label="Setareh Docs, inicio">
+  <svg class="star" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
+    <path
+      d="M16 1 L19 11 L28.5 6.5 L24 16 L28.5 25.5 L19 21 L16 31 L13 21 L3.5 25.5 L8 16 L3.5 6.5 L13 11 Z"
+      fill="currentColor"></path>
+    <circle cx="16" cy="16" r="4.5" fill="var(--st-void)"></circle>
+  </svg>
+  <span class="word" translate="no">Setareh</span>
+  <span class="docs">Docs</span>
+</a>
+
+<style>
+  .site-title {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    text-decoration: none;
+    white-space: nowrap;
+    color: var(--st-flag);
+  }
+  .word {
+    font-family: var(--st-font-label);
+    font-weight: 700;
+    font-size: 1.75rem;
+    line-height: 1;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--st-edge);
+  }
+  .docs {
+    font-family: var(--st-font-label);
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--st-flag);
+  }
+  .site-title:hover .word {
+    color: var(--st-flag);
+  }
+</style>

@@ -1,0 +1,116 @@
+---
+import Default from '@astrojs/starlight/components/MarkdownContent.astro';
+---
+
+<Default><slot /></Default>
+
+<script>
+  // Tables: label each cell with its column so narrow screens can stack rows.
+  function stackTables() {
+    for (const table of document.querySelectorAll<HTMLTableElement>('.sl-markdown-content table')) {
+      const heads = [...table.querySelectorAll('thead th')].map((th) => th.textContent?.trim() ?? '');
+      if (!heads.length) continue;
+      table.classList.add('st-stack');
+      for (const row of table.querySelectorAll('tbody tr')) {
+        [...row.children].forEach((cell, i) => {
+          if (heads[i]) cell.setAttribute('data-label', heads[i]);
+        });
+      }
+    }
+  }
+
+  // Evidence: show each Stellar hash in full, with copy and explorer actions.
+  function expandHashes() {
+    const prefix = 'https://horizon-testnet.stellar.org/transactions/';
+    for (const link of document.querySelectorAll<HTMLAnchorElement>(`.sl-markdown-content a[href^="${prefix}"]`)) {
+      const hash = link.href.slice(prefix.length);
+      if (!/^[0-9a-f]{64}$/.test(hash)) continue;
+      const box = document.createElement('div');
+      box.className = 'st-hash';
+      const code = document.createElement('code');
+      code.textContent = hash;
+      const actions = document.createElement('div');
+      actions.className = 'st-hash-actions';
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.textContent = 'Copiar hash';
+      copy.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(hash);
+          copy.textContent = 'Copiado';
+        } catch {
+          copy.textContent = 'Selecciona y copia';
+        }
+        setTimeout(() => (copy.textContent = 'Copiar hash'), 1800);
+      });
+      const horizon = document.createElement('a');
+      horizon.href = link.href;
+      horizon.textContent = 'Horizon (JSON)';
+      const explorer = document.createElement('a');
+      explorer.href = `https://stellar.expert/explorer/testnet/tx/${hash}`;
+      explorer.textContent = 'Explorador';
+      actions.append(copy, horizon, explorer);
+      const seal = document.createElement('span');
+      seal.className = 'st-seal';
+      seal.innerHTML = '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 1 L19 11 L28.5 6.5 L24 16 L28.5 25.5 L19 21 L16 31 L13 21 L3.5 25.5 L8 16 L3.5 6.5 L13 11 Z"/><circle cx="16" cy="16" r="4.5" fill="#fff"/></svg>Hash público';
+      box.append(seal, code, actions);
+      link.replaceWith(box);
+    }
+  }
+
+  stackTables();
+  expandHashes();
+</script>
+
+<style is:global>
+  .st-seal {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--st-font-label);
+    font-weight: 600;
+    font-size: 0.8125rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--st-flag-deep);
+  }
+  .st-seal svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    fill: var(--st-flag-deep);
+  }
+  .st-hash {
+    display: grid;
+    gap: 0.5rem;
+  }
+  .sl-markdown-content .st-hash code {
+    display: block;
+    padding: 0.5rem 0.6rem;
+    background: var(--st-edge);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    word-break: break-all;
+  }
+  .st-hash-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .sl-markdown-content .st-hash-actions :is(button, a) {
+    font-family: var(--st-font-label);
+    font-weight: 600;
+    font-size: 0.8125rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: var(--st-ink);
+    background: transparent;
+    border: 1.5px solid var(--st-ink);
+    padding: 0.3rem 0.6rem;
+    cursor: pointer;
+  }
+  .sl-markdown-content .st-hash-actions :is(button, a):hover {
+    background: var(--st-ink);
+    color: var(--st-window);
+  }
+</style>

@@ -1,0 +1,13 @@
+---
+import Default from '@astrojs/starlight/components/PageTitle.astro';
+import Lifecycle from './Lifecycle.astro';
+import McpTools from './McpTools.astro';
+import VerifySteps from './VerifySteps.astro';
+
+const id = Astro.locals.starlightRoute.id;
+---
+
+<Default />
+{id === 'evidencia' && <VerifySteps />}
+{id === 'operaciones/estados-y-recuperacion' && <Lifecycle />}
+{id === 'referencia/mcp' && <McpTools />}
