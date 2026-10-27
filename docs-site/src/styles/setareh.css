@@ -519,8 +519,7 @@ html:not([data-has-hero]) main::before {
 }
 
 /* Identifiers are copied, never broken mid-token */
-.sl-markdown-content td:first-child code,
-.sl-markdown-content td code:only-child {
+.sl-markdown-content td:first-child > code:only-child {
   white-space: nowrap;
   overflow-wrap: normal;
 }

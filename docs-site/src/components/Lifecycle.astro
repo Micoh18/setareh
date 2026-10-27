@@ -1,6 +1,7 @@
 ---
 // Quote lifecycle as a film rail: normal states are frames, exceptions hang
 // on pins beneath the state they branch from. Mirrors the tables below.
+const closed = ['expired', 'payment_failed', 'out_of_stock'];
 const branches = [
   { state: 'quoted', note: 'Draft y quote creados; aún no se pide pago.', hung: [['expired', 'Venció: crea un quote nuevo, no pagues el anterior.']] },
   { state: 'payment_required', note: 'Quote listo para la wallet; espera confirmación.', hung: [] },
@@ -28,7 +29,7 @@ const branches = [
 <figure class="life" aria-labelledby="st-life-caption">
   <figcaption id="st-life-caption">
     <span class="st-label">Ciclo de vida de un quote</span>
-    <span class="key st-label">Fotograma: estado normal · colgado: excepción</span>
+    <span class="key st-label">Fotograma: estado normal · colgado: excepción · esquina perforada: cerrado sin orden</span>
   </figcaption>
   <ol class="rail">
     {
@@ -42,6 +43,11 @@ const branches = [
             <ul class="hung" aria-label={`Excepciones desde ${b.state}`}>
               {b.hung.map(([s, n], i) => (
                 <li class="chip exception st-hung" style={`--st-swing:${i % 2 ? 1.2 : -1.5}deg`}>
+                  {closed.includes(s) && (
+                    <svg class="corner" viewBox="0 0 28 28" aria-label="cerrado sin orden" role="img">
+                      <path d="M0 0 H28 V28 Z" />
+                    </svg>
+                  )}
                   <code>{s}</code>
                   <span class="note">{n}</span>
                 </li>
@@ -131,6 +137,14 @@ const branches = [
     font-size: 0.8125rem;
     line-height: 1.4;
     color: var(--st-ink-muted);
+  }
+  .corner {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 1.1rem;
+    height: 1.1rem;
+    fill: var(--st-ink);
   }
   .hung {
     list-style: none;
