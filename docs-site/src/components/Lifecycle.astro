@@ -60,6 +60,37 @@ const branches = [
   </ol>
 </figure>
 
+<script>
+  // The figure and the ledgers below describe the same states. Hovering a
+  // chip marks its row in the margin; hovering a row outlines its chip.
+  const chips = new Map<string, HTMLElement>();
+  for (const chip of document.querySelectorAll<HTMLElement>('.life .chip')) {
+    const name = chip.querySelector('code')?.textContent?.trim();
+    if (name) chips.set(name, chip);
+  }
+  const rows = new Map<string, HTMLTableRowElement>();
+  for (const row of document.querySelectorAll<HTMLTableRowElement>('.sl-markdown-content table tbody tr')) {
+    const name = row.querySelector('td:first-child > code:only-child')?.textContent?.trim();
+    if (name && chips.has(name) && !rows.has(name)) rows.set(name, row);
+  }
+  for (const [name, chip] of chips) {
+    const row = rows.get(name);
+    if (!row) continue;
+    const on = () => {
+      chip.classList.add('st-hit');
+      row.classList.add('st-hit');
+    };
+    const off = () => {
+      chip.classList.remove('st-hit');
+      row.classList.remove('st-hit');
+    };
+    for (const el of [chip, row]) {
+      el.addEventListener('pointerenter', on);
+      el.addEventListener('pointerleave', off);
+    }
+  }
+</script>
+
 <style>
   .life {
     container-type: inline-size;
@@ -109,6 +140,18 @@ const branches = [
   .exception {
     background: var(--st-edge);
     border: 1.5px dashed var(--st-ink);
+  }
+  /* Pointed at from the ledger: the same void inset the verified frame wears. */
+  .chip {
+    outline: 3px solid transparent;
+    outline-offset: -3px;
+    transition: outline-color 160ms ease-out;
+  }
+  .chip.st-hit {
+    outline-color: var(--st-void);
+  }
+  .exception.st-hit {
+    outline-color: var(--st-flag);
   }
   .m {
     width: 0.875rem;

@@ -65,6 +65,13 @@
   --sl-line-height: 1.65;
   --sl-line-height-headings: 1.15;
   --sl-nav-height: 4.25rem;
+
+  /* Motion: one curve; feedback is fast, openings are short, the rail
+     stops once. Spatial movement only under no-preference. */
+  --st-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --st-fast: 120ms;
+  --st-open: 180ms;
+  --st-settle: 320ms;
 }
 
 ::selection {
@@ -125,9 +132,11 @@ body {
   color: var(--st-flag);
 }
 
+/* The current folio's fill is a tape stroke drawn as a background layer,
+   so it can be painted in from the left on page open. */
 #starlight__sidebar a[aria-current='page'],
 #starlight__sidebar a[aria-current='page']:hover {
-  background: var(--st-flag);
+  background: linear-gradient(var(--st-flag), var(--st-flag)) 0 0 / 100% 100% no-repeat var(--st-void);
   color: var(--st-void);
 }
 
@@ -399,23 +408,25 @@ mobile-starlight-toc nav {
   text-transform: uppercase;
 }
 
+/* The perforation tile is nine holes wider than the strip and parked to
+   the left, so the rail can advance one frame without exposing a gap. */
 .st-sprockets {
+  --st-advance: 16.875rem;
   height: 1.25rem;
   background:
-    radial-gradient(circle, transparent 0, transparent 0),
     repeating-linear-gradient(
       90deg,
       transparent 0 0.875rem,
       var(--st-void) 0.875rem 1.75rem,
       transparent 1.75rem 1.875rem
-    ) center / 100% 0.625rem no-repeat,
+    ) calc(-1 * var(--st-advance)) 50% / calc(100% + var(--st-advance)) 0.625rem no-repeat,
     var(--st-flag) var(--st-grain);
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .st-hung {
     transform-origin: 50% 0;
-    animation: st-settle 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: st-settle 900ms var(--st-ease) both;
   }
   @keyframes st-settle {
     from {
@@ -425,10 +436,127 @@ mobile-starlight-toc nav {
       transform: rotate(var(--st-swing, -2deg));
     }
   }
+  /* The home rail advances one frame and stops (applied in Hero.astro). */
+  @keyframes st-advance {
+    from {
+      transform: translateX(16.5rem);
+    }
+  }
+  @keyframes st-sprocket {
+    from {
+      background-position:
+        0 50%,
+        0 0;
+    }
+  }
 }
 
 .st-hung {
   transform: rotate(var(--st-swing, -2deg));
+}
+
+/* ---------- Motion: feedback and state ---------- */
+
+/* Every hover or current-state change in the chrome transitions in one
+   beat. Color only, so it also runs under reduced motion. */
+.sections a,
+#starlight__sidebar a,
+.right-sidebar-panel a,
+.pagination-links .link-title,
+.sl-markdown-content a,
+.sl-menu-button,
+starlight-menu-button button,
+mobile-starlight-toc summary,
+.st-hash-actions :is(button, a),
+.expressive-code .copy button {
+  transition:
+    color var(--st-fast) ease-out,
+    background-color var(--st-fast) ease-out,
+    border-color var(--st-fast) ease-out;
+}
+
+/* Leaving a page: the same 3px arrow nudge the doors already use. */
+.pagination-links a svg {
+  transition: transform 200ms var(--st-ease);
+}
+.pagination-links a[rel='next']:hover svg {
+  transform: translateX(3px);
+}
+.pagination-links a[rel='prev']:hover svg {
+  transform: translateX(-3px);
+}
+
+/* The copy button is square like every other control. */
+.expressive-code .copy button {
+  border-radius: 0;
+}
+
+/* Lifecycle figure and ledger point at each other on hover: a tape mark
+   in the ledger's margin, a void outline on the chip. */
+.sl-markdown-content td:first-child {
+  position: relative;
+}
+.sl-markdown-content td:first-child::before {
+  content: '';
+  position: absolute;
+  left: -0.9rem;
+  top: 1rem;
+  width: 0.5rem;
+  height: 0.375rem;
+  background: var(--st-flag) var(--st-grain);
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+}
+.sl-markdown-content tr.st-hit td:first-child::before {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Opening a page: the tape stroke is painted across the current folio
+     from the left, then the folded flag drops onto it. */
+  /* A brush stroke, not a snap: ease in and out so the tape is seen
+     travelling across the folio. */
+  #starlight__sidebar a[aria-current='page'] {
+    animation: st-stroke 480ms cubic-bezier(0.65, 0, 0.35, 1) both;
+  }
+  @keyframes st-stroke {
+    from {
+      background-size: 0% 100%;
+    }
+  }
+  #starlight__sidebar a[aria-current='page']::after {
+    animation: st-drop 400ms var(--st-ease) 420ms both;
+  }
+  @keyframes st-drop {
+    from {
+      transform: translateY(-1.25rem);
+    }
+  }
+
+  /* The search dialog arrives instead of appearing. */
+  site-search dialog[open] {
+    animation: st-rise 160ms var(--st-ease) both;
+  }
+  @keyframes st-rise {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+
+  /* The mobile sidebar is a popover; it opens as a cut from the top. */
+  #starlight__sidebar:popover-open {
+    clip-path: inset(0);
+    transition:
+      clip-path var(--st-open) var(--st-ease),
+      display var(--st-open) allow-discrete,
+      overlay var(--st-open) allow-discrete;
+  }
+  @starting-style {
+    #starlight__sidebar:popover-open {
+      clip-path: inset(0 0 100% 0);
+    }
+  }
 }
 
 /* Starlight's own mobile controls, rebuilt in the bench's vocabulary */
@@ -538,4 +666,64 @@ html:not([data-has-hero]) main::before {
   height: 1.2rem;
   background: var(--st-void);
   clip-path: polygon(0 0, 100% 0, 100% 75%, 50% 100%, 0 75%);
+}
+
+/* ---------- Motion: continuity between pages ---------- */
+
+/* Cross-document view transitions: the frame (masthead, sidebar, right
+   rail) holds still while the reading window cuts to the next page, and
+   the flag fill of the current folio slides from the old entry to the
+   new one: the rail advances. CSS only; browsers without support load
+   the page as before. */
+@view-transition {
+  navigation: auto;
+}
+
+header.header {
+  view-transition-name: st-masthead;
+}
+#starlight__sidebar {
+  view-transition-name: st-sidebar;
+}
+#starlight__sidebar a[aria-current='page'] {
+  view-transition-name: st-folio;
+}
+.right-sidebar {
+  view-transition-name: st-toc;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 160ms;
+  animation-timing-function: ease-out;
+}
+::view-transition-group(st-folio) {
+  animation-duration: var(--st-settle);
+  animation-timing-function: var(--st-ease);
+}
+/* The frame does not crossfade; it is the same frame. */
+::view-transition-old(st-masthead),
+::view-transition-old(st-sidebar),
+::view-transition-old(st-toc) {
+  animation: none;
+  opacity: 0;
+}
+::view-transition-new(st-masthead),
+::view-transition-new(st-sidebar),
+::view-transition-new(st-toc) {
+  animation: none;
+}
+
+/* When the folio arrived by sliding, it is not painted again. */
+html[data-st-vt] #starlight__sidebar a[aria-current='page'],
+html[data-st-vt] #starlight__sidebar a[aria-current='page']::after {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }

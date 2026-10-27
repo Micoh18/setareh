@@ -148,7 +148,7 @@ Density is that of a working reference sheet: generous measure in the window (46
 - State marks (cross, star seal, pin, punched corner, folded tape flag) instead of colored badges.
 - Square corners everywhere; borders are rules, perforations and tape, never rounded containers.
 - Single theme; the theme selector is intentionally empty.
-- One motion: hung tags settle once on load, and only when motion is allowed.
+- Motion happens when something changes state or when the rail stops; it never runs while someone reads.
 
 ## Colors
 
@@ -197,7 +197,7 @@ All three are self-hosted through @fontsource: Barlow Condensed 600/700, Literat
 - **Body** (Literata 400, 1.0625rem, 1.65): running copy, pretty wrap. Home lede at 1.25rem/1.6, max 52ch.
 - **Frame Title** (Barlow Condensed 700, 2rem, 1.05, uppercase): rail frame titles (1.75rem narrow), door titles (clamp(2rem, 3vw, 2.5rem)), pagination titles (1.75rem), step numerals (2.25rem).
 - **Nav** (Barlow Condensed 600, 1rem to 1.125rem, 0.06em to 0.08em, uppercase): masthead tabs, sidebar folios, door links, menu items.
-- **Label** (Barlow Condensed 600, 0.75rem to 0.875rem, 0.1em to 0.12em, uppercase): table headers, sidebar group names and the on-this-page heading (in flag), aside titles, figure captions, legends, the limits line, hash actions.
+- **Label** (Barlow Condensed 600, 0.75rem to 0.9375rem, 0.1em to 0.12em, uppercase): table headers, sidebar group names and the on-this-page heading (in flag), aside titles, figure captions, legends, hash actions, and the limits line (0.9375rem, edge, after a tape strip).
 - **Code** (JetBrains Mono 400/500, 0.875rem; 0.75rem for frame details and folio numbers): code blocks, inline code, identifiers, hashes, sidebar folio counters.
 
 ### Named Rules
@@ -253,7 +253,8 @@ The mark grammar:
 ### Rail frames (signature)
 - **Style:** white frames on the grainy flag rail, square, 8.75rem min height, frame title top-left, mono detail pinned to the bottom in ink-muted, state mark top-right.
 - **Verified frame:** a 3px void inset outline and the deep-flag star seal; its detail is a link to the evidence.
-- **Pending:** a hung tag below the rail on a pin, outside the rail itself.
+- **Pending:** a hung tag below the rail on a pin, outside the rail itself. It stays on narrow screens, at 15rem, with the limits paragraph beneath.
+- **Limits:** under the legend, the limits sentence ("Solo Stellar testnet · solo Shopify · sin auditoría externa") is a tape strip on the frame: a 2.5rem flag tape followed by label type at 0.9375rem in edge. It is the one line an evaluator must not miss, so it sits a step above the legend, never beside it.
 
 ### Lifecycle figure
 - **Style:** void tray holding a rail of state frames (window white, flag sprocket bands); exceptions hang below their source state as dashed edge tags on flag pins, alternately rotated; closed-without-order exceptions carry the punched corner. A caption in labels states the key.
@@ -281,7 +282,17 @@ The mark grammar:
 - **Style:** no box; a 2px ink rule on top, Barlow 700 uppercase title at 1.75rem in ink, deep flag on hover.
 
 ### Motion
-- One settle: hung tags rotate from about -6deg to about -2deg over 900ms (cubic-bezier(0.16, 1, 0.3, 1)) once on load, only under prefers-reduced-motion: no-preference. With reduced motion they rest at their final angle. The door arrow nudge is the only hover motion.
+Motion occurs when something changes state (copy, open, current page) or when the rail stops. It never runs while someone reads. One curve, cubic-bezier(0.16, 1, 0.3, 1), exposed as --st-ease; three beats: 120ms for feedback (--st-fast), 180ms for openings (--st-open), 320ms for a settle (--st-settle). Spatial movement lives only under prefers-reduced-motion: no-preference; color and state changes transition regardless, so feedback stays legible with reduced motion.
+
+- **The rail stops (focal moment, home only):** on load the film advances one frame to the left and stops under the blade: every rail frame and edge code translates from 16.5rem to 0 over 700ms while both perforation strips shift their holes by nine pitches (16.875rem) in sync. The hung tag's 900ms settle starts 520ms in, as the rail decelerates, so it reads as the consequence of the stop. Plays once per session (sessionStorage flag `st-rail-seen` sets `data-st-rail-seen` on the root); on a return visit the rail is already parked. The perforation tile is drawn nine pitches wider than the strip and parked to the left so the shift never exposes a gap.
+- **Hung tags settle:** rotate from about -6deg to about -2deg over 900ms once on load (exceptions in the lifecycle figure alternate the angle). With reduced motion they rest at their final angle.
+- **Current folio:** on page open the flag fill of the current sidebar entry is painted in from the left as a tape stroke (background-size 0% to 100%, 360ms), then the folded tape flag drops 1.25rem onto it (400ms, starting at 240ms). The fill is a gradient background layer over void so the stroke can animate.
+- **Copying a hash:** the button inverts to ink for 1.8s (state, also under reduced motion) and the hash box flashes once from window wash (#fbe6dc) to edge over 600ms; a polite live region announces the result.
+- **Between pages (continuity):** cross-document view transitions (`@view-transition { navigation: auto }`, CSS only, no client router). The masthead, sidebar and right rail carry view-transition-names and hold still; the reading window crossfades in 160ms; the current folio's flag fill carries `st-folio` and slides from the previous entry to the new one in 320ms: the rail advances. A `pagereveal` listener in the head marks documents that arrived this way (`data-st-vt`) so the tape stroke and flag drop run only on a first load or in browsers without the feature. Reduced motion makes every transition instant.
+- **Openings:** the mobile sidebar popover opens as a cut from the top (clip-path inset, 180ms, with @starting-style); the search dialog rises 4px while fading in over 160ms; the home MENÚ trigger fills flag in 120ms.
+- **Pointing:** hovering a lifecycle chip marks its ledger row with a small tape in the margin, and hovering the row outlines the chip (void on normal frames, flag on hung exceptions), 160ms.
+- **Leaving:** door links, pagination links and hash actions share the same 3px arrow nudge (200ms); masthead tabs, folios, right-rail links, markdown links and controls transition color and background in 120ms.
+- **Never:** sprockets looping, animated grain, hover lift or scale on frames, scroll-triggered section reveals, parallax, or re-swinging a tag on hover.
 
 ## Do's and Don'ts
 
@@ -293,7 +304,8 @@ The mark grammar:
 - **Do** set scanned text in Barlow Condensed capitals, read text in Literata, copied text in JetBrains Mono.
 - **Do** keep every corner square and define containers with top rules, perforations and dashed pinned borders.
 - **Do** let tables stack into labelled entries below 50rem.
-- **Do** honor reduced motion: hung tags rest at their final rotation with no animation.
+- **Do** honor reduced motion: no spatial movement (the rail is parked, tags rest at their final angle, the tape flag is already down), while color and state transitions still confirm what happened.
+- **Do** animate only a state change, an opening, or the rail stopping; a new animation that would run while someone reads does not belong.
 
 ### Don't:
 - **Don't** add a light theme or a theme switcher; the site ships one theme.

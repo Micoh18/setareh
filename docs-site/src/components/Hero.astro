@@ -42,6 +42,13 @@ const doors = [
 ];
 ---
 
+<script is:inline>
+  // The rail advances once per session; on a return visit it is already parked.
+  try {
+    if (sessionStorage.getItem('st-rail-seen')) document.documentElement.setAttribute('data-st-rail-seen', '');
+    else sessionStorage.setItem('st-rail-seen', '1');
+  } catch {}
+</script>
 <div class="st-hero">
   <section class="trace" aria-labelledby="st-trace-title">
     <div class="trace-head">
@@ -82,10 +89,10 @@ const doors = [
         hecho
         <svg viewBox="0 0 32 32" aria-hidden="true"><path class="s" d="M16 1 L19 11 L28.5 6.5 L24 16 L28.5 25.5 L19 21 L16 31 L13 21 L3.5 25.5 L8 16 L3.5 6.5 L13 11 Z" /></svg>
         hash público
-        <span class="wide-only legend-item"><svg viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5" class="p" /></svg>
+        <span class="legend-item"><svg viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5" class="p" /></svg>
         colgado: pendiente</span>
       </span>
-      <span class="limits-line">Solo Stellar testnet · solo Shopify · sin auditoría externa<span class="narrow-only"> · piloto externo pendiente</span></span>
+      <span class="limits-line">Solo Stellar testnet · solo Shopify · sin auditoría externa</span>
     </p>
     <div class="bin">
       <div class="hang">
@@ -253,10 +260,8 @@ const doors = [
     color: var(--st-void);
   }
   .edge-caption {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 0.4rem 2rem;
+    display: grid;
+    gap: 0.75rem;
     max-width: 82rem;
     margin: 0 auto;
     padding: 0.6rem clamp(1rem, 5vw, 5.75rem) 0;
@@ -294,8 +299,21 @@ const doors = [
   .legend .p {
     fill: var(--st-flag);
   }
+  /* The limits are the one sentence an evaluator must not miss: a tape
+     strip on the frame, in edge, a step above the legend. */
   .limits-line {
-    color: var(--st-flag);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.9375rem;
+    color: var(--st-edge);
+  }
+  .limits-line::before {
+    content: '';
+    flex: none;
+    width: 2.5rem;
+    height: 0.375rem;
+    background: var(--st-flag) var(--st-grain);
   }
   .bin {
     display: grid;
@@ -395,20 +413,30 @@ const doors = [
     transform: translateX(3px);
   }
 
-  .narrow-only {
-    display: none;
+  /* The focal moment: the film advances one frame and stops under the
+     blade. Frames, edge codes and perforations move together; the hung
+     tag swings as a consequence once the rail has stopped. Once per
+     session, and never under reduced motion. */
+  @media (prefers-reduced-motion: no-preference) {
+    :global(html:not([data-st-rail-seen])) .frames .frame,
+    :global(html:not([data-st-rail-seen])) .edge span {
+      animation: st-advance 700ms var(--st-ease) both;
+    }
+    :global(html:not([data-st-rail-seen])) .trace .st-sprockets {
+      animation: st-sprocket 700ms var(--st-ease) both;
+    }
+    :global(html:not([data-st-rail-seen])) .hang .trim {
+      animation-delay: 520ms;
+    }
   }
+
   @media (max-width: 50rem) {
     .edge span,
-    .bin,
     .wide-only {
       display: none;
     }
-    .narrow-only {
-      display: inline;
-    }
     .edge-caption {
-      padding-bottom: 1.25rem;
+      padding-bottom: 0.5rem;
     }
     .frames {
       grid-auto-columns: 78%;

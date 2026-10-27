@@ -27,6 +27,14 @@ export default defineConfig({
           },
         },
         { tag: 'meta', attrs: { name: 'twitter:image', content: 'https://docs.setareh.site/og.png' } },
+        // Marks a document that arrived through a cross-document view
+        // transition, so the current folio is not painted a second time
+        // after sliding into place (see setareh.css, continuity).
+        {
+          tag: 'script',
+          content:
+            "addEventListener('pagereveal',function(e){if(e.viewTransition)document.documentElement.setAttribute('data-st-vt','')})",
+        },
       ],
       customCss: [
         '@fontsource/barlow-condensed/600.css',
