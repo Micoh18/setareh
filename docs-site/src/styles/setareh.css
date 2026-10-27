@@ -132,9 +132,11 @@ body {
   color: var(--st-flag);
 }
 
+/* The current folio's fill is a tape stroke drawn as a background layer,
+   so it can be painted in from the left on page open. */
 #starlight__sidebar a[aria-current='page'],
 #starlight__sidebar a[aria-current='page']:hover {
-  background: var(--st-flag);
+  background: linear-gradient(var(--st-flag), var(--st-flag)) 0 0 / 100% 100% no-repeat var(--st-void);
   color: var(--st-void);
 }
 
@@ -510,13 +512,24 @@ mobile-starlight-toc summary,
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* The folded tape flag drops onto the current folio once per page. */
+  /* Opening a page: the tape stroke is painted across the current folio
+     from the left, then the folded flag drops onto it. */
+  /* A brush stroke, not a snap: ease in and out so the tape is seen
+     travelling across the folio. */
+  #starlight__sidebar a[aria-current='page'] {
+    animation: st-stroke 480ms cubic-bezier(0.65, 0, 0.35, 1) both;
+  }
+  @keyframes st-stroke {
+    from {
+      background-size: 0% 100%;
+    }
+  }
   #starlight__sidebar a[aria-current='page']::after {
-    animation: st-drop var(--st-settle) var(--st-ease) both;
+    animation: st-drop 400ms var(--st-ease) 420ms both;
   }
   @keyframes st-drop {
     from {
-      transform: translateY(-0.5rem);
+      transform: translateY(-1.25rem);
     }
   }
 
