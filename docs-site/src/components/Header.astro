@@ -1,0 +1,174 @@
+---
+import Search from '@astrojs/starlight/components/Search.astro';
+import SiteTitle from 'virtual:starlight/components/SiteTitle';
+
+const id = Astro.locals.starlightRoute.id;
+
+const sections = [
+  { label: 'Empezar', href: '/primeros-pasos/', ids: ['primeros-pasos', 'arquitectura', 'runbook'] },
+  {
+    label: 'Integrar',
+    href: '/referencia/mcp/',
+    ids: ['referencia/configuracion', 'referencia/mcp', 'referencia/http-x402', 'agentes/checkout', 'comercios/shopify'],
+  },
+  {
+    label: 'Operar',
+    href: '/operaciones/estados-y-recuperacion/',
+    ids: ['operaciones/estados-y-recuperacion', 'operaciones/despliegue', 'operaciones/metricas', 'seguridad', 'agentes'],
+  },
+  { label: 'Evidencia', href: '/evidencia/', ids: ['evidencia'] },
+];
+---
+
+<div class="header">
+  <div class="title-wrapper">
+    <SiteTitle />
+  </div>
+  <nav class="sections" aria-label="Secciones">
+    {
+      sections.map((s) => (
+        <a href={s.href} aria-current={s.ids.includes(id) ? 'true' : undefined}>
+          {s.label}
+        </a>
+      ))
+    }
+  </nav>
+  <div class="search print:hidden">
+    <Search />
+  </div>
+  <details class="menu print:hidden">
+    <summary>Menú</summary>
+    <nav aria-label="Secciones">
+      {
+        sections.map((s) => (
+          <a href={s.href} aria-current={s.ids.includes(id) ? 'true' : undefined}>
+            {s.label}
+          </a>
+        ))
+      }
+    </nav>
+  </details>
+</div>
+
+<style>
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    height: 100%;
+  }
+  .title-wrapper {
+    min-width: 0;
+    overflow: clip;
+    padding: 0.25rem;
+    margin: -0.25rem;
+  }
+  .sections {
+    display: none;
+    gap: 1.75rem;
+  }
+  .sections a {
+    font-family: var(--st-font-label);
+    font-weight: 600;
+    font-size: 1.0625rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: var(--st-edge);
+    padding-block: 0.25rem;
+    border-bottom: 2px solid transparent;
+  }
+  .sections a:hover {
+    color: var(--st-flag);
+  }
+  .sections a[aria-current='true'] {
+    color: var(--st-flag);
+    border-bottom-color: var(--st-flag);
+  }
+  .search {
+    display: flex;
+    margin-inline-start: auto;
+  }
+  @media (min-width: 62rem) {
+    .sections {
+      display: flex;
+    }
+  }
+  /* Pages without a sidebar (the home) get their own section menu on narrow
+     screens; elsewhere Starlight's sidebar toggle already covers it. */
+  .menu {
+    position: relative;
+  }
+  .menu summary {
+    list-style: none;
+    cursor: pointer;
+    font-family: var(--st-font-label);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--st-flag);
+    border: 1.5px solid var(--st-flag);
+    padding: 0.45rem 0.8rem;
+  }
+  .menu summary::-webkit-details-marker {
+    display: none;
+  }
+  .menu[open] summary {
+    background: var(--st-flag);
+    color: var(--st-void);
+  }
+  .menu nav {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.5rem);
+    z-index: var(--sl-z-index-menu);
+    display: grid;
+    min-width: 13rem;
+    background: var(--st-void);
+    border: 1px solid var(--st-spool);
+  }
+  .menu nav a {
+    padding: 0.8rem 1rem;
+    font-family: var(--st-font-label);
+    font-weight: 600;
+    font-size: 1.125rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: var(--st-edge);
+    border-bottom: 1px solid var(--st-spool);
+  }
+  .menu nav a[aria-current='true'] {
+    background: var(--st-flag);
+    color: var(--st-void);
+  }
+  :global(html[data-has-sidebar]) .menu {
+    display: none;
+  }
+  @media (min-width: 62rem) {
+    .menu {
+      display: none;
+    }
+  }
+  /* Search trigger: a charred field with a flag shortcut. */
+  .search :global(button[data-open-modal]) {
+    border-radius: 0;
+    background: var(--st-charred);
+    border-color: var(--st-spool);
+    color: var(--st-on-void-muted);
+    font-family: var(--sl-font-mono);
+    font-size: 0.8125rem;
+  }
+  .search :global(button[data-open-modal]:hover) {
+    border-color: var(--st-flag);
+    color: var(--st-edge);
+  }
+  .search :global(button[data-open-modal] kbd) {
+    background: transparent;
+    color: var(--st-flag);
+    font-family: var(--st-font-label);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+  }
+</style>

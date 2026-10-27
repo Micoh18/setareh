@@ -1,0 +1,430 @@
+---
+const PAGE_TITLE_ID = '_top';
+
+const { data } = Astro.locals.starlightRoute.entry;
+const { title = data.title, tagline } = data.hero || {};
+
+const settlementHash = 'ff61775d6db907bd3a5ede8a69f8fdb882693c0bd39e185d34ccbfba78f65001';
+
+const frames = [
+  { code: '01', step: 'Quote', title: 'Quote fijado', detail: 'productos, despacho y vencimiento congelados', state: 'done' },
+  { code: '02', step: 'Confirmación', title: 'La persona confirma', detail: 'userConfirmed: true', state: 'done' },
+  {
+    code: '03',
+    step: 'Settlement x402',
+    title: 'USDC liquidado',
+    detail: `tx ${settlementHash.slice(0, 6)}…${settlementHash.slice(-6)} · testnet`,
+    href: '/evidencia/',
+    state: 'verified',
+  },
+  { code: '04', step: 'Orden', title: 'Una sola orden Shopify', detail: 'idempotente · máx. 1 por quote', state: 'done' },
+];
+
+const doors = [
+  {
+    title: 'Integrar un agente',
+    text: 'Configura el backend, conecta el runtime MCP y crea tu primer quote.',
+    links: [
+      ['Primeros pasos', '/primeros-pasos/'],
+      ['Referencia MCP', '/referencia/mcp/'],
+      ['API HTTP y x402', '/referencia/http-x402/'],
+    ],
+  },
+  {
+    title: 'Verificar las afirmaciones',
+    text: 'Revisa las transacciones en Stellar testnet, la CI, el modelo de amenazas y el límite de cada afirmación.',
+    links: [
+      ['Evidencia pública', '/evidencia/'],
+      ['Seguridad y límites', '/seguridad/'],
+      ['Estados y recuperación', '/operaciones/estados-y-recuperacion/'],
+    ],
+  },
+];
+---
+
+<div class="st-hero">
+  <section class="trace" aria-labelledby="st-trace-title">
+    <div class="trace-head">
+      <h2 id="st-trace-title" class="st-label">La traza · una compra, cuatro fotogramas</h2>
+      <p class="st-label muted">Stellar testnet · entorno de referencia</p>
+    </div>
+    <div class="st-sprockets edge" aria-hidden="true">
+      {frames.map((f) => <span>{f.code}</span>)}
+    </div>
+    <ol class="frames">
+      {
+        frames.map((f) => (
+          <li class="frame" data-state={f.state}>
+            <span class="frame-title">{f.title}</span>
+            <span class="detail">
+              <span class="sr-only">Fotograma {f.code}, {f.step}: </span>
+              {f.href ? <a href={f.href}>{f.detail}</a> : f.detail}
+            </span>
+            {f.state === 'done' && (
+              <svg class="mark cross" viewBox="0 0 40 40" aria-label="hecho en el flujo de referencia" role="img">
+                <path d="M5 6 C14 15 24 25 35 35 M34 5 C25 15 15 24 6 34" />
+              </svg>
+            )}
+            {f.state === 'verified' && (
+              <svg class="mark seal" viewBox="0 0 32 32" aria-label="verificable con hash público" role="img">
+                <path d="M16 1 L19 11 L28.5 6.5 L24 16 L28.5 25.5 L19 21 L16 31 L13 21 L3.5 25.5 L8 16 L3.5 6.5 L13 11 Z" />
+                <circle cx="16" cy="16" r="4.5" fill="var(--st-window)" />
+              </svg>
+            )}
+          </li>
+        ))
+      }
+    </ol>
+    <div class="st-sprockets" aria-hidden="true"></div>
+    <p class="edge-caption st-label">
+      <span class="legend">
+        <svg viewBox="0 0 40 40" aria-hidden="true"><path class="x" d="M5 6 C14 15 24 25 35 35 M34 5 C25 15 15 24 6 34" /></svg>
+        hecho
+        <svg viewBox="0 0 32 32" aria-hidden="true"><path class="s" d="M16 1 L19 11 L28.5 6.5 L24 16 L28.5 25.5 L19 21 L16 31 L13 21 L3.5 25.5 L8 16 L3.5 6.5 L13 11 Z" /></svg>
+        hash público
+        <svg viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5" class="p" /></svg>
+        colgado: pendiente
+      </span>
+      <span class="limits-line">Solo Stellar testnet · solo Shopify · sin auditoría externa<span class="narrow-only"> · piloto externo pendiente</span></span>
+    </p>
+    <div class="bin">
+      <div class="hang">
+        <svg class="pin" viewBox="0 0 14 34" width="14" height="34" aria-hidden="true">
+          <line x1="7" y1="0" x2="7" y2="22" stroke="var(--st-on-void-muted)" stroke-width="1.5"></line>
+          <circle cx="7" cy="25" r="6" fill="var(--st-flag)"></circle>
+        </svg>
+        <div class="frame trim st-hung" data-state="pending">
+          <span class="frame-title">Piloto externo</span>
+          <span class="detail"><span class="sr-only">Diferido: </span>con un comercio tercero · aún no demostrado</span>
+        </div>
+      </div>
+      <p class="limits">
+        Las liquidaciones de referencia son internas. No hay mainnet ni custodia; el piloto con un comercio
+        tercero queda colgado hasta contar con evidencia redactada.
+      </p>
+    </div>
+  </section>
+
+  <section class="st-window intro">
+    <h1 id={PAGE_TITLE_ID} data-page-title set:html={title} />
+    {tagline && <p class="tagline" set:html={tagline} />}
+    <div class="doors">
+      {
+        doors.map((d) => (
+          <section class="door">
+            <h2>{d.title}</h2>
+            <p>{d.text}</p>
+            <ul>
+              {d.links.map(([label, href]) => (
+                <li>
+                  <a href={href}>
+                    {label}
+                    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                      <path d="M2 8 H13 M9 4 L13 8 L9 12" />
+                    </svg>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))
+      }
+    </div>
+  </section>
+</div>
+
+<style>
+  .trace {
+    margin-inline: calc(50% - 50vw);
+    padding-top: 1rem;
+    background: var(--st-void);
+  }
+  .trace-head,
+  .bin {
+    max-width: 82rem;
+    margin-inline: auto;
+    padding-inline: clamp(1rem, 5vw, 5.75rem);
+  }
+  .trace-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem 2rem;
+    padding-bottom: 0.75rem;
+  }
+  .trace-head h2 {
+    margin: 0;
+    color: var(--st-edge);
+    font-size: 1.0625rem;
+  }
+  .muted {
+    margin: 0;
+    color: var(--st-on-void-muted);
+    font-size: 0.8125rem;
+  }
+  .frames {
+    list-style: none;
+    margin: 0;
+    padding: 0.9rem max(1rem, calc((100vw - 82rem) / 2 + clamp(1rem, 5vw, 5.75rem)));
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(15rem, 1fr);
+    gap: 1.5rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 1rem;
+    scrollbar-width: none;
+    background: var(--st-flag) var(--st-grain);
+  }
+  .frames::-webkit-scrollbar {
+    display: none;
+  }
+  .frame {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-height: 8.75rem;
+    padding: 1.1rem 1.1rem 0.9rem;
+    background: var(--st-window);
+    color: var(--st-ink);
+    scroll-snap-align: start;
+    margin: 0;
+  }
+  .frame[data-state='verified'] {
+    outline: 3px solid var(--st-void);
+    outline-offset: -3px;
+  }
+  .frame-title {
+    font-family: var(--st-font-label);
+    font-weight: 700;
+    font-size: 2rem;
+    line-height: 1.05;
+    text-transform: uppercase;
+    padding-right: 2.25rem;
+  }
+  .detail {
+    margin-top: auto;
+    font-family: var(--sl-font-mono);
+    font-size: 0.75rem;
+    color: var(--st-ink-muted);
+  }
+  .detail a {
+    color: var(--st-flag-deep);
+    text-underline-offset: 0.2em;
+  }
+  .mark {
+    position: absolute;
+  }
+  .cross {
+    top: 0.85rem;
+    right: 0.9rem;
+    width: 2.25rem;
+    height: 2.25rem;
+    fill: none;
+    stroke: var(--st-ink);
+    stroke-width: 5;
+    stroke-linecap: round;
+  }
+  .seal {
+    top: 0.75rem;
+    right: 0.8rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    fill: var(--st-flag-deep);
+  }
+  .edge {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(15rem, 1fr);
+    gap: 1.5rem;
+    align-items: center;
+    padding-inline: max(1rem, calc((100vw - 82rem) / 2 + clamp(1rem, 5vw, 5.75rem)));
+    height: 1.5rem;
+  }
+  .edge span {
+    width: fit-content;
+    padding: 0 0.35rem;
+    background: var(--st-flag);
+    font-family: var(--sl-font-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--st-void);
+  }
+  .edge-caption {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.4rem 2rem;
+    max-width: 82rem;
+    margin: 0 auto;
+    padding: 0.6rem clamp(1rem, 5vw, 5.75rem) 0;
+    font-size: 0.8125rem;
+    color: var(--st-on-void-muted);
+  }
+  .legend {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .legend svg {
+    width: 0.9rem;
+    height: 0.9rem;
+    margin-left: 0.6rem;
+  }
+  .legend svg:first-child {
+    margin-left: 0;
+  }
+  .legend .x {
+    fill: none;
+    stroke: var(--st-edge);
+    stroke-width: 5;
+    stroke-linecap: round;
+  }
+  .legend .s {
+    fill: var(--st-flag);
+  }
+  .legend .p {
+    fill: var(--st-flag);
+  }
+  .limits-line {
+    color: var(--st-flag);
+  }
+  .bin {
+    display: grid;
+    grid-template-columns: minmax(14rem, 18.5rem) minmax(0, 36rem);
+    gap: 2rem;
+    padding-bottom: 1.25rem;
+  }
+  .hang {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .trim {
+    --st-swing: -2.5deg;
+    --st-swing-from: -7deg;
+    width: 100%;
+    min-height: 5.5rem;
+  }
+  .limits {
+    margin: 0;
+    padding-top: 1.5rem;
+    color: var(--st-edge);
+    max-width: 62ch;
+  }
+
+  .intro {
+    padding: clamp(1.5rem, 3vw, 2.25rem) clamp(1.25rem, 5vw, 4.5rem) 1rem;
+  }
+  .intro h1 {
+    margin: 0;
+    font-size: clamp(2.25rem, 4.5vw, 3.25rem);
+    line-height: 1.1;
+    color: var(--st-ink);
+    max-width: 34ch;
+  }
+  .tagline {
+    margin: 1rem 0 0;
+    font-size: 1.25rem;
+    line-height: 1.6;
+    color: var(--st-ink);
+    max-width: 52ch;
+  }
+  .doors {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+    gap: 1.25rem 2rem;
+    margin-top: 1.5rem;
+  }
+  .door {
+    border-top: 6px solid var(--st-ink);
+    padding-top: 1.25rem;
+  }
+  .door h2 {
+    margin: 0;
+    font-family: var(--st-font-label);
+    font-weight: 700;
+    font-size: clamp(2rem, 3vw, 2.5rem);
+    line-height: 1.05;
+    text-transform: uppercase;
+    color: var(--st-ink);
+  }
+  .door p {
+    margin: 0.6rem 0 0;
+    color: var(--st-ink-muted);
+    max-width: 46ch;
+  }
+  .door ul {
+    list-style: none;
+    margin: 1rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.15rem;
+  }
+  .door a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-block: 0.3rem;
+    font-family: var(--st-font-label);
+    font-weight: 600;
+    font-size: 1.125rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: var(--st-ink);
+  }
+  .door a svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .door a:hover {
+    color: var(--st-flag-deep);
+  }
+  .door a:hover svg {
+    transform: translateX(3px);
+  }
+
+  .narrow-only {
+    display: none;
+  }
+  @media (max-width: 50rem) {
+    .edge span,
+    .bin {
+      display: none;
+    }
+    .narrow-only {
+      display: inline;
+    }
+    .edge-caption {
+      padding-bottom: 1.25rem;
+    }
+    .frames {
+      grid-auto-columns: 78%;
+      padding-inline: 1rem;
+      gap: 0.875rem;
+    }
+    .frame-title {
+      font-size: 1.75rem;
+    }
+    .bin {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+    }
+    .hang {
+      align-items: flex-start;
+      padding-left: 2rem;
+    }
+    .trim {
+      width: 15rem;
+    }
+    .limits {
+      padding-top: 0.5rem;
+    }
+  }
+</style>

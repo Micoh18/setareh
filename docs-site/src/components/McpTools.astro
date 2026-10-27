@@ -1,0 +1,136 @@
+---
+const tools = [
+  ['search_catalog', 'Buscar variantes activas en Shopify.', 'Solo lectura'],
+  ['check_availability', 'Reconsultar el stock antes de cotizar.', 'Solo lectura'],
+  ['create_quote', 'Fijar productos, despacho y monto USDC.', 'Crea un draft · requiere confirmación'],
+  ['pay_and_place_order', 'Obtener el endpoint x402 que paga la wallet.', 'Requiere confirmación'],
+  ['get_order_status', 'Consultar el estado y un resumen seguro del pago.', 'Solo lectura'],
+];
+---
+
+<section class="tools" aria-labelledby="st-tools-title">
+  <h2 id="st-tools-title" class="st-label">Las cinco herramientas, en orden de uso</h2>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Herramienta</th>
+        <th scope="col">Para qué</th>
+        <th scope="col">Efecto</th>
+      </tr>
+    </thead>
+    <tbody>
+      {
+        tools.map(([name, what, effect], i) => (
+          <tr>
+            <td>
+              <a href={`#${name}`}>
+                <span class="n">{i + 1}</span>
+                <code>{name}</code>
+              </a>
+            </td>
+            <td>{what}</td>
+            <td class:list={['effect', { confirm: effect.includes('confirmación') }]}>
+              {effect.includes('confirmación') && (
+                <svg class="flag" viewBox="0 0 34 54" aria-hidden="true">
+                  <path d="M0 0 H34 V40 L17 54 L0 40 Z" />
+                </svg>
+              )}
+              {effect}
+            </td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</section>
+
+<style>
+  section {
+    margin-top: 2rem;
+  }
+  .tools h2 {
+    margin: 0 0 0.6rem;
+    font-size: 0.9375rem;
+    color: var(--st-flag-deep);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    border-top: 2px solid var(--st-ink);
+    font-size: 0.9375rem;
+  }
+  th {
+    text-align: left;
+    font-family: var(--st-font-label);
+    font-weight: 600;
+    font-size: 0.8125rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--st-ink-muted);
+    padding: 0.6rem 0.75rem 0.6rem 0;
+    border-bottom: 1px solid var(--st-hairline);
+  }
+  td {
+    padding: 0.65rem 0.75rem 0.65rem 0;
+    border-bottom: 1px solid var(--st-hairline);
+    vertical-align: baseline;
+    color: var(--st-ink);
+  }
+  td a {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    text-decoration: none;
+    color: var(--st-ink);
+  }
+  td a:hover code {
+    color: var(--st-flag-deep);
+  }
+  .n {
+    font-family: var(--st-font-label);
+    font-weight: 700;
+    font-size: 1.375rem;
+    color: var(--st-flag-deep);
+    min-width: 1rem;
+  }
+  code {
+    font-family: var(--sl-font-mono);
+    font-weight: 500;
+    font-size: 0.875rem;
+    background: none;
+    padding: 0;
+  }
+  .effect {
+    font-family: var(--st-font-label);
+    font-weight: 600;
+    font-size: 0.8125rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--st-ink-muted);
+  }
+  .effect.confirm {
+    color: var(--st-flag-deep);
+  }
+  .flag {
+    width: 0.6rem;
+    height: 0.95rem;
+    margin-right: 0.35rem;
+    vertical-align: -0.1rem;
+    fill: var(--st-flag);
+  }
+  @media (max-width: 40rem) {
+    thead {
+      display: none;
+    }
+    tr {
+      display: grid;
+      gap: 0.15rem;
+      padding-block: 0.6rem;
+      border-bottom: 1px solid var(--st-hairline);
+    }
+    td {
+      border: 0;
+      padding: 0;
+    }
+  }
+</style>

@@ -6,3 +6,6 @@ docs-site/node_modules/
 docs-site/dist/
 docs-site/.astro/
 docs-site/src/content/docs/
+
+# Impeccable (design tool) local runtime state.
+docs-site/.impeccable/
