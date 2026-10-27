@@ -12,6 +12,22 @@ export default defineConfig({
         alt: 'Emblema solar de Setareh',
       },
       favicon: '/setareh-logo.png',
+      // Starlight already emits og:title/description/url/site_name and
+      // twitter:card; this adds the shared preview image every page lacked.
+      head: [
+        { tag: 'meta', attrs: { property: 'og:image', content: 'https://docs.setareh.site/og.png' } },
+        { tag: 'meta', attrs: { property: 'og:image:type', content: 'image/png' } },
+        { tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
+        { tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
+        {
+          tag: 'meta',
+          attrs: {
+            property: 'og:image:alt',
+            content: 'Setareh Docs: comercio verificable para agentes. Traza quote, confirmación, settlement y orden en Stellar testnet.',
+          },
+        },
+        { tag: 'meta', attrs: { name: 'twitter:image', content: 'https://docs.setareh.site/og.png' } },
+      ],
       customCss: [
         '@fontsource/barlow-condensed/600.css',
         '@fontsource/barlow-condensed/700.css',
