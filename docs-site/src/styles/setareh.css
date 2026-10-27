@@ -65,6 +65,13 @@
   --sl-line-height: 1.65;
   --sl-line-height-headings: 1.15;
   --sl-nav-height: 4.25rem;
+
+  /* Motion: one curve; feedback is fast, openings are short, the rail
+     stops once. Spatial movement only under no-preference. */
+  --st-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --st-fast: 120ms;
+  --st-open: 180ms;
+  --st-settle: 320ms;
 }
 
 ::selection {
@@ -399,23 +406,25 @@ mobile-starlight-toc nav {
   text-transform: uppercase;
 }
 
+/* The perforation tile is nine holes wider than the strip and parked to
+   the left, so the rail can advance one frame without exposing a gap. */
 .st-sprockets {
+  --st-advance: 16.875rem;
   height: 1.25rem;
   background:
-    radial-gradient(circle, transparent 0, transparent 0),
     repeating-linear-gradient(
       90deg,
       transparent 0 0.875rem,
       var(--st-void) 0.875rem 1.75rem,
       transparent 1.75rem 1.875rem
-    ) center / 100% 0.625rem no-repeat,
+    ) calc(-1 * var(--st-advance)) 50% / calc(100% + var(--st-advance)) 0.625rem no-repeat,
     var(--st-flag) var(--st-grain);
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .st-hung {
     transform-origin: 50% 0;
-    animation: st-settle 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: st-settle 900ms var(--st-ease) both;
   }
   @keyframes st-settle {
     from {
@@ -425,10 +434,116 @@ mobile-starlight-toc nav {
       transform: rotate(var(--st-swing, -2deg));
     }
   }
+  /* The home rail advances one frame and stops (applied in Hero.astro). */
+  @keyframes st-advance {
+    from {
+      transform: translateX(16.5rem);
+    }
+  }
+  @keyframes st-sprocket {
+    from {
+      background-position:
+        0 50%,
+        0 0;
+    }
+  }
 }
 
 .st-hung {
   transform: rotate(var(--st-swing, -2deg));
+}
+
+/* ---------- Motion: feedback and state ---------- */
+
+/* Every hover or current-state change in the chrome transitions in one
+   beat. Color only, so it also runs under reduced motion. */
+.sections a,
+#starlight__sidebar a,
+.right-sidebar-panel a,
+.pagination-links .link-title,
+.sl-markdown-content a,
+.sl-menu-button,
+starlight-menu-button button,
+mobile-starlight-toc summary,
+.st-hash-actions :is(button, a),
+.expressive-code .copy button {
+  transition:
+    color var(--st-fast) ease-out,
+    background-color var(--st-fast) ease-out,
+    border-color var(--st-fast) ease-out;
+}
+
+/* Leaving a page: the same 3px arrow nudge the doors already use. */
+.pagination-links a svg {
+  transition: transform 200ms var(--st-ease);
+}
+.pagination-links a[rel='next']:hover svg {
+  transform: translateX(3px);
+}
+.pagination-links a[rel='prev']:hover svg {
+  transform: translateX(-3px);
+}
+
+/* The copy button is square like every other control. */
+.expressive-code .copy button {
+  border-radius: 0;
+}
+
+/* Lifecycle figure and ledger point at each other on hover: a tape mark
+   in the ledger's margin, a void outline on the chip. */
+.sl-markdown-content td:first-child {
+  position: relative;
+}
+.sl-markdown-content td:first-child::before {
+  content: '';
+  position: absolute;
+  left: -0.9rem;
+  top: 1rem;
+  width: 0.5rem;
+  height: 0.375rem;
+  background: var(--st-flag) var(--st-grain);
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+}
+.sl-markdown-content tr.st-hit td:first-child::before {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* The folded tape flag drops onto the current folio once per page. */
+  #starlight__sidebar a[aria-current='page']::after {
+    animation: st-drop var(--st-settle) var(--st-ease) both;
+  }
+  @keyframes st-drop {
+    from {
+      transform: translateY(-0.5rem);
+    }
+  }
+
+  /* The search dialog arrives instead of appearing. */
+  site-search dialog[open] {
+    animation: st-rise 160ms var(--st-ease) both;
+  }
+  @keyframes st-rise {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+
+  /* The mobile sidebar is a popover; it opens as a cut from the top. */
+  #starlight__sidebar:popover-open {
+    clip-path: inset(0);
+    transition:
+      clip-path var(--st-open) var(--st-ease),
+      display var(--st-open) allow-discrete,
+      overlay var(--st-open) allow-discrete;
+  }
+  @starting-style {
+    #starlight__sidebar:popover-open {
+      clip-path: inset(0 0 100% 0);
+    }
+  }
 }
 
 /* Starlight's own mobile controls, rebuilt in the bench's vocabulary */
