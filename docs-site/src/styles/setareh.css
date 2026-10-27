@@ -667,3 +667,63 @@ html:not([data-has-hero]) main::before {
   background: var(--st-void);
   clip-path: polygon(0 0, 100% 0, 100% 75%, 50% 100%, 0 75%);
 }
+
+/* ---------- Motion: continuity between pages ---------- */
+
+/* Cross-document view transitions: the frame (masthead, sidebar, right
+   rail) holds still while the reading window cuts to the next page, and
+   the flag fill of the current folio slides from the old entry to the
+   new one: the rail advances. CSS only; browsers without support load
+   the page as before. */
+@view-transition {
+  navigation: auto;
+}
+
+header.header {
+  view-transition-name: st-masthead;
+}
+#starlight__sidebar {
+  view-transition-name: st-sidebar;
+}
+#starlight__sidebar a[aria-current='page'] {
+  view-transition-name: st-folio;
+}
+.right-sidebar {
+  view-transition-name: st-toc;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 160ms;
+  animation-timing-function: ease-out;
+}
+::view-transition-group(st-folio) {
+  animation-duration: var(--st-settle);
+  animation-timing-function: var(--st-ease);
+}
+/* The frame does not crossfade; it is the same frame. */
+::view-transition-old(st-masthead),
+::view-transition-old(st-sidebar),
+::view-transition-old(st-toc) {
+  animation: none;
+  opacity: 0;
+}
+::view-transition-new(st-masthead),
+::view-transition-new(st-sidebar),
+::view-transition-new(st-toc) {
+  animation: none;
+}
+
+/* When the folio arrived by sliding, it is not painted again. */
+html[data-st-vt] #starlight__sidebar a[aria-current='page'],
+html[data-st-vt] #starlight__sidebar a[aria-current='page']::after {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
