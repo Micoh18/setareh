@@ -39,6 +39,7 @@ export default defineConfig({
           items: [
             { slug: 'operaciones/estados-y-recuperacion' },
             { slug: 'operaciones/despliegue' },
+            { slug: 'operaciones/metricas' },
             { slug: 'seguridad' },
             { slug: 'agentes' },
             { slug: 'evidencia' },

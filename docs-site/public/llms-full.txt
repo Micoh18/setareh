@@ -138,6 +138,8 @@ límite local antes de firmar.
 | Pago liquidado pero orden en revisión | Detén nuevos intentos para ese quote y concilia antes de actuar manualmente. |
 | Duda sobre estado de un draft | Ejecuta `npm.cmd run reconcile:draft -- gid://shopify/DraftOrder/<id>`. |
 | Duda sobre una orden pagada | Ejecuta `npm.cmd run reconcile:order -- <quoteId>`. |
+| El servicio se reinició durante compras en curso | Ejecuta `npm.cmd run reconcile:stuck`; con `--apply` resuelve cada quote atascado según su estado. |
+| Revisión periódica | Ejecuta `npm.cmd run metrics` y atiende `alerts.stuck` y `alerts.needsReview`. Ver [Métricas](/operaciones/metricas/). |
 | Quote en `payment_unknown` (timeout o error del facilitador) | No pagues de nuevo. Ejecuta `npm.cmd run reconcile:payment -- <quoteId>` y, si el veredicto es `paid` o `unpaid`, repite con `--apply`. |
 
 Un quote admite un pago y una orden. Ante reintentos, usa siempre el mismo
@@ -684,6 +686,45 @@ El segundo comando consulta el draft, persiste la orden cuando existe e intenta
 adjuntar la evidencia. Úsalo sólo después de confirmar que hay un pago liquidado
 para ese quote.
 
+## Fichas por escenario
+
+Cada fila es un escenario probado automáticamente en CI (matriz de fallos de
+la semana 2). "Garantía" es lo que Setareh asegura sin intervención.
+
+| Escenario | Estado final | Garantía | Cómo confirmarlo | Acción |
+| --- | --- | --- | --- | --- |
+| Dos pagos concurrentes del mismo quote | Uno liquida; el otro recibe `409` antes de llegar al facilitador | Un solo cobro | Log `quote.status` con un único paso a `payment_submitted` | Ninguna |
+| Reintento tras una compra exitosa | Devuelve la misma orden | Ni segunda orden ni segundo cobro | `get_order_status` | Ninguna |
+| El facilitador rechaza el pago explícitamente | `payment_failed` | No hubo cobro | Log `payment.failed` con `reason` | Crear un quote nuevo |
+| Facilitador con timeout, caído o respuesta inválida | `payment_unknown` | El quote queda bloqueado para nuevos pagos | Log `payment.unknown` con `reason` | `reconcile:payment` |
+| El quote vence durante el settlement | El pago se registra y la orden continúa | El pago no se pierde | `payment.settled` después de `expiresAt` | Ninguna |
+| Shopify falla al completar el draft tras el pago | `manual_review`, pago guardado, sin orden | Sin segundo cobro | `http.error` y `quote.status` → `manual_review` | `reconcile:order` |
+| Shopify completó la orden pero la respuesta se perdió | `manual_review` | Una sola orden | `reconcile:order` encuentra la orden en el draft | `reconcile:order` |
+| Falla adjuntar la evidencia tras crear la orden | Orden en `manual_review` con su ID guardado | Sin segunda orden | Fila en `orders` con estado `manual_review` | `reconcile:order` |
+| Stock agotado entre el pago y la orden | `out_of_stock`, pago guardado | Shopify no se llama | `quote.status` → `out_of_stock` | Revisión manual; reembolso fuera de banda |
+| Proceso reiniciado a mitad del pago o de la orden | `payment_submitted` o `creating_shopify_order` por más de 5 minutos | Nada se repite solo | `reconcile:stuck` o `metrics` → `alerts.stuck` | `reconcile:stuck --apply` |
+| Shopify limita o responde `5xx` en lecturas | Reintento acotado con backoff | Sin efectos duplicados | Log `shopify.call` con `attempt` > 1 | Ninguna |
+| Payload liquidado con monto, red, activo o destino distintos | `manual_review` | Nunca se crea la orden | Log `payment.unrecorded` | Revisión manual |
+
+## Quotes atascados tras un reinicio (`reconcile:stuck`)
+
+Un quote no debería pasar más de cinco minutos en `payment_submitted`,
+`payment_settled` o `creating_shopify_order`. Si el proceso se reinició en
+medio de un pago o de una orden, queda ahí.
+
+```powershell
+cd backend
+npm.cmd run reconcile:stuck                      # lista, sin cambios (sale con código 2 si hay alguno)
+npm.cmd run reconcile:stuck -- --apply           # resuelve todos
+npm.cmd run reconcile:stuck -- --quote <quoteId> --apply
+```
+
+| Estado atascado | Con `--apply` |
+| --- | --- |
+| `payment_submitted` | Pasa a `payment_unknown` conservando pagador y expiración de la autorización; después, `reconcile:payment`. |
+| `creating_shopify_order` | Consulta el draft: si ya tiene orden, la adopta y adjunta la evidencia; si no, vuelve a `payment_settled` y crea la orden una vez. |
+| `payment_settled` | Crea la orden por el camino idempotente normal. |
+
 ## Historial de estados
 
 Cada transición de un quote queda en la tabla `quote_event` con el estado
@@ -698,6 +739,64 @@ liquidado. Primero consulta `get_order_status` o concilia el `quoteId` original;
 si el estado es `payment_unknown`, usa `reconcile:payment` antes que nada.
 Setareh vincula un pago y una orden a cada quote para mantener idempotencia,
 pero las personas que operan el sistema deben conservar esa misma disciplina.
+
+## Métricas
+
+URL canónica: /operaciones/metricas/
+
+Las métricas se derivan de la tabla `quote_event`, que registra cada cambio
+de estado de un quote con su hora y el `correlationId` de la request que lo
+causó. No requieren infraestructura adicional y sobreviven a reinicios.
+
+```powershell
+cd backend
+npm.cmd run metrics
+npm.cmd run metrics -- --since 2026-10-26T00:00:00Z
+```
+
+La salida es JSON con cuatro bloques.
+
+## Embudo
+
+| Campo | Significado |
+| --- | --- |
+| `quotes` | Quotes creados (`quoted`). |
+| `challenged` | Quotes que recibieron el desafío `402` (`payment_required`). |
+| `submitted` | Quotes con un pago reclamado y enviado al facilitador. |
+| `settled` | Pagos liquidados y registrados. |
+| `created` | Órdenes Shopify creadas con evidencia adjunta. |
+| `quoteToSettled`, `settledToCreated`, `quoteToCreated` | Tasas de conversión entre esas etapas. |
+
+Cada quote cuenta una vez por etapa alcanzada. Un `settledToCreated` menor que
+1 significa que hay pagos sin orden: revisa `alerts`.
+
+## Excepciones
+
+Cantidad de quotes que pasaron por `expired`, `payment_failed`,
+`payment_unknown`, `out_of_stock` y `manual_review`. `payment_unknown` y
+`manual_review` siempre merecen una persona; ver
+[Estados y recuperación](/operaciones/estados-y-recuperacion/).
+
+## Latencias
+
+p50 y p95 en milisegundos, con el número de muestras:
+
+| Tramo | Qué mide |
+| --- | --- |
+| `submittedToSettled` | Tiempo del facilitador Stellar en liquidar. |
+| `settledToCreated` | Tiempo de Shopify en completar el draft y recibir la evidencia. |
+| `quotedToCreated` | Experiencia completa del comprador. |
+
+## Alertas
+
+- `stuck`: quotes que llevan más de cinco minutos en `payment_submitted`,
+  `payment_settled` o `creating_shopify_order`. Ninguno debería quedarse ahí:
+  son señal de un proceso interrumpido. Se resuelven con `reconcile:stuck`.
+- `needsReview`: quotes en `payment_unknown`, `manual_review` u
+  `out_of_stock`, con la fecha desde la que esperan.
+
+Estas alertas están pensadas para revisión manual periódica. El piloto no
+incluye monitoreo 24/7 ni SLA.
 
 ## Primeros pasos
 
