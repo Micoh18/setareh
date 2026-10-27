@@ -57,8 +57,37 @@ export class CommerceService {
     return quote;
   }
 
-  markPaymentSubmitted(quoteId: string) {
+  /**
+   * Claims the quote for one settlement and keeps what the signed authorization says (payer, expiry),
+   * so that if the process dies mid-settlement the payment can still be reconciled against the network.
+   */
+  markPaymentSubmitted(quoteId: string, paymentPayload?: unknown) {
     if (!this.db.claimPaymentSubmission(quoteId)) throw new Error("Quote is not ready for payment settlement.");
+    const transfer = describeSignedTransfer(paymentPayload);
+    this.db.recordPaymentAttempt({ quoteId, outcome: "submitted", errorReason: "", facilitatorTransaction: null, payer: transfer?.from ?? null, amount: transfer ? transfer.amount.toString() : null, payTo: transfer?.to ?? null, signatureExpirationLedger: transfer?.signatureExpirationLedger ?? null });
+  }
+
+  /**
+   * A quote left in payment_submitted after a restart: the facilitator may or may not have settled it.
+   * Moves it to payment_unknown, carrying over the submitted attempt's data for reconcile:payment.
+   */
+  markInterruptedSettlement(quoteId: string) {
+    if (!this.db.transitionQuote(quoteId, "payment_submitted", "payment_unknown")) throw new Error("Quote is not payment_submitted.");
+    const submitted = this.db.getLatestPaymentAttempt(quoteId);
+    return this.db.recordPaymentAttempt({ quoteId, outcome: "unknown", errorReason: "process_interrupted", facilitatorTransaction: null, payer: submitted?.payer ?? null, amount: submitted?.amount ?? null, payTo: submitted?.payTo ?? null, signatureExpirationLedger: submitted?.signatureExpirationLedger ?? null });
+  }
+
+  /**
+   * A quote left in creating_shopify_order after a restart. If Shopify already completed the draft, the
+   * order is adopted; otherwise the claim is released and the order is placed again (the draft is intact).
+   */
+  async resumeInterruptedOrder(quoteId: string) {
+    const quote = this.db.getQuote(quoteId);
+    if (!quote || quote.status !== "creating_shopify_order") throw new Error("Quote is not creating_shopify_order.");
+    const draft = await this.shopify.getDraftOrder(quote.shopifyDraftOrderId);
+    if (draft?.order) return this.reconcilePaidDraftOrder(quoteId);
+    if (!this.db.transitionQuote(quoteId, "creating_shopify_order", "payment_settled")) throw new Error("Quote changed while resuming.");
+    return this.placePaidOrder(quoteId, true);
   }
 
   /**

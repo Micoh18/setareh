@@ -103,6 +103,8 @@ límite local antes de firmar.
 | Pago liquidado pero orden en revisión | Detén nuevos intentos para ese quote y concilia antes de actuar manualmente. |
 | Duda sobre estado de un draft | Ejecuta `npm.cmd run reconcile:draft -- gid://shopify/DraftOrder/<id>`. |
 | Duda sobre una orden pagada | Ejecuta `npm.cmd run reconcile:order -- <quoteId>`. |
+| El servicio se reinició durante compras en curso | Ejecuta `npm.cmd run reconcile:stuck`; con `--apply` resuelve cada quote atascado según su estado. |
+| Revisión periódica | Ejecuta `npm.cmd run metrics` y atiende `alerts.stuck` y `alerts.needsReview`. Ver [Métricas](/operaciones/metricas/). |
 | Quote en `payment_unknown` (timeout o error del facilitador) | No pagues de nuevo. Ejecuta `npm.cmd run reconcile:payment -- <quoteId>` y, si el veredicto es `paid` o `unpaid`, repite con `--apply`. |
 
 Un quote admite un pago y una orden. Ante reintentos, usa siempre el mismo

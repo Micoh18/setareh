@@ -36,7 +36,7 @@ export type OrderRecord = {
 export type PaymentAttemptRecord = {
   id: string;
   quoteId: string;
-  outcome: "failed" | "unknown";
+  outcome: "submitted" | "failed" | "unknown";
   errorReason: string;
   facilitatorTransaction: string | null;
   payer: string | null;
@@ -237,6 +237,36 @@ export class SetarehDatabase {
     if (!row) return undefined;
     const text = (value: unknown) => (value === null || value === undefined ? null : String(value));
     return { id: String(row.id), quoteId: String(row.quote_id), outcome: row.outcome as PaymentAttemptRecord["outcome"], errorReason: String(row.error_reason), facilitatorTransaction: text(row.facilitator_transaction), payer: text(row.payer), amount: text(row.amount), payTo: text(row.pay_to), signatureExpirationLedger: row.signature_expiration_ledger === null ? null : Number(row.signature_expiration_ledger), createdAt: String(row.created_at) };
+  }
+
+  /** Quotes sitting in an intermediate status since before `olderThan`; each should have moved on within seconds. */
+  listStuckQuotes(olderThan: string): Array<{ quoteId: string; status: QuoteStatus; since: string }> {
+    const rows = this.db.prepare(`
+      SELECT q.id AS quote_id, q.status, COALESCE(MAX(e.at), q.created_at) AS since
+      FROM quote q LEFT JOIN quote_event e ON e.quote_id = q.id
+      WHERE q.status IN ('payment_submitted', 'payment_settled', 'creating_shopify_order')
+      GROUP BY q.id HAVING since < ? ORDER BY since`).all(olderThan) as Array<Record<string, unknown>>;
+    return rows.map((row) => ({ quoteId: String(row.quote_id), status: row.status as QuoteStatus, since: String(row.since) }));
+  }
+
+  /** Quotes that need a person: unknown payments, manual review and stock lost after payment. */
+  listQuotesNeedingReview(): Array<{ quoteId: string; status: QuoteStatus; since: string }> {
+    const rows = this.db.prepare(`
+      SELECT q.id AS quote_id, q.status, COALESCE(MAX(e.at), q.created_at) AS since
+      FROM quote q LEFT JOIN quote_event e ON e.quote_id = q.id
+      WHERE q.status IN ('payment_unknown', 'manual_review', 'out_of_stock') GROUP BY q.id ORDER BY since`).all() as Array<Record<string, unknown>>;
+    return rows.map((row) => ({ quoteId: String(row.quote_id), status: row.status as QuoteStatus, since: String(row.since) }));
+  }
+
+  countQuotesByStatus(since?: string): Record<string, number> {
+    const rows = this.db.prepare(`SELECT status, COUNT(*) AS n FROM quote WHERE created_at >= ? GROUP BY status`).all(since ?? "") as Array<{ status: string; n: number }>;
+    return Object.fromEntries(rows.map((row) => [row.status, Number(row.n)]));
+  }
+
+  /** All status transitions since a date, oldest first, for funnel and latency metrics. */
+  listQuoteEvents(since?: string): Array<{ quoteId: string; from: QuoteStatus | null; to: QuoteStatus; at: string }> {
+    const rows = this.db.prepare("SELECT quote_id, from_status, to_status, at FROM quote_event WHERE at >= ? ORDER BY id").all(since ?? "") as Array<Record<string, unknown>>;
+    return rows.map((row) => ({ quoteId: String(row.quote_id), from: (row.from_status ?? null) as QuoteStatus | null, to: row.to_status as QuoteStatus, at: String(row.at) }));
   }
 
   /** Which quote, if any, already owns a Stellar transaction; one transaction can settle only one quote. */

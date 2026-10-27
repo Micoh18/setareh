@@ -140,7 +140,7 @@ export function createHttpApp(service: CommerceService, options: { shopifyOAuth?
       const path = (context.transportContext as { request?: { path?: string } } | undefined)?.request?.path;
       try {
         if (!path) throw new Error("Unable to resolve quote for this payment route.");
-        service.markPaymentSubmitted(quoteIdFromPath(path));
+        service.markPaymentSubmitted(quoteIdFromPath(path), context.paymentPayload);
         return undefined;
       } catch (error) {
         return { abort: true as const, reason: "quote_not_payable", message: error instanceof Error ? error.message : "Quote is not payable." };
