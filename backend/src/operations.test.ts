@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { CommerceService } from "./commerce.js";
 import { SetarehDatabase } from "./db.js";
-import { findStuckQuotes, STUCK_AFTER_MS } from "./operations.js";
+import { computeMetrics, findStuckQuotes, STUCK_AFTER_MS } from "./operations.js";
 
 const variant = { id: "gid://shopify/ProductVariant/1", inventoryQuantity: 5, inventoryPolicy: "DENY", availableForSale: true, product: {} };
 
@@ -78,5 +78,26 @@ test("F11: an interrupted order attempt adopts the Shopify order when the draft 
     assert.equal(run.database.getQuote("adopt")?.status, "created");
     assert.equal(run.database.getQuote("retry")?.status, "created");
     assert.deepEqual(findStuckQuotes(run.database, later()), []);
+  } finally { run.cleanup(); }
+});
+
+test("metrics derive the funnel, exceptions, latencies and alerts from quote_event", () => {
+  const run = fixture();
+  try {
+    for (const id of ["a", "b", "c"]) { run.quote(id); run.database.updateQuoteStatus(id, "payment_required"); }
+    run.database.updateQuoteStatus("a", "payment_submitted"); run.settle("a"); run.database.claimShopifyOrderCreation("a"); run.database.updateQuoteStatus("a", "created");
+    run.database.updateQuoteStatus("b", "payment_submitted"); run.database.updateQuoteStatus("b", "payment_failed");
+    run.database.updateQuoteStatus("c", "expired");
+    run.quote("d"); run.database.updateQuoteStatus("d", "manual_review");
+    const metrics = computeMetrics(run.database, { now: later() });
+    assert.deepEqual(metrics.funnel, { quotes: 4, challenged: 3, submitted: 2, settled: 1, created: 1, quoteToSettled: 0.25, settledToCreated: 1, quoteToCreated: 0.25 });
+    assert.deepEqual(metrics.exceptions, { expired: 1, paymentFailed: 1, paymentUnknown: 0, outOfStock: 0, manualReview: 1 });
+    assert.equal(metrics.latency.submittedToSettled.samples, 1);
+    assert.equal(metrics.latency.quotedToCreated.samples, 1);
+    assert.ok((metrics.latency.quotedToCreated.p95Ms ?? -1) >= 0);
+    assert.deepEqual(metrics.currentStatuses, { created: 1, payment_failed: 1, expired: 1, manual_review: 1 });
+    assert.deepEqual(metrics.alerts.needsReview.map((q) => q.quoteId), ["d"]);
+    assert.deepEqual(metrics.alerts.stuck, []);
+    assert.equal(computeMetrics(run.database, { since: new Date(Date.now() + 1_000).toISOString() }).funnel.quotes, 0);
   } finally { run.cleanup(); }
 });

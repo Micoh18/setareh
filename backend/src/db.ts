@@ -258,6 +258,17 @@ export class SetarehDatabase {
     return rows.map((row) => ({ quoteId: String(row.quote_id), status: row.status as QuoteStatus, since: String(row.since) }));
   }
 
+  countQuotesByStatus(since?: string): Record<string, number> {
+    const rows = this.db.prepare(`SELECT status, COUNT(*) AS n FROM quote WHERE created_at >= ? GROUP BY status`).all(since ?? "") as Array<{ status: string; n: number }>;
+    return Object.fromEntries(rows.map((row) => [row.status, Number(row.n)]));
+  }
+
+  /** All status transitions since a date, oldest first, for funnel and latency metrics. */
+  listQuoteEvents(since?: string): Array<{ quoteId: string; from: QuoteStatus | null; to: QuoteStatus; at: string }> {
+    const rows = this.db.prepare("SELECT quote_id, from_status, to_status, at FROM quote_event WHERE at >= ? ORDER BY id").all(since ?? "") as Array<Record<string, unknown>>;
+    return rows.map((row) => ({ quoteId: String(row.quote_id), from: (row.from_status ?? null) as QuoteStatus | null, to: row.to_status as QuoteStatus, at: String(row.at) }));
+  }
+
   /** Which quote, if any, already owns a Stellar transaction; one transaction can settle only one quote. */
   getQuoteIdByTransaction(transactionHash: string): string | undefined {
     const row = this.db.prepare("SELECT quote_id FROM payment WHERE stellar_transaction_hash = ?").get(transactionHash) as { quote_id: string } | undefined;
