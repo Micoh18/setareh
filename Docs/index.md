@@ -45,6 +45,7 @@ como capacidad disponible antes de implementarla.
 - [Referencia MCP](/referencia/mcp/): herramientas para un runtime de agentes.
 - [API HTTP y x402](/referencia/http-x402/): endpoints y settlement.
 - [Checkout para agentes](/agentes/checkout/): confirmación, límites y wallet.
+- [Reproducir el piloto](/agentes/reproducir-el-piloto/): compra de punta a punta y reintento controlado con tu propia wallet testnet.
 - [Conectar un comercio Shopify](/comercios/shopify/): permisos y preflight.
 
 ## Operar con seguridad

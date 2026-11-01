@@ -73,6 +73,7 @@ export default defineConfig({
             { slug: 'referencia/mcp' },
             { slug: 'referencia/http-x402' },
             { slug: 'agentes/checkout' },
+            { slug: 'agentes/reproducir-el-piloto' },
             { slug: 'comercios/shopify' },
           ],
         },

@@ -90,6 +90,10 @@ Shopify no tenían plazo.
 
 ## Criterio para declarar un piloto externo
 
+La guía [Reproducir el piloto](/agentes/reproducir-el-piloto/) describe el
+procedimiento que seguirá la persona evaluadora: compra con su propia wallet
+testnet y reintento controlado del mismo quote.
+
 Un piloto con un comercio de un tercero se publicará como tal sólo cuando se
 puedan reunir y redactar de forma segura estos elementos: confirmación escrita
 del comercio, confirmación independiente del evaluador, fecha y alcance del
