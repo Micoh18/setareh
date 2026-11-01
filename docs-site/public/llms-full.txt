@@ -481,7 +481,7 @@ infraestructura y sus consolas no se publican.
 ## Matriz de fallos, logs y métricas
 
 Semana 2 del sprint: pruebas automatizadas de fallos, logs estructurados con
-correlación y métricas. Estado al 27 de octubre de 2026:
+correlación y métricas. Estado al 30 de octubre de 2026:
 
 | Evidencia | Dónde comprobarla |
 | --- | --- |
@@ -492,6 +492,9 @@ correlación y métricas. Estado al 27 de octubre de 2026:
 | Compra real repetida | Las dos transacciones de octubre 26 y 27 en la tabla superior, con reintento rechazado |
 | CI por cambio | PRs [#6](https://github.com/Micoh18/setareh/pull/6), [#7](https://github.com/Micoh18/setareh/pull/7), [#8](https://github.com/Micoh18/setareh/pull/8), [#9](https://github.com/Micoh18/setareh/pull/9) y [#10](https://github.com/Micoh18/setareh/pull/10), todos con CI en verde; runs [40222068704](https://github.com/Micoh18/setareh/actions/runs/40222068704), [40415893237](https://github.com/Micoh18/setareh/actions/runs/40415893237), [40422247678](https://github.com/Micoh18/setareh/actions/runs/40422247678), [40425813855](https://github.com/Micoh18/setareh/actions/runs/40425813855), [40430038845](https://github.com/Micoh18/setareh/actions/runs/40430038845) |
 | Pruebas automatizadas | 67 pruebas en `backend/src/*.test.ts` (35 en la semana 1) |
+| Métricas del entorno publicado | `metrics` ejecutado el 30 de octubre de 2026 sobre el entorno publicado: embudo quote → pago → orden 1/1/1 desde que existe `quote_event`, 0 excepciones, latencia pago enviado → liquidado 3,5 s y liquidado → orden 2,4 s, sin alertas de quotes atascados ni en revisión |
+| Documentación publicada en la semana | PRs [#11](https://github.com/Micoh18/setareh/pull/11), [#12](https://github.com/Micoh18/setareh/pull/12) y [#13](https://github.com/Micoh18/setareh/pull/13) con CI en verde; `main` cerró la semana en `f7d5bbd` ([run](https://github.com/Micoh18/setareh/actions/runs/40602795629)) |
+| Demostración grabada | [Video de la semana 2](https://youtu.be/QTsrii0g9D4): una compra real en testnet con el código nuevo y el reintento rechazado |
 | Auditoría de dependencias | `npm audit` sigue bloqueando el CI ante cualquier aviso, salvo una excepción acotada y con vencimiento (2026-11-30) para `GHSA-mrhx-c7xc-m3w5` en la copia de zod 3 que fija `@x402/core`, que no tiene versión corregida; la justificación está en `backend/scripts/audit-prod.mjs` |
 
 Hallazgos corregidos durante la semana, todos encontrados al escribir estas
