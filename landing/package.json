@@ -1,0 +1,14 @@
+{
+  "name": "setareh-landing",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@setareh/brand": "file:../packages/brand",
+    "astro": "^7.3.5"
+  }
+}
