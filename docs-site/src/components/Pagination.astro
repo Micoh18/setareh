@@ -1,0 +1,76 @@
+---
+const { dir, pagination } = Astro.locals.starlightRoute;
+const { prev, next } = pagination;
+---
+
+{
+  (prev || next) && (
+    <div class="pagination-links print:hidden" dir={dir}>
+      {prev && (
+        <a href={prev.href} rel="prev">
+          <span class="label">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+            {Astro.locals.t('page.previousLink')}
+          </span>
+          <span class="link-title">{prev.label}</span>
+        </a>
+      )}
+      {next && (
+        <a href={next.href} rel="next">
+          <span class="label">
+            {Astro.locals.t('page.nextLink')}
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+          </span>
+          <span class="link-title">{next.label}</span>
+        </a>
+      )}
+    </div>
+  )
+}
+
+<style>
+  .pagination-links {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
+    gap: 1rem;
+  }
+  a {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 1rem;
+    border: 1px solid var(--st-border);
+    border-radius: 12px;
+    text-decoration: none;
+    font-size: 0.875rem;
+    line-height: 1.4286;
+    overflow-wrap: anywhere;
+    transition:
+      border-color var(--st-fast) ease-out,
+      background-color var(--st-fast) ease-out;
+  }
+  a:hover {
+    border-color: var(--st-text-3);
+    background: var(--st-surface);
+  }
+  [rel='next'] {
+    align-items: flex-end;
+    text-align: end;
+  }
+  [rel='prev']:only-child {
+    grid-column: 1;
+  }
+  [rel='next']:only-child {
+    grid-column: -2;
+  }
+  .label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--st-text-2);
+  }
+  .link-title {
+    font-weight: 500;
+    color: var(--st-link);
+  }
+</style>

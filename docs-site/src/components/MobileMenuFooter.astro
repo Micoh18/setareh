@@ -1,0 +1,24 @@
+---
+import ThemeSelect from 'virtual:starlight/components/ThemeSelect';
+---
+
+<div class="mobile-preferences">
+  <a href="/primeros-pasos/" class="st-button st-button--primary">Empezar</a>
+  <ThemeSelect />
+</div>
+
+<style>
+  .mobile-preferences {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: auto;
+    margin-inline: calc(-1 * var(--sl-sidebar-pad-x));
+    padding: 1rem var(--sl-sidebar-pad-x);
+    border-top: 1px solid var(--st-border);
+    background: var(--st-bg);
+  }
+</style>

@@ -1,136 +1,116 @@
 ---
-const tools = [
-  ['search_catalog', 'Buscar variantes activas en Shopify.', 'Solo lectura'],
-  ['check_availability', 'Reconsultar el stock antes de cotizar.', 'Solo lectura'],
-  ['create_quote', 'Fijar productos, despacho y monto USDC.', 'Crea un draft · requiere confirmación'],
-  ['pay_and_place_order', 'Obtener el endpoint x402 que paga la wallet.', 'Requiere confirmación'],
-  ['get_order_status', 'Consultar el estado y un resumen seguro del pago.', 'Solo lectura'],
+const tools: [string, string, 'read' | 'confirm' | 'draft'][] = [
+  ['search_catalog', 'Buscar variantes activas en Shopify.', 'read'],
+  ['check_availability', 'Reconsultar el stock antes de cotizar.', 'read'],
+  ['create_quote', 'Fijar productos, despacho y monto USDC.', 'draft'],
+  ['pay_and_place_order', 'Obtener el endpoint x402 que paga la wallet.', 'confirm'],
+  ['get_order_status', 'Consultar el estado y un resumen seguro del pago.', 'read'],
 ];
+const effect = {
+  read: ['Solo lectura', ''],
+  draft: ['Crea un draft · requiere confirmación', 'st-badge--warn'],
+  confirm: ['Requiere confirmación', 'st-badge--warn'],
+};
 ---
 
-<section class="tools" aria-labelledby="st-tools-title">
-  <h2 id="st-tools-title" class="st-label">Las cinco herramientas, en orden de uso</h2>
-  <table>
-    <thead>
-      <tr>
-        <th scope="col">Herramienta</th>
-        <th scope="col">Para qué</th>
-        <th scope="col">Efecto</th>
-      </tr>
-    </thead>
-    <tbody>
-      {
-        tools.map(([name, what, effect], i) => (
-          <tr>
-            <td>
-              <a href={`#${name}`}>
-                <span class="n">{i + 1}</span>
-                <code>{name}</code>
-              </a>
-            </td>
-            <td>{what}</td>
-            <td class:list={['effect', { confirm: effect.includes('confirmación') }]}>
-              {effect.includes('confirmación') && (
-                <svg class="flag" viewBox="0 0 34 54" aria-hidden="true">
-                  <path d="M0 0 H34 V40 L17 54 L0 40 Z" />
-                </svg>
-              )}
-              {effect}
-            </td>
-          </tr>
-        ))
-      }
-    </tbody>
-  </table>
+<section class="tools not-content" aria-labelledby="st-tools-title">
+  <h2 id="st-tools-title" class="st-eyebrow">Las cinco herramientas, en orden de uso</h2>
+  <ol>
+    {
+      tools.map(([name, what, kind], i) => (
+        <li>
+          <span class="n" aria-hidden="true">
+            {i + 1}
+          </span>
+          <div class="body">
+            <a href={`#${name}`}>
+              <code>{name}</code>
+            </a>
+            <p>{what}</p>
+          </div>
+          <span class:list={['st-badge', effect[kind][1]]}>{effect[kind][0]}</span>
+        </li>
+      ))
+    }
+  </ol>
 </section>
 
 <style>
-  section {
+  .tools {
     margin-top: 2rem;
   }
-  .tools h2 {
-    margin: 0 0 0.6rem;
-    font-size: 0.9375rem;
-    color: var(--st-flag-deep);
+  h2 {
+    margin: 0 0 0.75rem;
   }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    border-top: 4px solid var(--st-flag);
-    font-size: 0.9375rem;
+  ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--st-border);
+    border-radius: 12px;
+    background: var(--st-surface);
+    overflow: hidden;
   }
-  th {
-    text-align: left;
-    font-family: var(--st-font-label);
-    font-weight: 600;
-    font-size: 0.8125rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--st-ink-muted);
-    padding: 0.6rem 0.75rem 0.6rem 0;
-    border-bottom: 1px solid var(--st-hairline);
+  li {
+    display: grid;
+    grid-template-columns: 1.75rem 1fr auto;
+    align-items: start;
+    gap: 0.875rem;
+    margin: 0;
+    padding: 0.875rem;
   }
-  td {
-    padding: 0.65rem 0.75rem 0.65rem 0;
-    border-bottom: 1px solid var(--st-hairline);
-    vertical-align: baseline;
-    color: var(--st-ink);
-  }
-  td a {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 0.6rem;
-    text-decoration: none;
-    color: var(--st-ink);
-  }
-  td a:hover code {
-    color: var(--st-flag-deep);
+  li + li {
+    border-top: 1px solid var(--st-border);
   }
   .n {
-    font-family: var(--st-font-label);
-    font-weight: 700;
-    font-size: 1.375rem;
-    color: var(--st-flag-deep);
-    min-width: 1rem;
-  }
-  code {
-    font-family: var(--sl-font-mono);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 1px solid var(--st-border);
+    border-radius: 999px;
+    background: var(--st-subtle);
+    color: var(--st-text-2);
     font-weight: 500;
     font-size: 0.875rem;
+  }
+  .body {
+    display: grid;
+    gap: 0.125rem;
+    min-width: 0;
+  }
+  a {
+    text-decoration: none;
+    color: var(--st-link);
+  }
+  a:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+  code {
+    font-family: var(--st-font-ui);
+    font-weight: 500;
+    font-size: 0.875rem;
+    line-height: 1.4286;
     background: none;
     padding: 0;
+    color: inherit;
+    overflow-wrap: anywhere;
   }
-  .effect {
-    font-family: var(--st-font-label);
-    font-weight: 600;
-    font-size: 0.8125rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--st-ink-muted);
-  }
-  .effect.confirm {
-    color: var(--st-flag-deep);
-  }
-  .flag {
-    width: 0.6rem;
-    height: 0.95rem;
-    margin-right: 0.35rem;
-    vertical-align: -0.1rem;
-    fill: var(--st-flag);
+  p {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.4286;
+    color: var(--st-text-2);
   }
   @media (max-width: 40rem) {
-    thead {
-      display: none;
+    li {
+      grid-template-columns: 1.75rem 1fr;
     }
-    tr {
-      display: grid;
-      gap: 0.15rem;
-      padding-block: 0.6rem;
-      border-bottom: 1px solid var(--st-hairline);
-    }
-    td {
-      border: 0;
-      padding: 0;
+    .st-badge {
+      grid-column: 2;
+      justify-self: start;
     }
   }
 </style>

@@ -19,127 +19,111 @@ import Default from '@astrojs/starlight/components/MarkdownContent.astro';
     }
   }
 
-  // Evidence: show each Stellar hash in full, with copy and explorer actions.
-  function expandHashes() {
-    const prefix = 'https://horizon-testnet.stellar.org/transactions/';
-    for (const link of document.querySelectorAll<HTMLAnchorElement>(`.sl-markdown-content a[href^="${prefix}"]`)) {
-      const hash = link.href.slice(prefix.length);
-      if (!/^[0-9a-f]{64}$/.test(hash)) continue;
-      const box = document.createElement('div');
-      box.className = 'st-hash';
-      const code = document.createElement('code');
-      code.textContent = hash;
-      const actions = document.createElement('div');
-      actions.className = 'st-hash-actions';
-      const copy = document.createElement('button');
-      copy.type = 'button';
-      copy.textContent = 'Copiar hash';
-      const status = document.createElement('span');
-      status.className = 'sr-only';
-      status.setAttribute('aria-live', 'polite');
-      let reset: ReturnType<typeof setTimeout> | undefined;
-      copy.addEventListener('click', async () => {
-        clearTimeout(reset);
-        box.classList.remove('is-copied');
-        try {
-          await navigator.clipboard.writeText(hash);
-          copy.textContent = 'Copiado';
-          copy.classList.add('is-done');
-          // Restart the flash on repeated clicks.
-          void box.offsetWidth;
-          box.classList.add('is-copied');
-          status.textContent = 'Hash copiado al portapapeles';
-        } catch {
-          copy.textContent = 'Selecciona y copia';
-          status.textContent = 'No se pudo copiar; selecciona el hash y cópialo';
-        }
-        reset = setTimeout(() => {
-          copy.textContent = 'Copiar hash';
-          copy.classList.remove('is-done');
-          box.classList.remove('is-copied');
-        }, 1800);
-      });
-      const horizon = document.createElement('a');
-      horizon.href = link.href;
-      horizon.textContent = 'Horizon (JSON)';
-      const explorer = document.createElement('a');
-      explorer.href = `https://stellar.expert/explorer/testnet/tx/${hash}`;
-      explorer.textContent = 'Explorador';
-      actions.append(copy, horizon, explorer);
-      const seal = document.createElement('span');
-      seal.className = 'st-seal';
-      seal.innerHTML = '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 1 L19 11 L28.5 6.5 L24 16 L28.5 25.5 L19 21 L16 31 L13 21 L3.5 25.5 L8 16 L3.5 6.5 L13 11 Z"/><circle cx="16" cy="16" r="4.5" fill="#fff"/></svg>Hash público';
-      box.append(seal, code, actions, status);
-      link.replaceWith(box);
+  // Quote states in the first column become insignias; colour only marks a
+  // real state (closed in error, waiting on review, or created).
+  const stateTone: Record<string, string> = {
+    created: 'ok',
+    expired: 'err',
+    payment_failed: 'err',
+    out_of_stock: 'err',
+    payment_unknown: 'warn',
+    manual_review: 'warn',
+    shopify_failed: 'warn',
+  };
+  function badgeStates() {
+    for (const code of document.querySelectorAll<HTMLElement>(
+      '.sl-markdown-content td:first-child > code:only-child'
+    )) {
+      const name = code.textContent?.trim() ?? '';
+      if (!/^[a-z_]+$/.test(name)) continue;
+      code.classList.add('st-badge');
+      const tone = stateTone[name];
+      if (tone) code.classList.add(`st-badge--${tone}`);
+    }
+  }
+
+  // Links out to Horizon or the explorer get an outward arrow and the full
+  // hash as a tooltip, so the short form stays copyable in context.
+  function markExternal() {
+    for (const link of document.querySelectorAll<HTMLAnchorElement>('.sl-markdown-content a[href^="http"]')) {
+      if (link.host === location.host) continue;
+      link.classList.add('st-external');
+      link.rel = 'noopener';
+      const hash = link.href.match(/transactions\/([0-9a-f]{64})$/)?.[1];
+      if (hash) link.title = hash;
+    }
+  }
+
+  // Code blocks carry a tab with the language name, as the design's
+  // "código con pestañas"; the copy control sits in that same bar.
+  const languageNames: Record<string, string> = {
+    powershell: 'PowerShell',
+    ps1: 'PowerShell',
+    bash: 'Bash',
+    sh: 'Shell',
+    json: 'JSON',
+    toml: 'TOML',
+    ini: 'INI',
+    http: 'HTTP',
+    text: 'Texto',
+    txt: 'Texto',
+    yaml: 'YAML',
+    yml: 'YAML',
+    ts: 'TypeScript',
+    js: 'JavaScript',
+  };
+  function labelCodeFrames() {
+    for (const frame of document.querySelectorAll<HTMLElement>('.expressive-code figure.frame')) {
+      const pre = frame.querySelector<HTMLElement>('pre[data-language]');
+      const lang = pre?.dataset.language ?? '';
+      const label = languageNames[lang] ?? (lang ? lang.toUpperCase() : '');
+      let header = frame.querySelector<HTMLElement>(':scope > .header');
+      if (!header) {
+        header = document.createElement('figcaption');
+        header.className = 'header st-added';
+        frame.prepend(header);
+      }
+      const title = header.querySelector<HTMLElement>('.title');
+      if (title && title.textContent?.trim()) continue;
+      if (!label) continue;
+      const tab = document.createElement('span');
+      tab.className = 'st-lang';
+      tab.textContent = label;
+      header.prepend(tab);
     }
   }
 
   stackTables();
-  expandHashes();
+  badgeStates();
+  markExternal();
+  labelCodeFrames();
 </script>
 
 <style is:global>
-  .st-seal {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-family: var(--st-font-label);
-    font-weight: 600;
-    font-size: 0.8125rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--st-flag-deep);
+  .sl-markdown-content td:first-child > code.st-badge {
+    padding: 0.125rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
   }
-  .st-seal svg {
-    width: 1.1rem;
-    height: 1.1rem;
-    fill: var(--st-flag-deep);
-  }
-  .st-hash {
-    display: grid;
-    gap: 0.5rem;
-  }
-  .sl-markdown-content .st-hash code {
-    display: block;
-    padding: 0.5rem 0.6rem;
-    background: var(--st-edge);
-    font-size: 0.8125rem;
-    line-height: 1.5;
-    word-break: break-all;
-  }
-  .st-hash-actions {
+  .expressive-code figure.frame > .header.st-added {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
+    align-items: center;
+    min-height: 2.5rem;
+    padding: 0 0.75rem 0 0.5rem;
+    border-bottom: 1px solid var(--st-code-border);
+    background: var(--st-code-bg);
+    border-radius: 12px 12px 0 0;
   }
-  .sl-markdown-content .st-hash-actions :is(button, a) {
-    font-family: var(--st-font-label);
-    font-weight: 600;
-    font-size: 0.8125rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    text-decoration: none;
-    color: var(--st-ink);
-    background: transparent;
-    border: 1.5px solid var(--st-ink);
-    padding: 0.3rem 0.6rem;
-    cursor: pointer;
+  .expressive-code figure.frame > .header.st-added::after {
+    content: none;
   }
-  .sl-markdown-content .st-hash-actions :is(button, a):hover,
-  .sl-markdown-content .st-hash-actions button.is-done {
-    background: var(--st-ink);
-    color: var(--st-window);
-  }
-  /* Copying is the one high-stakes act on the site: the hash box flashes
-     once in the window wash so the eye lands on what was taken. */
-  @media (prefers-reduced-motion: no-preference) {
-    .sl-markdown-content .st-hash.is-copied code {
-      animation: st-flash 600ms ease-out;
-    }
-    @keyframes st-flash {
-      from {
-        background: #fbe6dc;
-      }
-    }
+  .expressive-code .st-lang {
+    display: inline-block;
+    padding: 0.625rem 0.625rem 0.5rem;
+    border-bottom: 2px solid #e08a5e;
+    color: var(--st-code-text);
+    font-weight: 500;
+    font-size: 0.875rem;
+    line-height: 1.4286;
   }
 </style>
