@@ -5,16 +5,18 @@ export default defineConfig({
   site: 'https://docs.setareh.site',
   integrations: [
     starlight({
-      title: 'Setareh Docs',
+      title: 'Setareh',
       description: 'Documentación pública de Setareh.',
       logo: {
-        src: './src/assets/setareh-logo.png',
-        alt: 'Emblema solar de Setareh',
+        src: './src/assets/setareh-emblema.svg',
+        alt: 'Emblema león y sol de Setareh',
       },
-      favicon: '/setareh-logo.png',
+      favicon: '/favicon.svg',
       // Starlight already emits og:title/description/url/site_name and
       // twitter:card; this adds the shared preview image every page lacked.
       head: [
+        { tag: 'link', attrs: { rel: 'icon', type: 'image/png', sizes: '512x512', href: '/favicon.png' } },
+        { tag: 'link', attrs: { rel: 'apple-touch-icon', href: '/favicon.png' } },
         { tag: 'meta', attrs: { property: 'og:image', content: 'https://docs.setareh.site/og.png' } },
         { tag: 'meta', attrs: { property: 'og:image:type', content: 'image/png' } },
         { tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
@@ -23,27 +25,14 @@ export default defineConfig({
           tag: 'meta',
           attrs: {
             property: 'og:image:alt',
-            content: 'Setareh Docs: comercio verificable para agentes. Traza quote, confirmación, settlement y orden en Stellar testnet.',
+            content: 'Setareh Docs: comercio verificable para agentes. Quote fijado, confirmación humana, USDC en Stellar testnet y una sola orden Shopify.',
           },
         },
         { tag: 'meta', attrs: { name: 'twitter:image', content: 'https://docs.setareh.site/og.png' } },
-        // Marks a document that arrived through a cross-document view
-        // transition, so the current folio is not painted a second time
-        // after sliding into place (see setareh.css, continuity).
-        {
-          tag: 'script',
-          content:
-            "addEventListener('pagereveal',function(e){if(e.viewTransition)document.documentElement.setAttribute('data-st-vt','')})",
-        },
       ],
       customCss: [
-        '@fontsource/barlow-condensed/600.css',
-        '@fontsource/barlow-condensed/700.css',
-        '@fontsource/literata/400.css',
-        '@fontsource/literata/400-italic.css',
-        '@fontsource/literata/600.css',
-        '@fontsource/jetbrains-mono/400.css',
-        '@fontsource/jetbrains-mono/500.css',
+        '@fontsource-variable/fraunces/full.css',
+        '@fontsource-variable/inter/index.css',
         './src/styles/setareh.css',
       ],
       components: {
@@ -51,9 +40,13 @@ export default defineConfig({
         SiteTitle: './src/components/SiteTitle.astro',
         ThemeProvider: './src/components/ThemeProvider.astro',
         ThemeSelect: './src/components/ThemeSelect.astro',
-        Hero: './src/components/Hero.astro',
+        MobileMenuFooter: './src/components/MobileMenuFooter.astro',
+        PageFrame: './src/components/PageFrame.astro',
         PageTitle: './src/components/PageTitle.astro',
         MarkdownContent: './src/components/MarkdownContent.astro',
+        Footer: './src/components/Footer.astro',
+        Pagination: './src/components/Pagination.astro',
+        Hero: './src/components/Hero.astro',
       },
       disable404Route: true,
       defaultLocale: 'root',
@@ -61,7 +54,7 @@ export default defineConfig({
         root: { label: 'Español', lang: 'es' },
       },
       sidebar: [
-        { slug: 'index' },
+        { slug: 'index', label: 'Inicio de la documentación' },
         {
           label: 'Empezar',
           items: [{ slug: 'primeros-pasos' }, { slug: 'arquitectura' }, { slug: 'runbook' }],
@@ -75,6 +68,7 @@ export default defineConfig({
             { slug: 'agentes/checkout' },
             { slug: 'agentes/reproducir-el-piloto' },
             { slug: 'comercios/shopify' },
+            { slug: 'agentes' },
           ],
         },
         {
@@ -83,10 +77,11 @@ export default defineConfig({
             { slug: 'operaciones/estados-y-recuperacion' },
             { slug: 'operaciones/despliegue' },
             { slug: 'operaciones/metricas' },
-            { slug: 'seguridad' },
-            { slug: 'agentes' },
-            { slug: 'evidencia' },
           ],
+        },
+        {
+          label: 'Verificar',
+          items: [{ slug: 'seguridad' }, { slug: 'evidencia' }],
         },
       ],
     }),
