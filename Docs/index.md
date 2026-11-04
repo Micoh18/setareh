@@ -1,17 +1,12 @@
 ---
-title: Setareh Docs
-description: Documentación pública para operar e integrar Setareh.
-template: splash
-hero:
-  title: Comercio verificable para agentes
-  tagline: Consulta catálogo, fija un quote, liquida USDC testnet y crea una orden Shopify verificable.
-  actions:
-    - text: Abrir runbook
-      link: /runbook/
-      icon: right-arrow
-    - text: Uso por agentes
-      link: /agentes/
-      variant: minimal
+title: Documentación de Setareh
+description: Consulta catálogo, fija un quote, liquida USDC testnet y crea una orden Shopify verificable.
+tableOfContents: false
+editUrl: false
+lastUpdated: false
+pagefind: false
+prev: false
+next: false
 ---
 
 ## Qué es Setareh
@@ -32,26 +27,3 @@ como capacidad disponible antes de implementarla.
 3. La persona confirma explícitamente la compra.
 4. La wallet liquida USDC por x402 en Stellar testnet.
 5. Setareh valida el pago y crea una única orden Shopify.
-
-## Empieza aquí
-
-- [Primeros pasos](/primeros-pasos/): instala, configura y verifica el backend.
-- [Arquitectura](/arquitectura/): entiende las responsabilidades, el ciclo de
-  compra y el límite actual del adaptador Shopify.
-- [Runbook operativo](/runbook/): prepara y ejecuta un demo de forma segura.
-
-## Integrar
-
-- [Referencia MCP](/referencia/mcp/): herramientas para un runtime de agentes.
-- [API HTTP y x402](/referencia/http-x402/): endpoints y settlement.
-- [Checkout para agentes](/agentes/checkout/): confirmación, límites y wallet.
-- [Reproducir el piloto](/agentes/reproducir-el-piloto/): compra de punta a punta y reintento controlado con tu propia wallet testnet.
-- [Conectar un comercio Shopify](/comercios/shopify/): permisos y preflight.
-
-## Operar con seguridad
-
-- [Configuración](/referencia/configuracion/)
-- [Seguridad, límites y modelo de amenazas](/seguridad/)
-- [Estados y recuperación](/operaciones/estados-y-recuperacion/)
-- [Uso por agentes](/agentes/)
-- [Evidencia pública de referencia](/evidencia/)
