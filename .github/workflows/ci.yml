@@ -51,9 +51,33 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: docs-site/package-lock.json
+      - name: Instalar el paquete de marca compartido
+        run: npm ci --prefix ../packages/brand
       - name: Instalar dependencias bloqueadas
         run: npm ci
       - name: Revisar que los docs no expongan secretos
         run: npm run check:public-content
       - name: Construir el portal
+        run: npm run build
+
+  landing:
+    name: Landing — compilación estática
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: landing
+    steps:
+      - name: Obtener código
+        uses: actions/checkout@v5
+      - name: Configurar Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: landing/package-lock.json
+      - name: Instalar el paquete de marca compartido
+        run: npm ci --prefix ../packages/brand
+      - name: Instalar dependencias bloqueadas
+        run: npm ci
+      - name: Construir la landing
         run: npm run build

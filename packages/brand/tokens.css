@@ -1,0 +1,100 @@
+/*
+ * Setareh brand tokens (rebranding 2026). Shared by setareh.site and
+ * docs.setareh.site. One accent (terracota) reserved for what can be clicked;
+ * tonal café neutrals over cream. Light is the positive brand version and the
+ * default; dark is the negative version (light terracota on café).
+ *
+ * The dark palette applies under `:root[data-theme='dark']`. Each site decides
+ * how `data-theme` is set (stored choice, then system preference).
+ */
+
+:root {
+  /* Surfaces */
+  --st-bg: #f6eedf;
+  --st-surface: #ffffff;
+  --st-subtle: #f1e6d2;
+  --st-sand: #e6d9c6;
+  --st-border: #dccdb2;
+  --st-footer-bg: #3a2a20;
+
+  /* Text */
+  --st-text: #2b1e16;
+  --st-text-2: #6a5646;
+  --st-text-3: #8c7a68;
+  --st-on-footer: #f3e9d8;
+  --st-on-footer-2: #c9b9a3;
+
+  /* Accent, interactive only */
+  --st-link: #9a4421;
+  --st-accent: #a84b24;
+  --st-accent-hover: #b5532a;
+  --st-on-accent: #f6eedf;
+  --st-brand: #a84b24;
+  --st-on-brand: #f6eedf;
+  --st-logo: #b5532a;
+
+  /* Code, always on the dark café surface */
+  --st-code-bg: #33261d;
+  --st-code-text: #f3e9d8;
+  --st-code-border: #4a382b;
+  --st-code-accent: #e08a5e;
+
+  /* States, only for real states */
+  --st-ok: #1e7a4c;
+  --st-ok-bg: #e3f3ea;
+  --st-warn: #8f5b00;
+  --st-warn-bg: #fbf1dc;
+  --st-err: #b42318;
+  --st-err-bg: #fdecea;
+
+  --st-overlay: rgb(43 30 22 / 55%);
+  --st-shadow: 0 16px 40px rgb(43 30 22 / 14%), 0 2px 6px rgb(43 30 22 / 8%);
+
+  /* Type */
+  --st-font-display: 'Fraunces Variable', Fraunces, Georgia, 'Times New Roman', serif;
+  --st-font-ui: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --st-display-settings: 'SOFT' 0, 'WONK' 1, 'opsz' 144;
+
+  /* Shape and motion */
+  --st-radius-badge: 6px;
+  --st-radius-item: 8px;
+  --st-radius-card: 12px;
+  --st-radius-panel: 16px;
+  --st-radius-pill: 999px;
+  --st-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --st-fast: 120ms;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --st-bg: #1e1611;
+  --st-surface: #2a1f18;
+  --st-subtle: #33261d;
+  --st-sand: #33261d;
+  --st-border: #4a382b;
+  --st-footer-bg: #2a1f18;
+
+  --st-text: #f3e9d8;
+  --st-text-2: #c9b9a3;
+  --st-text-3: #8c7a68;
+  --st-on-footer: #f3e9d8;
+  --st-on-footer-2: #c9b9a3;
+
+  --st-link: #e08a5e;
+  --st-accent: #e08a5e;
+  --st-accent-hover: #e89a72;
+  --st-on-accent: #1e1611;
+  --st-brand: #a84b24;
+  --st-on-brand: #f3e9d8;
+  --st-logo: #e08a5e;
+
+  --st-ok: #6fd6a0;
+  --st-ok-bg: #0f2a20;
+  --st-warn: #f4c25b;
+  --st-warn-bg: #2a2410;
+  --st-err: #ff8a80;
+  --st-err-bg: #2e1414;
+
+  --st-overlay: rgb(14 10 8 / 70%);
+  --st-shadow: 0 16px 40px rgb(0 0 0 / 45%), 0 2px 6px rgb(0 0 0 / 30%);
+}

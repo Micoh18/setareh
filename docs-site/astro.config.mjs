@@ -8,7 +8,7 @@ export default defineConfig({
       title: 'Setareh',
       description: 'Documentación pública de Setareh.',
       logo: {
-        src: './src/assets/setareh-emblema.svg',
+        src: '@setareh/brand/assets/setareh-emblema.svg',
         alt: 'Emblema león y sol de Setareh',
       },
       favicon: '/favicon.svg',
@@ -30,11 +30,7 @@ export default defineConfig({
         },
         { tag: 'meta', attrs: { name: 'twitter:image', content: 'https://docs.setareh.site/og.png' } },
       ],
-      customCss: [
-        '@fontsource-variable/fraunces/full.css',
-        '@fontsource-variable/inter/index.css',
-        './src/styles/setareh.css',
-      ],
+      customCss: ['@setareh/brand/fonts.css', '@setareh/brand/tokens.css', './src/styles/setareh.css'],
       components: {
         Header: './src/components/Header.astro',
         SiteTitle: './src/components/SiteTitle.astro',

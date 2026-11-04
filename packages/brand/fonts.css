@@ -1,0 +1,3 @@
+/* Fraunces only for large titles; Inter for everything else. */
+@import '@fontsource-variable/fraunces/full.css';
+@import '@fontsource-variable/inter/index.css';
