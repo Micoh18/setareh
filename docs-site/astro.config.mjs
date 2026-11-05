@@ -63,6 +63,7 @@ export default defineConfig({
             { slug: 'referencia/http-x402' },
             { slug: 'agentes/checkout' },
             { slug: 'agentes/reproducir-el-piloto' },
+            { slug: 'agentes/reproducir-el-piloto-windows' },
             { slug: 'comercios/shopify' },
             { slug: 'agentes' },
           ],

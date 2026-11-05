@@ -1,7 +1,10 @@
 ---
-title: Reproducir el piloto
+title: Reproducir el piloto (macOS)
 description: Guía para que una persona evaluadora, sin conocimientos técnicos, haga una compra de prueba y un reintento controlado conversando con un agente que usa el MCP de Setareh y su propia wallet testnet.
 ---
+
+Esta es la versión para **macOS** con la app Terminal. Si vas a usar
+Windows, sigue [Reproducir el piloto (Windows)](/agentes/reproducir-el-piloto-windows/).
 
 ## Qué vas a comprobar
 
@@ -32,21 +35,29 @@ Max). Si no la tienes, díselo a Setareh antes de la ventana.
 
 ## 1. Instalar tres programas
 
-Todo es "Siguiente, Siguiente, Finalizar" con las opciones por defecto.
+Todo es "Continuar, Continuar, Instalar" con las opciones por defecto.
 
-1. **Node.js**: descarga la versión LTS en [nodejs.org](https://nodejs.org/)
-   e instálala.
-2. **Git**: descarga e instala desde [git-scm.com](https://git-scm.com/download/win).
-3. **Claude Code**: abre PowerShell (tecla Windows, escribe `PowerShell`,
-   Enter), pega esta línea y pulsa Enter:
+1. **Node.js**: descarga la versión LTS para macOS en [nodejs.org](https://nodejs.org/)
+   e instala el `.pkg`.
+2. **Git**: abre la app **Terminal** (pulsa Cmd+Espacio, escribe `Terminal`,
+   Enter), pega esta línea y pulsa Enter. Si Git ya está instalado, muestra su
+   versión; si no, macOS ofrece instalar las herramientas de línea de
+   comandos: acepta y espera a que termine.
 
-   ```powershell
-   irm https://claude.ai/install.ps1 | iex
+   ```sh
+   git --version
    ```
 
-Cierra PowerShell y vuelve a abrirlo para que reconozca los tres programas.
-Escribe `claude` y pulsa Enter: la primera vez te abre el navegador para que
-inicies sesión con tu cuenta de Claude. Cuando termine, escribe `/exit`.
+3. **Claude Code**: en la misma Terminal pega esta línea y pulsa Enter:
+
+   ```sh
+   curl -fsSL https://claude.ai/install.sh | bash
+   ```
+
+Cierra la Terminal (Cmd+Q) y vuelve a abrirla para que reconozca los tres
+programas. Escribe `claude` y pulsa Enter: la primera vez te abre el navegador
+para que inicies sesión con tu cuenta de Claude. Cuando termine, escribe
+`/exit`.
 
 ## 2. Crear tu wallet de prueba
 
@@ -64,27 +75,28 @@ inicies sesión con tu cuenta de Claude. Cuando termine, escribe `/exit`.
 
 ## 3. Descargar Setareh
 
-En PowerShell pega estas líneas una por una, pulsando Enter tras cada una.
+En la Terminal pega estas líneas una por una, pulsando Enter tras cada una.
 La última tarda uno o dos minutos:
 
-```powershell
+```sh
 cd ~
 git clone https://github.com/Micoh18/setareh.git
-cd setareh\backend
-npm.cmd ci
+cd setareh/backend
+npm ci
 ```
 
 ## 4. Guardar tu clave en el archivo de la wallet
 
-Sigue en la misma ventana de PowerShell:
+Sigue en la misma ventana de la Terminal:
 
-```powershell
-notepad agent.env
+```sh
+touch agent.env
+open -e agent.env
 ```
 
-El Bloc de notas pregunta si quieres crear el archivo: pulsa **Sí**. Pega
-estas tres líneas, cambia `<tu clave secreta S...>` por tu clave secreta
-(sin los signos `<` `>`) y guarda con Ctrl+S:
+Se abre TextEdit con un archivo vacío. Pega estas tres líneas, cambia
+`<tu clave secreta S...>` por tu clave secreta (sin los signos `<` `>`) y
+guarda con Cmd+S:
 
 ```ini
 SETAREH_API_URL=https://api.setareh.site
@@ -96,14 +108,14 @@ AGENT_STELLAR_PRIVATE_KEY=<tu clave secreta S...>
 pago mayor a 5 USDC, aunque alguien se lo pida. El producto de prueba cuesta
 menos.
 
-Ese archivo nunca se envía a nadie. Puedes cerrar el Bloc de notas.
+Ese archivo nunca se envía a nadie. Puedes cerrar TextEdit.
 
 ## 5. Abrir el agente y hacer la compra
 
-En PowerShell:
+En la Terminal:
 
-```powershell
-cd ~\setareh
+```sh
+cd ~/setareh
 claude
 ```
 
@@ -163,15 +175,17 @@ Crea la carpeta evidencia dentro de backend y guarda ahí un archivo por cada he
 ```
 
 Anota el commit que te diga. Luego haz una captura de pantalla de la
-respuesta del mensaje 4 y otra de la del mensaje 5 (tecla Windows+Shift+S).
+respuesta del mensaje 4 y otra de la del mensaje 5 (Cmd+Shift+4 y arrastra
+sobre la ventana; la imagen queda en el Escritorio).
 Escribe `/exit` para cerrar el agente.
 
 ## 6. Qué enviar
 
 Por el canal privado:
 
-- La carpeta `evidencia` comprimida. Está en `C:\Users\<tu usuario>\setareh\backend\evidencia`.
-  Clic derecho sobre la carpeta, **Enviar a**, **Carpeta comprimida**.
+- La carpeta `evidencia` comprimida. Está en `/Users/<tu usuario>/setareh/backend/evidencia`
+  (en Finder: menú Ir, Carpeta personal, `setareh`, `backend`). Clic
+  secundario sobre la carpeta y **Comprimir "evidencia"**.
 - Las dos capturas de pantalla.
 - El commit del mensaje 6.
 - Cualquier cosa que no haya salido como describe esta página, con tus
@@ -199,8 +213,8 @@ y puede publicarse.
 | El faucet de Circle no entrega USDC | El faucet tiene cupo diario y a veces falla | Envía tu clave **pública** (`G...`) por el canal privado; Setareh te transfiere USDC de prueba y anota el hash de esa transferencia |
 | En el mensaje 1 falla `account` | Friendbot no llegó a crear la cuenta | Repite **Fund account with Friendbot** en Stellar Lab y vuelve a enviar el mensaje 1 |
 | En el mensaje 1 falla `usdc` | El faucet no corrió o usaste otra clave | Pide USDC en el faucet con la misma clave pública que muestra el agente |
-| En el mensaje 1 falla `AGENT_STELLAR_PRIVATE_KEY` | La clave quedó mal pegada en `agent.env` | Abre de nuevo `notepad agent.env`, revisa que empieza con `S`, tiene 56 caracteres y no tiene espacios ni `<` `>` |
-| Claude Code no muestra el servidor `setareh` | Abriste `claude` en otra carpeta o dijiste No a la autorización | Escribe `/exit`, ejecuta `cd ~\setareh` y vuelve a abrir `claude` |
+| En el mensaje 1 falla `AGENT_STELLAR_PRIVATE_KEY` | La clave quedó mal pegada en `agent.env` | Abre de nuevo `open -e agent.env`, revisa que empieza con `S`, tiene 56 caracteres y no tiene espacios ni `<` `>` |
+| Claude Code no muestra el servidor `setareh` | Abriste `claude` en otra carpeta o dijiste No a la autorización | Escribe `/exit`, ejecuta `cd ~/setareh` y vuelve a abrir `claude` |
 | El agente no encuentra el producto | Aún no está publicado o el nombre es distinto | Confirma el nombre exacto con Setareh por el canal privado |
 | Código `429` al crear el quote | Límite de 10 quotes por hora | Espera los segundos que indique y repite el mensaje 3 |
 | `Quote expired` en el mensaje 4 | Pasaron más de 10 minutos | Repite el mensaje 3 para crear un quote nuevo. Es una compra nueva, no un reintento |
@@ -217,7 +231,7 @@ declarado en `.mcp.json` en la raíz del repositorio. Expone `check_setup`,
 `pay_and_place_order`, `get_order_status` y `verify_payment`, todas contra
 la API pública; la firma x402 ocurre dentro de ese proceso con la clave de
 `agent.env`. Si prefieres no usar un agente, el mismo flujo existe como
-comandos: `npm.cmd run demo:check` y `npm.cmd run demo:pay -- <quoteId>`
+comandos: `npm run demo:check` y `npm run demo:pay -- <quoteId>`
 desde `backend`, con el quote creado por `POST /v1/quotes`; ver
 [Checkout para agentes](/agentes/checkout/) y la
 [referencia MCP](/referencia/mcp/). Con Codex CLI, el mismo servidor se
@@ -227,5 +241,5 @@ declara en `~/.codex/config.toml`:
 [mcp_servers.setareh]
 command = "node"
 args = ["backend/node_modules/tsx/dist/cli.mjs", "backend/src/agent-mcp.ts"]
-cwd = "C:/Users/<tu usuario>/setareh"
+cwd = "/Users/<tu usuario>/setareh"
 ```

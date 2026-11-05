@@ -90,7 +90,7 @@ Shopify no tenían plazo.
 
 ## Criterio para declarar un piloto externo
 
-La guía [Reproducir el piloto](/agentes/reproducir-el-piloto/) describe el
+La guía [Reproducir el piloto](/agentes/reproducir-el-piloto/) (macOS; hay [versión para Windows](/agentes/reproducir-el-piloto-windows/)) describe el
 procedimiento que seguirá la persona evaluadora: compra con su propia wallet
 testnet y reintento controlado del mismo quote.
 
