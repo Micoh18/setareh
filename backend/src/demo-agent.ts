@@ -1,55 +1,25 @@
-import dotenv from "dotenv";
-import { resolve } from "node:path";
-import { x402Client } from "@x402/fetch";
-import { wrapFetchWithPayment } from "@x402/fetch";
-import { ExactStellarScheme } from "@x402/stellar/exact/client";
-import { createEd25519Signer, USDC_TESTNET_ADDRESS } from "@x402/stellar";
+import { loadAgentEnv, payQuote, redactSecret } from "./agent-wallet.js";
 
-dotenv.config({ path: resolve(process.cwd(), process.env.SETAREH_AGENT_ENV_FILE ?? "agent.env"), quiet: true });
-
+const env = loadAgentEnv();
 const quoteId = process.argv[2];
-const privateKey = process.env.AGENT_STELLAR_PRIVATE_KEY;
-const apiUrl = process.env.SETAREH_API_URL ?? "http://127.0.0.1:4020";
-const maxUsdc = Number(process.env.AGENT_MAX_USDC ?? "30");
+const apiUrl = env.apiUrl ?? "http://127.0.0.1:4020";
+const maxUsdc = Number(env.maxUsdc ?? "30");
 
 if (!quoteId) throw new Error("Usage: npm run demo:pay -- <quoteId>");
-const agentPrivateKey = privateKey;
-if (!agentPrivateKey) throw new Error("AGENT_STELLAR_PRIVATE_KEY is required in agent.env.");
+if (!env.secret) throw new Error("AGENT_STELLAR_PRIVATE_KEY is required in agent.env.");
 if (!Number.isFinite(maxUsdc) || maxUsdc <= 0) throw new Error("AGENT_MAX_USDC must be positive.");
 
-function decodePaymentRequired(response: Response) {
-  const encoded = response.headers.get("payment-required");
-  if (!encoded) throw new Error("Setareh did not return a PAYMENT-REQUIRED challenge.");
-  return JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")) as { accepts: Array<{ network: string; asset: string; amount: string; payTo: string }> };
+async function main(secret: string) {
+  const result = await payQuote({ apiUrl, quoteId, secret, maxUsdc });
+  switch (result.outcome) {
+    case "created": process.stdout.write(`${JSON.stringify(result.order, null, 2)}\n`); return;
+    case "refused_locally": throw new Error(result.message);
+    case "rejected_before_payment": throw new Error(`Expected 402 before payment, received ${result.httpStatus}: ${result.message}`);
+    case "failed_after_payment_attempt": throw new Error(`Payment/order request failed (${result.httpStatus}): ${result.message}`);
+  }
 }
 
-async function main(walletSecret: string) {
-  const endpoint = new URL(`/v1/quotes/${quoteId}/pay-and-place`, apiUrl).toString();
-  const request = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userConfirmed: true }) };
-  const preview = await fetch(endpoint, request);
-  if (preview.status !== 402) throw new Error(`Expected 402 before payment, received ${preview.status}: ${await preview.text()}`);
-  const requirement = decodePaymentRequired(preview).accepts[0];
-  if (!requirement || requirement.network !== "stellar:testnet" || requirement.asset !== USDC_TESTNET_ADDRESS) throw new Error("Setareh requested an unsupported payment network or asset.");
-  const maximumAtomic = BigInt(Math.round(maxUsdc * 10_000_000));
-  if (BigInt(requirement.amount) > maximumAtomic) throw new Error(`Quote exceeds the local ${maxUsdc} USDC spending limit.`);
-
-  const signer = createEd25519Signer(walletSecret, "stellar:testnet");
-  // x402 defaults to a conservative $1 cap. Keep the SDK cap aligned with the
-  // explicit local limit that was checked above, rather than disabling its
-  // spend controls for the demo wallet.
-  const client = x402Client.fromConfig({
-    schemes: [{ network: "stellar:testnet", client: new ExactStellarScheme(signer) }],
-    spendControls: { maxAmountPerPayment: `$${maxUsdc}` },
-  });
-  const paidFetch = wrapFetchWithPayment(fetch, client);
-  const response = await paidFetch(endpoint, request);
-  if (!response.ok) throw new Error(`Payment/order request failed (${response.status}): ${await response.text()}`);
-  process.stdout.write(`${JSON.stringify(await response.json(), null, 2)}\n`);
-}
-
-main(agentPrivateKey).catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  const safeMessage = privateKey ? message.replaceAll(privateKey, "[redacted]") : message;
-  console.error(safeMessage);
+main(env.secret).catch((error: unknown) => {
+  console.error(redactSecret(error instanceof Error ? error.message : String(error), env.secret));
   process.exitCode = 1;
 });
