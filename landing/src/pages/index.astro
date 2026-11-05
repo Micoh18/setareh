@@ -1,0 +1,321 @@
+---
+import Base from '../layouts/Base.astro';
+import SiteNav from '../components/SiteNav.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import Icon from '../components/Icon.astro';
+import Glyph from '../components/Glyph.astro';
+
+const docs = 'https://docs.setareh.site';
+
+const pillars = [
+  { icon: 'quote-fijado', title: 'Quote fijado', text: 'Productos, despacho y vencimiento quedan congelados antes de pagar.' },
+  { icon: 'confirmacion', title: 'Confirmación humana', text: 'Ninguna compra avanza sin la confirmación explícita de la persona.' },
+  { icon: 'usdc', title: 'USDC por x402', text: 'Liquidación en Stellar testnet y una sola orden Shopify por quote.' },
+] as const;
+
+const frames = [
+  ['Fotograma 01', 'Quote fijado', 'quote · 3 ítems · vence 15:00'],
+  ['Fotograma 02', 'La persona confirma', 'userConfirmed: true'],
+  ['Fotograma 03', 'USDC liquidado', 'tx ff6177…f65001'],
+  ['Fotograma 04', 'Una sola orden Shopify', 'orden #1042 · máx. 1 por quote'],
+];
+
+const paths = [
+  {
+    img: '/img/camino-terminal.jpg',
+    alt: 'Persona escribiendo en un terminal de computadora antiguo, en semitono',
+    badge: 'Integrar',
+    title: 'Integrar un agente',
+    text: 'Configura el backend, conecta el runtime MCP y crea tu primer quote.',
+    link: ['Primeros pasos', `${docs}/primeros-pasos/`],
+  },
+  {
+    img: '/img/camino-operador.jpg',
+    alt: 'Operador frente a un panel de control con indicadores, en semitono',
+    badge: 'Evidencia',
+    title: 'Verificar las afirmaciones',
+    text: 'Revisa transacciones en Stellar testnet, la CI y el límite de cada afirmación.',
+    link: ['Evidencia pública', `${docs}/evidencia/`],
+  },
+  {
+    img: '/img/camino-mostrador.jpg',
+    alt: 'Mostrador de una tienda con una caja registradora antigua, en semitono',
+    badge: 'Operar',
+    title: 'Operar con seguridad',
+    text: 'Estados, recuperación, límites y modelo de amenazas antes de abrir un comercio.',
+    link: ['Seguridad y límites', `${docs}/seguridad/`],
+  },
+];
+
+const steps = [
+  ['Busca', 'El agente consulta el catálogo y verifica disponibilidad.'],
+  ['Cotiza', 'Crea un quote con productos, despacho y vencimiento.'],
+  ['Confirma', 'La persona confirma explícitamente la compra.'],
+  ['Liquida', 'La wallet paga USDC por x402 en Stellar testnet.'],
+  ['Ordena', 'Setareh valida el pago y crea una única orden Shopify.'],
+];
+
+const learn = [
+  { icon: 'primeros-pasos', title: 'Primeros pasos', text: 'Instala el backend y ejecuta tu primera compra en testnet.', href: `${docs}/primeros-pasos/` },
+  { icon: 'referencia-mcp', title: 'Referencia MCP', text: 'Herramientas, parámetros y qué requiere confirmación.', href: `${docs}/referencia/mcp/` },
+  { icon: 'api-x402', title: 'API HTTP y x402', text: 'Endpoints, pagos x402 y códigos de estado.', href: `${docs}/referencia/http-x402/` },
+] as const;
+
+const why = [
+  { icon: 'usdc', title: 'USDC nativo de Circle', text: 'Circle emite USDC directamente en Stellar. Aquí usamos USDC de testnet.' },
+  { icon: 'finalidad', title: 'Finalidad en ~5 s', text: 'Las transacciones se confirman en unos 5 segundos, con finalidad.' },
+  { icon: 'comision', title: 'Comisiones mínimas', text: 'La comisión base es 0,00001 XLM por operación: una fracción de centavo.' },
+  { icon: 'api-x402', title: 'x402 en Stellar', text: 'Pagos por solicitud HTTP con USDC. Setareh lo usa en Stellar testnet.' },
+] as const;
+
+// Answers follow the public documentation; the questions are the design's.
+const faq = [
+  {
+    q: '¿Qué es Setareh?',
+    a: 'Un entorno de referencia que conecta un agente con un comercio Shopify: fija un quote, pide confirmación, liquida USDC testnet por x402 y crea una orden.',
+  },
+  {
+    q: '¿Usa dinero real?',
+    a: 'No. Setareh opera sólo en Stellar testnet con USDC de prueba. No hay mainnet, custodia de wallets ni dinero real.',
+  },
+  {
+    q: '¿Qué plataformas de comercio soporta?',
+    a: 'Hoy sólo Shopify, que conserva la fuente de verdad de catálogo, inventario y pedidos. Otros backoffices requerirían adaptadores explícitos que aún no existen.',
+  },
+  {
+    q: '¿Cómo se evitan las órdenes duplicadas?',
+    a: 'Cada quote admite un único pago y una única orden. Setareh persiste el estado del quote y la idempotencia, y un reintento del mismo quote se rechaza con 409 sin cobrar ni crear una segunda orden.',
+  },
+  {
+    q: '¿Qué confirma la persona?',
+    a: 'Los productos, el despacho y el monto exacto en USDC de un quote ya fijado. Sin esa confirmación explícita (userConfirmed: true) no se crea el quote ni se pide ningún pago.',
+  },
+  {
+    q: '¿Qué es x402?',
+    a: 'Un protocolo de pago sobre HTTP: el servidor responde 402 Payment Required con los requisitos, la wallet firma el pago y reintenta la solicitud. Setareh lo usa con USDC en Stellar testnet.',
+  },
+  {
+    q: '¿Tiene auditoría externa?',
+    a: 'No. El modelo de amenazas, los límites y la evidencia están publicados, pero no hay auditoría externa ni un piloto con un comercio tercero demostrado todavía.',
+  },
+  {
+    q: '¿Cómo empiezo?',
+    a: `Sigue <a href="${docs}/primeros-pasos/">Primeros pasos</a>: instala el backend, configura una tienda Shopify de desarrollo y una wallet testnet, y ejecuta tu primera compra.`,
+  },
+];
+---
+
+<Base title="Setareh · Comercio verificable para agentes" description="Consulta catálogo, fija un quote, liquida USDC testnet y crea una orden Shopify verificable.">
+  <section class="hero">
+    <SiteNav />
+    <div class="hero-text">
+      <p class="st-eyebrow">Stellar testnet · entorno de referencia</p>
+      <h1 class="st-display">Comercio verificable para agentes</h1>
+      <p class="lead">Consulta catálogo, fija un quote, liquida USDC testnet y crea una orden Shopify verificable.</p>
+      <a href={`${docs}/primeros-pasos/`} class="st-button st-button--on-brand">Empezar <Glyph name="arrow-right" /></a>
+    </div>
+    <img class="hero-image" src="/img/hero-consola.jpg" width="1200" height="633" alt="Operador de espaldas frente a una consola de control antigua, en semitono terracota" fetchpriority="high" />
+  </section>
+
+  <section class="section section--subtle" aria-labelledby="pilares">
+    <div class="wrap">
+      <div class="titles titles--center">
+        <p class="st-eyebrow">Qué resuelve</p>
+        <h2 id="pilares" class="st-display">Compras de agentes que se pueden verificar</h2>
+      </div>
+      <div class="grid grid--3 grid--pillars">
+        {
+          pillars.map((p) => (
+            <article class="pillar">
+              <span class="ring"><Icon name={p.icon} /></span>
+              <h3 class="st-h3">{p.title}</h3>
+              <p class="st-muted">{p.text}</p>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--sand" aria-labelledby="flujo">
+    <div class="wrap">
+      <div class="flow-head">
+        <div class="titles">
+          <p class="st-eyebrow">El flujo</p>
+          <h2 id="flujo" class="st-display">De quote a orden, sin atajos</h2>
+        </div>
+        <a href={`${docs}/arquitectura/`} class="st-button st-button--secondary">Ver arquitectura <Glyph name="arrow-up-right" /></a>
+      </div>
+      <div class="product st-card">
+        <div class="receipt-panel">
+          <div class="receipt" aria-label="Ejemplo de quote fijado">
+            <div class="row"><b>Quote Q-2041</b><span class="st-badge">Fijado</span></div>
+            <p class="st-muted">micohstore · vence 15:00</p>
+            <hr />
+            <div class="row"><span>Tortuga de cerámica × 1</span><b>18,00 USDC</b></div>
+            <div class="row"><span>Despacho estándar</span><b>4,50 USDC</b></div>
+            <hr />
+            <div class="row"><b>Total</b><b>22,50 USDC</b></div>
+            <div class="confirm">
+              <Icon name="sello" />
+              <span>Confirmado por la persona<br /><span class="st-muted">tx ff6177…f65001</span></span>
+            </div>
+          </div>
+        </div>
+        <div class="frames">
+          <h3 class="st-display">Una compra, cuatro fotogramas</h3>
+          <p class="st-muted">Cada compra deja una traza que cualquiera puede revisar.</p>
+          {
+            frames.map(([eyebrow, title, detail]) => (
+              <div class="frame">
+                <Icon name="sello" />
+                <div class="t">
+                  <span class="st-eyebrow">{eyebrow}</span>
+                  <b>{title}</b>
+                </div>
+                <span class="detail">{detail}</span>
+              </div>
+            ))
+          }
+          <p class="pending"><Glyph name="info" size={16} /> Hash público colgado: pendiente</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="caminos">
+    <div class="wrap">
+      <div class="titles titles--center">
+        <p class="st-eyebrow">Por dónde empezar</p>
+        <h2 id="caminos" class="st-display">Tres caminos en la documentación</h2>
+      </div>
+      <div class="grid grid--3">
+        {
+          paths.map((c) => (
+            <article class="path st-card">
+              <img src={c.img} width="720" height="540" alt={c.alt} loading="lazy" />
+              <div class="body">
+                <span class="st-badge">{c.badge}</span>
+                <h3 class="st-h3">{c.title}</h3>
+                <p class="st-muted">{c.text}</p>
+                <a href={c.link[1]} class="link">{c.link[0]} <Glyph name="chevron-right" size={16} /></a>
+              </div>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--subtle" aria-labelledby="que-es">
+    <div class="wrap about">
+      <div class="left">
+        <div class="titles">
+          <p class="st-eyebrow">Qué es Setareh</p>
+          <h2 id="que-es" class="st-display">Un puente verificable entre agentes y Shopify</h2>
+        </div>
+        <p class="st-muted">Shopify conserva la fuente de verdad de catálogo, inventario y pedidos. Setareh crea quotes y valida el pago antes de crear una orden.</p>
+      </div>
+      <ol class="steps">
+        {
+          steps.map(([title, text], i) => (
+            <li class="step st-card">
+              <span class="n">0{i + 1}</span>
+              <div>
+                <b>{title}</b>
+                <span class="st-muted">{text}</span>
+              </div>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </section>
+
+  <section class="band" aria-label="Liquidación de referencia verificable">
+    <p class="word" aria-hidden="true">Verificable</p>
+    <div class="tx">
+      <div class="top"><span>Liquidación de referencia</span><span class="ok"><Glyph name="check" size={14} /> Confirmada</span></div>
+      <p class="hash">tx ff6177…f65001</p>
+      <p class="st-muted">Stellar testnet · USDC · x402</p>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="aprender">
+    <div class="wrap">
+      <div class="notices">
+        <div class="notice notice--warn" role="note">
+          <Glyph name="triangle-alert" size={22} />
+          <div><b>Solo Stellar testnet · solo Shopify · sin auditoría externa</b>Las liquidaciones de referencia son internas. No hay mainnet ni custodia.</div>
+        </div>
+        <div class="notice notice--info" role="note">
+          <Glyph name="info" size={22} />
+          <div><b>Piloto externo: diferido</b>Con un comercio tercero, aún no demostrado.</div>
+        </div>
+      </div>
+      <div class="titles">
+        <p class="st-eyebrow">Documentación</p>
+        <h2 id="aprender" class="st-display">Aprende a integrar</h2>
+      </div>
+      <div class="grid grid--3">
+        {
+          learn.map((l) => (
+            <a href={l.href} class="learn st-card">
+              <span class="top"><Icon name={l.icon} /><Glyph name="arrow-up-right" size={20} class="arrow" /></span>
+              <span class="st-h3">{l.title}</span>
+              <span class="st-muted">{l.text}</span>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section id="por-que-stellar" class="section section--subtle" aria-labelledby="stellar">
+    <div class="wrap">
+      <div class="titles titles--center">
+        <p class="st-eyebrow">Por qué Stellar</p>
+        <h2 id="stellar" class="st-display">Una red pensada para pagos</h2>
+      </div>
+      <div class="grid grid--4">
+        {
+          why.map((w) => (
+            <article class="why st-card">
+              <span class="ring"><Icon name={w.icon} /></span>
+              <h3 class="st-h3">{w.title}</h3>
+              <p class="st-muted">{w.text}</p>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section id="preguntas" class="section" aria-labelledby="faq-title">
+    <div class="wrap">
+      <div class="titles titles--center">
+        <p class="st-eyebrow">Preguntas frecuentes</p>
+        <h2 id="faq-title" class="st-display">Lo esencial, en corto</h2>
+      </div>
+      <div class="faq">
+        {
+          faq.map((item, i) => (
+            <details open={i === 0}>
+              <summary>{item.q} <Glyph name="chevron-down" size={20} /></summary>
+              <p set:html={item.a} />
+            </details>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--sand">
+    <div class="wrap cta">
+      <h2 class="st-display">Integra tu primer agente en testnet</h2>
+      <a href={`${docs}/primeros-pasos/`} class="st-button st-button--primary">Empezar <Glyph name="arrow-right" /></a>
+    </div>
+  </section>
+
+  <SiteFooter />
+</Base>
