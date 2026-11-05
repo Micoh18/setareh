@@ -9,3 +9,9 @@ docs-site/src/content/docs/
 
 # Impeccable (design tool) local runtime state.
 docs-site/.impeccable/
+
+# Landing (setareh.site) and the shared brand package.
+landing/node_modules/
+landing/dist/
+landing/.astro/
+packages/brand/node_modules/

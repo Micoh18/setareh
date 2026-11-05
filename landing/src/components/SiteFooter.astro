@@ -1,0 +1,219 @@
+---
+import sol from './sol-footer.svg?raw';
+import Glyph from './Glyph.astro';
+
+const docs = 'https://docs.setareh.site';
+const year = new Date().getUTCFullYear();
+const columns = [
+  {
+    title: 'Empezar',
+    links: [
+      ['Primeros pasos', `${docs}/primeros-pasos/`],
+      ['Arquitectura y modelo de compra', `${docs}/arquitectura/`],
+      ['Por qué Stellar', '#por-que-stellar'],
+      ['Runbook operativo', `${docs}/runbook/`],
+    ],
+  },
+  {
+    title: 'Integrar',
+    links: [
+      ['Configuración', `${docs}/referencia/configuracion/`],
+      ['Referencia MCP', `${docs}/referencia/mcp/`],
+      ['API HTTP y x402', `${docs}/referencia/http-x402/`],
+      ['Checkout para agentes', `${docs}/agentes/checkout/`],
+      ['Conectar un comercio Shopify', `${docs}/comercios/shopify/`],
+    ],
+  },
+  {
+    title: 'Operar',
+    links: [
+      ['Estados y recuperación', `${docs}/operaciones/estados-y-recuperacion/`],
+      ['Despliegue y release', `${docs}/operaciones/despliegue/`],
+      ['Métricas', `${docs}/operaciones/metricas/`],
+      ['Uso por agentes', `${docs}/agentes/`],
+    ],
+  },
+  {
+    title: 'Verificar',
+    links: [
+      ['Seguridad y límites', `${docs}/seguridad/`],
+      ['Evidencia pública de referencia', `${docs}/evidencia/`],
+      ['Preguntas frecuentes', '#preguntas'],
+    ],
+  },
+];
+const sun = sol.replace(/<svg([^>]*)>/, '<svg$1 aria-hidden="true" focusable="false">');
+---
+
+<footer class="footer">
+  <span class="sun" set:html={sun} />
+  <div class="inner">
+    <div class="brand">
+      <p class="word" translate="no">Setareh</p>
+      <p class="tagline">Comercio verificable para agentes.</p>
+    </div>
+    <div class="columns">
+      {
+        columns.map((c) => (
+          <div class="col">
+            <p class="st-eyebrow">{c.title}</p>
+            {c.links.map(([label, href]) => (
+              <a href={href}>{label}</a>
+            ))}
+          </div>
+        ))
+      }
+    </div>
+    <hr />
+    <p class="notice">
+      <Glyph name="triangle-alert" />
+      Solo Stellar testnet · solo Shopify · sin auditoría externa. No hay mainnet ni custodia.
+    </p>
+    <div class="bottom">
+      <p>© {year} Setareh · <a href={docs}>docs.setareh.site</a></p>
+      <nav class="social" aria-label="Redes">
+        <a href="https://github.com/Micoh18/setareh"><Glyph name="github" /> GitHub</a>
+      </nav>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .footer {
+    position: relative;
+    overflow: hidden;
+    background: var(--st-footer-bg);
+    color: var(--st-on-footer);
+  }
+  .sun {
+    position: absolute;
+    top: 1.5rem;
+    left: 50%;
+    width: 34.75rem;
+    height: 34.75rem;
+    margin-left: -8rem;
+    opacity: 0.16;
+    pointer-events: none;
+  }
+  .sun :global(svg) {
+    width: 100%;
+    height: 100%;
+  }
+  .inner {
+    position: relative;
+    max-width: 75rem;
+    margin: 0 auto;
+    padding: 4rem 1.25rem 2.5rem;
+    display: grid;
+    gap: 2.5rem;
+  }
+  .word {
+    margin: 0;
+    font-family: var(--st-font-display);
+    font-variation-settings: var(--st-display-settings);
+    font-weight: 600;
+    font-size: 3rem;
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+  }
+  .tagline {
+    margin: 0.5rem 0 0;
+    max-width: 21rem;
+    font-size: 1rem;
+    line-height: 1.625;
+    color: var(--st-on-footer-2);
+  }
+  .columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.75rem, 1fr));
+    gap: 2rem;
+  }
+  .col {
+    display: grid;
+    gap: 0.75rem;
+    align-content: start;
+  }
+  .col .st-eyebrow {
+    margin: 0 0 0.25rem;
+    color: var(--st-on-footer-2);
+  }
+  .col a {
+    font-size: 0.875rem;
+    line-height: 1.4286;
+    color: var(--st-on-footer);
+    text-decoration: none;
+  }
+  .col a:hover,
+  .bottom a:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+  hr {
+    margin: 0;
+    border: 0;
+    border-top: 1px solid var(--st-on-footer-2);
+    opacity: 0.3;
+  }
+  .notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin: -1rem 0 0;
+    font-size: 0.875rem;
+    line-height: 1.4286;
+    color: var(--st-on-footer-2);
+  }
+  .notice :global(svg) {
+    flex: none;
+    margin-top: 0.0625rem;
+  }
+  .bottom {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.75rem 1.5rem;
+    margin-top: -1.25rem;
+    font-size: 0.875rem;
+    line-height: 1.4286;
+    color: var(--st-on-footer-2);
+  }
+  .bottom p {
+    margin: 0;
+  }
+  .bottom a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .social {
+    display: flex;
+    gap: 1.5rem;
+  }
+  .social a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--st-on-footer);
+  }
+  @media (min-width: 56rem) {
+    .inner {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+      padding: 6rem clamp(1.25rem, 8.33vw, 7.5rem) 3.5rem;
+      column-gap: 2rem;
+    }
+    .word {
+      font-size: 4.5rem;
+    }
+    .columns {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    hr,
+    .notice,
+    .bottom {
+      grid-column: 1 / -1;
+    }
+    .sun {
+      left: 39%;
+      margin-left: 0;
+    }
+  }
+</style>

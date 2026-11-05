@@ -1,0 +1,45 @@
+---
+// Brand icons from @setareh/brand, inlined so their stroke follows the text
+// colour of the theme. Lucide glyphs for UI (arrows, chevrons) live in Glyph.
+import quoteFijado from '@setareh/brand/assets/icons/quote-fijado.svg?raw';
+import confirmacion from '@setareh/brand/assets/icons/confirmacion.svg?raw';
+import usdc from '@setareh/brand/assets/icons/usdc.svg?raw';
+import sello from '@setareh/brand/assets/icons/sello.svg?raw';
+import apiX402 from '@setareh/brand/assets/icons/api-x402.svg?raw';
+import referenciaMcp from '@setareh/brand/assets/icons/referencia-mcp.svg?raw';
+import primerosPasos from '@setareh/brand/assets/icons/primeros-pasos.svg?raw';
+import finalidad from '@setareh/brand/assets/icons/finalidad.svg?raw';
+import comision from '@setareh/brand/assets/icons/comision.svg?raw';
+
+const icons: Record<string, string> = {
+  'quote-fijado': quoteFijado,
+  confirmacion,
+  usdc,
+  sello,
+  'api-x402': apiX402,
+  'referencia-mcp': referenciaMcp,
+  'primeros-pasos': primerosPasos,
+  finalidad,
+  comision,
+};
+
+interface Props {
+  name: keyof typeof icons;
+  size?: number;
+  class?: string;
+}
+const { name, size = 24, class: className } = Astro.props;
+const svg = icons[name]
+  .replace(/<svg([^>]*)>/, `<svg$1 aria-hidden="true" focusable="false" style="width:${size}px;height:${size}px">`)
+  .replace(/stroke="#2B1E16"/gi, 'stroke="currentColor"');
+---
+
+<span class:list={['icon', className]} set:html={svg} />
+
+<style>
+  .icon {
+    display: inline-flex;
+    flex: none;
+    line-height: 0;
+  }
+</style>

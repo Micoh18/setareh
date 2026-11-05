@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./logo.png" width="210" alt="Setareh logo: una estrella geométrica dorada" />
+  <img src="./packages/brand/assets/favicon.png" width="160" alt="Emblema león y sol de Setareh" />
 </p>
 
 <h1 align="center">Setareh</h1>
@@ -190,8 +190,8 @@ La herramienta `pay_and_place_order` devuelve una URL HTTP completa cuando `SETA
 
 ```text
 .
-├── logo.png                    # identidad visual de Setareh
-├── index.html / styles.css      # landing de Setareh
+├── packages/brand/              # tokens, fuentes y activos de marca compartidos
+├── landing/                     # setareh.site (Astro estático)
 ├── backend/                     # MCP, API HTTP x402 y lógica de comercio
 │   ├── src/commerce.ts          # ciclo quote → pago → orden
 │   ├── src/http.ts              # endpoint HTTP protegido por x402

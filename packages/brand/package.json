@@ -1,0 +1,17 @@
+{
+  "name": "@setareh/brand",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tokens, fuentes y activos de marca compartidos por setareh.site y docs.setareh.site.",
+  "type": "module",
+  "exports": {
+    "./tokens.css": "./tokens.css",
+    "./fonts.css": "./fonts.css",
+    "./assets/*": "./assets/*"
+  },
+  "files": ["tokens.css", "fonts.css", "assets"],
+  "dependencies": {
+    "@fontsource-variable/fraunces": "^5.3.0",
+    "@fontsource-variable/inter": "^5.3.0"
+  }
+}
