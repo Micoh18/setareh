@@ -16,7 +16,9 @@ x402 en USDC sobre Stellar testnet.
 - Una cuenta Stellar testnet receptora con trustline de USDC testnet.
 - Una wallet testnet de demo para el agente, también con trustline de USDC.
 
-> Nunca uses una clave de mainnet ni dinero real con este MVP.
+:::danger
+Nunca uses una clave de mainnet ni dinero real con este MVP.
+:::
 
 ## Instalación local
 

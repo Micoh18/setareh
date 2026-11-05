@@ -1,14 +1,17 @@
 ---
+import emblem from '../assets/setareh-emblema.svg?raw';
+
 const { siteTitleHref } = Astro.locals.starlightRoute;
+// The emblem ships from Figma with a fixed terracota fill; the brand guide
+// sets the negative version in light terracota on café, so the fill follows
+// the theme token instead.
+const svg = emblem
+  .replace(/<svg([^>]*)>/, '<svg$1 class="emblem" aria-hidden="true" focusable="false">')
+  .replace(/fill="#B5532A"/gi, 'fill="currentColor"');
 ---
 
 <a href={siteTitleHref} class="site-title" aria-label="Setareh Docs, inicio">
-  <svg class="star" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
-    <path
-      d="M16 1 L19 11 L28.5 6.5 L24 16 L28.5 25.5 L19 21 L16 31 L13 21 L3.5 25.5 L8 16 L3.5 6.5 L13 11 Z"
-      fill="currentColor"></path>
-    <circle cx="16" cy="16" r="4.5" fill="var(--st-void)"></circle>
-  </svg>
+  <span class="mark" set:html={svg} />
   <span class="word" translate="no">Setareh</span>
   <span class="docs">Docs</span>
 </a>
@@ -17,29 +20,48 @@ const { siteTitleHref } = Astro.locals.starlightRoute;
   .site-title {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
+    gap: 0.625rem;
     text-decoration: none;
     white-space: nowrap;
-    color: var(--st-flag);
+    color: var(--st-text);
+  }
+  .mark {
+    display: inline-flex;
+    width: 2rem;
+    height: 2rem;
+    color: var(--st-logo);
+  }
+  .mark :global(svg) {
+    width: 100%;
+    height: 100%;
   }
   .word {
-    font-family: var(--st-font-label);
-    font-weight: 700;
+    font-family: var(--st-font-display);
+    font-weight: 600;
+    font-variation-settings: 'SOFT' 0, 'WONK' 1, 'opsz' 72;
     font-size: 1.75rem;
     line-height: 1;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--st-edge);
+    letter-spacing: -0.02em;
+    color: var(--st-text);
   }
   .docs {
-    font-family: var(--st-font-label);
-    font-weight: 600;
-    font-size: 1rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--st-flag);
+    display: none;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    background: var(--st-subtle);
+    color: var(--st-text-2);
+    font-weight: 500;
+    font-size: 0.875rem;
+    line-height: 1.4286;
   }
-  .site-title:hover .word {
-    color: var(--st-flag);
+  @media (min-width: 30rem) {
+    .docs {
+      display: inline-block;
+    }
+  }
+  @media (min-width: 50rem) {
+    .word {
+      font-size: 2.25rem;
+    }
   }
 </style>

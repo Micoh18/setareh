@@ -1,0 +1,152 @@
+---
+import primerosPasos from '../assets/icons/primeros-pasos.svg?raw';
+import integrar from '../assets/icons/integrar.svg?raw';
+import seguridad from '../assets/icons/seguridad.svg?raw';
+import evidencia from '../assets/icons/evidencia.svg?raw';
+
+// The brand icons ship with the café ink stroke; here the stroke follows the
+// text token so the dark theme keeps them legible.
+const icon = (svg: string) =>
+  svg
+    .replace(/<svg([^>]*)>/, '<svg$1 aria-hidden="true" focusable="false">')
+    .replace(/stroke="#2B1E16"/gi, 'stroke="currentColor"');
+
+const sections = [
+  {
+    title: 'Empezar',
+    text: 'Instala, configura y verifica el backend; entiende el ciclo de compra.',
+    icon: icon(primerosPasos),
+    links: [
+      ['Primeros pasos', '/primeros-pasos/'],
+      ['Arquitectura y modelo de compra', '/arquitectura/'],
+      ['Runbook operativo', '/runbook/'],
+    ],
+  },
+  {
+    title: 'Integrar',
+    text: 'Configura el backend, conecta el runtime MCP y crea tu primer quote.',
+    icon: icon(integrar),
+    links: [
+      ['Configuración', '/referencia/configuracion/'],
+      ['Referencia MCP', '/referencia/mcp/'],
+      ['API HTTP y x402', '/referencia/http-x402/'],
+      ['Checkout para agentes', '/agentes/checkout/'],
+      ['Reproducir el piloto', '/agentes/reproducir-el-piloto/'],
+      ['Conectar un comercio Shopify', '/comercios/shopify/'],
+    ],
+  },
+  {
+    title: 'Operar',
+    text: 'Estados, recuperación, despliegue y métricas del entorno de referencia.',
+    icon: icon(seguridad),
+    links: [
+      ['Estados y recuperación', '/operaciones/estados-y-recuperacion/'],
+      ['Despliegue y release', '/operaciones/despliegue/'],
+      ['Métricas', '/operaciones/metricas/'],
+    ],
+  },
+  {
+    title: 'Verificar',
+    text: 'Revisa las transacciones en Stellar testnet, la CI, el modelo de amenazas y el límite de cada afirmación.',
+    icon: icon(evidencia),
+    links: [
+      ['Seguridad, límites y modelo de amenazas', '/seguridad/'],
+      ['Evidencia pública de referencia', '/evidencia/'],
+      ['Uso por agentes', '/agentes/'],
+    ],
+  },
+];
+---
+
+<section class="sections not-content" aria-labelledby="st-sections-title">
+  <h2 id="st-sections-title">Secciones</h2>
+  <div class="grid">
+    {
+      sections.map((s) => (
+        <article class="card">
+          <span class="icon" set:html={s.icon} />
+          <h3>{s.title}</h3>
+          <p>{s.text}</p>
+          <ul>
+            {s.links.map(([label, href]) => (
+              <li>
+                <a href={href}>{label}</a>
+              </li>
+            ))}
+          </ul>
+        </article>
+      ))
+    }
+  </div>
+</section>
+
+<style>
+  .sections {
+    margin-top: 2.5rem;
+  }
+  h2 {
+    margin: 0 0 1.25rem;
+    font-family: var(--st-font-ui);
+    font-weight: 600;
+    font-size: var(--sl-text-h2);
+    line-height: 1.2857;
+    letter-spacing: -0.01em;
+    color: var(--st-text);
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+    gap: 1.25rem;
+  }
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    border: 1px solid var(--st-border);
+    border-radius: 16px;
+    background: var(--st-surface);
+  }
+  .icon {
+    display: inline-flex;
+    width: 2rem;
+    height: 2rem;
+    color: var(--st-text);
+  }
+  .icon :global(svg) {
+    width: 100%;
+    height: 100%;
+  }
+  h3 {
+    margin: 0;
+    font-weight: 600;
+    font-size: 1.25rem;
+    line-height: 1.4;
+    letter-spacing: -0.005em;
+    color: var(--st-text);
+  }
+  p {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.4286;
+    color: var(--st-text-2);
+  }
+  ul {
+    list-style: none;
+    margin: 0.25rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.375rem;
+  }
+  a {
+    font-weight: 500;
+    font-size: 0.875rem;
+    line-height: 1.4286;
+    color: var(--st-link);
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+</style>

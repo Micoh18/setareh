@@ -1,0 +1,15 @@
+{
+  "sidebarNav.accessibleLabel": "Navegación principal",
+  "tableOfContents.onThisPage": "En esta página",
+  "tableOfContents.overview": "Resumen",
+  "page.previousLink": "Anterior",
+  "page.nextLink": "Siguiente",
+  "page.editLink": "Editar esta página",
+  "page.lastUpdated": "Última actualización:",
+  "search.label": "Buscar en la documentación",
+  "search.clear": "Limpiar",
+  "search.cancel": "Cancelar",
+  "expressiveCode.copyButtonTooltip": "Copiar",
+  "expressiveCode.copyButtonCopied": "Copiado",
+  "expressiveCode.terminalWindowFallbackTitle": "Terminal"
+}

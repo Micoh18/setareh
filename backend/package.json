@@ -11,6 +11,7 @@
     "test": "node ./node_modules/tsx/dist/cli.mjs --test src/**/*.test.ts",
     "audit:prod": "node scripts/audit-prod.mjs",
     "demo:pay": "node ./node_modules/tsx/dist/cli.mjs src/demo-agent.ts",
+    "demo:check": "node ./node_modules/tsx/dist/cli.mjs src/demo-check.ts",
     "doctor": "node ./node_modules/tsx/dist/cli.mjs src/doctor.ts",
     "reconcile:draft": "node ./node_modules/tsx/dist/cli.mjs src/reconcile-draft.ts",
     "reconcile:order": "node ./node_modules/tsx/dist/cli.mjs src/reconcile-order.ts",

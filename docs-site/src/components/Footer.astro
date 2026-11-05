@@ -1,0 +1,71 @@
+---
+import Pagination from 'virtual:starlight/components/Pagination';
+
+const { editUrl, lastUpdated, lang } = Astro.locals.starlightRoute;
+---
+
+<footer class="doc-footer">
+  <Pagination />
+  {
+    (editUrl || lastUpdated) && (
+      <div class="meta">
+        {editUrl && (
+          <a href={editUrl} class="edit print:hidden">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
+              <path d="m15 5 4 4" />
+            </svg>
+            {Astro.locals.t('page.editLink')}
+          </a>
+        )}
+        {lastUpdated && (
+          <p>
+            {Astro.locals.t('page.lastUpdated')}{' '}
+            <time datetime={lastUpdated.toISOString()}>
+              {lastUpdated.toLocaleDateString(lang, { dateStyle: 'medium', timeZone: 'UTC' })}
+            </time>
+          </p>
+        )}
+      </div>
+    )
+  }
+</footer>
+
+<style>
+  .doc-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    margin-top: 3rem;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 2rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--st-border);
+    font-size: 0.875rem;
+    line-height: 1.4286;
+    color: var(--st-text-2);
+  }
+  .meta > p {
+    margin: 0;
+  }
+  .meta > p:only-child {
+    margin-inline-start: auto;
+  }
+  .edit {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-weight: 500;
+    color: var(--st-link);
+    text-decoration: none;
+  }
+  .edit:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+</style>

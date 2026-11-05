@@ -1,21 +1,24 @@
 ---
 const steps = [
-  'Copia el hash completo de una transacción de esta página.',
-  'Ábrelo en Horizon testnet y confirma successful: true y el ledger.',
-  'Compara el commit de build-info.json con la revisión publicada en GitHub.',
+  ['Copia el hash', 'De una transacción de esta página.'],
+  ['Ábrelo en Horizon testnet', 'Confirma successful: true y el ledger.'],
+  ['Compara el commit', 'El de build-info.json con la revisión publicada en GitHub.'],
 ];
 ---
 
-<section class="verify" aria-labelledby="st-verify-title">
-  <h2 id="st-verify-title" class="st-label">Cómo verificar en tres pasos</h2>
+<section class="verify not-content" aria-labelledby="st-verify-title">
+  <h2 id="st-verify-title" class="st-eyebrow">Cómo verificar en tres pasos</h2>
   <ol>
     {
-      steps.map((s, i) => (
+      steps.map(([title, detail], i) => (
         <li>
           <span class="n" aria-hidden="true">
             {i + 1}
           </span>
-          <span>{s}</span>
+          <div>
+            <strong>{title}</strong>
+            <p>{detail}</p>
+          </div>
         </li>
       ))
     }
@@ -23,39 +26,50 @@ const steps = [
 </section>
 
 <style>
-  section {
+  .verify {
     margin-top: 2rem;
   }
-  .verify h2 {
-    margin: 0 0 0.6rem;
-    font-size: 0.9375rem;
-    color: var(--st-flag-deep);
+  h2 {
+    margin: 0 0 0.75rem;
   }
   ol {
     list-style: none;
     margin: 0;
-    padding: 0.625rem;
+    padding: 1.5rem;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
-    gap: 0.625rem;
-    background: var(--st-void);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+    gap: 1.25rem;
+    border-radius: 16px;
+    background: var(--st-subtle);
   }
   li {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
+    display: grid;
+    grid-template-columns: 1.75rem 1fr;
+    gap: 0.75rem;
     margin: 0;
-    padding: 0.9rem 1rem 1rem;
-    background: var(--st-window);
-    color: var(--st-ink);
-    font-size: 1rem;
-    line-height: 1.5;
+    font-size: 0.875rem;
+    line-height: 1.4286;
   }
   .n {
-    font-family: var(--st-font-label);
-    font-weight: 700;
-    font-size: 2.25rem;
-    line-height: 1;
-    color: var(--st-flag-deep);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 1px solid var(--st-border);
+    border-radius: 999px;
+    background: var(--st-surface);
+    color: var(--st-text-2);
+    font-weight: 500;
+  }
+  strong {
+    display: block;
+    font-weight: 500;
+    color: var(--st-text);
+    padding-top: 0.1875rem;
+  }
+  p {
+    margin: 0.125rem 0 0;
+    color: var(--st-text-2);
   }
 </style>

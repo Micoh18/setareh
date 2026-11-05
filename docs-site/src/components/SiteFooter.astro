@@ -1,0 +1,42 @@
+---
+const year = new Date().getUTCFullYear();
+---
+
+<footer class="site-footer print:hidden">
+  <p>© {year} Setareh · Solo Stellar testnet</p>
+  <nav aria-label="Enlaces del sitio">
+    <a href="https://github.com/Micoh18/setareh">GitHub</a>
+    <a href="/llms.txt">llms.txt</a>
+  </nav>
+</footer>
+
+<style>
+  .site-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1.5rem;
+    padding: 1.25rem var(--sl-nav-pad-x);
+    border-top: 1px solid var(--st-border);
+    background: var(--st-subtle);
+    font-size: 0.875rem;
+    line-height: 1.4286;
+    color: var(--st-text-2);
+  }
+  p {
+    margin: 0;
+  }
+  nav {
+    display: flex;
+    gap: 1.25rem;
+  }
+  a {
+    color: var(--st-link);
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+</style>

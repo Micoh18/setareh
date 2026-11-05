@@ -1,13 +1,105 @@
 ---
-import Default from '@astrojs/starlight/components/PageTitle.astro';
 import Lifecycle from './Lifecycle.astro';
 import McpTools from './McpTools.astro';
 import VerifySteps from './VerifySteps.astro';
+import SectionCards from './SectionCards.astro';
 
-const id = Astro.locals.starlightRoute.id;
+const PAGE_TITLE_ID = '_top';
+const route = Astro.locals.starlightRoute;
+const { id, entry, sidebar } = route;
+const { title, description } = entry.data;
+const isHome = id === 'index' || id === '';
+
+// Breadcrumb: Docs › group › page, read from the sidebar the page sits in.
+let group: string | undefined;
+for (const item of sidebar) {
+  if (item.type === 'group' && item.entries.some((e) => e.type === 'link' && e.isCurrent)) {
+    group = item.label;
+  }
+}
 ---
 
-<Default />
+{
+  !isHome && (
+    <nav class="crumbs" aria-label="Ruta">
+      <a href="/">Docs</a>
+      {group && (
+        <>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+          <span class="group">{group}</span>
+        </>
+      )}
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+      <span class="current" aria-current="page">{title}</span>
+    </nav>
+  )
+}
+<h1 id={PAGE_TITLE_ID}>{title}</h1>
+{isHome && description && <p class="lead">{description}</p>}
+{
+  isHome && (
+    <div class="st-aviso starlight-aside starlight-aside--caution" role="note">
+      <p class="starlight-aside__title">
+        <svg class="starlight-aside__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
+        Solo Stellar testnet · solo Shopify · sin auditoría externa
+      </p>
+      <div class="starlight-aside__content">
+        <p>Las liquidaciones de referencia son internas. No hay mainnet ni custodia.</p>
+      </div>
+    </div>
+    <SectionCards />
+  )
+}
 {id === 'evidencia' && <VerifySteps />}
 {id === 'operaciones/estados-y-recuperacion' && <Lifecycle />}
 {id === 'referencia/mcp' && <McpTools />}
+
+<style>
+  .crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
+    margin-bottom: 1.25rem;
+    font-size: 0.875rem;
+    line-height: 1.4286;
+    color: var(--st-text-2);
+  }
+  .crumbs a {
+    color: var(--st-link);
+    text-decoration: none;
+  }
+  .crumbs a:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+  .crumbs svg {
+    flex: none;
+  }
+  .crumbs .current {
+    color: var(--st-text);
+  }
+  h1 {
+    margin: 0;
+    font-family: var(--st-font-display);
+    font-weight: 600;
+    font-variation-settings: 'SOFT' 0, 'WONK' 1, 'opsz' 144;
+    font-size: var(--sl-text-h1);
+    line-height: 1.0833;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+    color: var(--st-text);
+  }
+  .lead {
+    margin: 1.25rem 0 0;
+    font-size: 1.125rem;
+    line-height: 1.5556;
+    color: var(--st-text-2);
+  }
+  .st-aviso {
+    margin-top: 1.25rem;
+  }
+  .st-aviso p {
+    margin: 0;
+  }
+</style>

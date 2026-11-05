@@ -1,8 +1,15 @@
 ---
-// Mesa de corte ships a single theme: the frame is always black and the
-// reading windows always white, so no stored preference is applied.
+// The positive brand version (terracota on cream) is the default: the dark
+// theme is applied only when the reader asked for it or their system prefers
+// it. Same `starlight-theme` key as Starlight, read inline to avoid a flash.
 ---
 
 <script is:inline>
-  document.documentElement.dataset.theme = 'dark';
+  window.StarlightThemeProvider = (() => {
+    const storedTheme = typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+    const theme =
+      storedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.dataset.theme = theme === 'dark' ? 'dark' : 'light';
+    return { updatePickers() {} };
+  })();
 </script>
