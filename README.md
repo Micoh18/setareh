@@ -176,6 +176,8 @@ cwd = "C:/ruta/a/setareh/backend"
 
 La herramienta `pay_and_place_order` devuelve una URL HTTP completa cuando `SETAREH_BASE_URL` está configurada.
 
+Para un agente que compra desde otra máquina (por ejemplo, una persona evaluadora), `.mcp.json` en la raíz declara el servidor del lado comprador (`backend/src/agent-mcp.ts`): usa la API pública y firma con la wallet de `backend/agent.env`. Claude Code lo carga solo; la guía completa está en `Docs/agentes/reproducir-el-piloto.md`.
+
 ## Seguridad y límites
 
 - La clave privada de la wallet compradora nunca llega a Setareh.

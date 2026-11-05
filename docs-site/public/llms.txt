@@ -7,7 +7,7 @@ Documentación pública de Setareh, infraestructura de comercio verificable para
 - [Uso por agentes](/agentes/): Cómo usar la documentación pública de Setareh de forma segura.
 - [Runbook operativo](/runbook/): Preparación, ejecución, recuperación y cierre de una demostración de Setareh.
 - [Checkout para agentes](/agentes/checkout/): Cómo un runtime de agente usa MCP, x402 y una wallet local sin perder controles de gasto.
-- [Reproducir el piloto](/agentes/reproducir-el-piloto/): Guía paso a paso para que una persona evaluadora repita una compra de punta a punta en testnet y un reintento controlado, desde PowerShell y con su propia wallet.
+- [Reproducir el piloto](/agentes/reproducir-el-piloto/): Guía para que una persona evaluadora, sin conocimientos técnicos, haga una compra de prueba y un reintento controlado conversando con un agente que usa el MCP de Setareh y su propia wallet testnet.
 - [Arquitectura y modelo de compra](/arquitectura/): Cómo cooperan el agente, Setareh, Shopify, Stellar y el facilitador x402.
 - [Conectar un comercio Shopify](/comercios/shopify/): Requisitos, permisos y comprobaciones para el comercio que usa Setareh.
 - [Evidencia pública de referencia](/evidencia/): Trazas verificables del entorno de referencia y límites de lo que demuestran.
