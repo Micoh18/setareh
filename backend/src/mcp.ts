@@ -7,12 +7,12 @@ import { correlationIdFrom, errorMessage, log, withCorrelation } from "./log.js"
 const addressSchema = z.object({ address1: z.string().min(3), address2: z.string().optional(), city: z.string().min(2), province: z.string().optional(), country: z.string().min(2), zip: z.string().min(3), firstName: z.string().min(1), lastName: z.string().min(1), phone: z.string().optional() });
 const itemSchema = z.object({ variantId: z.string().startsWith("gid://shopify/ProductVariant/"), quantity: z.number().int().min(1).max(20) });
 
-function result(value: unknown) {
+export function result(value: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }], structuredContent: value as Record<string, unknown> };
 }
 
 /** Runs one tool call under its own correlation ID and logs its outcome (never its arguments). */
-function traced<A extends unknown[], R>(tool: string, handler: (...args: A) => Promise<R>) {
+export function traced<A extends unknown[], R>(tool: string, handler: (...args: A) => Promise<R>) {
   return (...args: A) => withCorrelation(correlationIdFrom(undefined), async () => {
     const startedAt = performance.now();
     try {

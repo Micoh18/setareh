@@ -1,21 +1,24 @@
 ---
-title: Reproducir el piloto
-description: Guía paso a paso para que una persona evaluadora repita una compra de punta a punta en testnet y un reintento controlado, desde PowerShell y con su propia wallet.
+title: Reproducir el piloto (macOS)
+description: Guía para que una persona evaluadora, sin conocimientos técnicos, haga una compra de prueba y un reintento controlado conversando con un agente que usa el MCP de Setareh y su propia wallet testnet.
 ---
+
+Esta es la versión para **macOS** con la app Terminal. Si vas a usar
+Windows, sigue [Reproducir el piloto (Windows)](/agentes/reproducir-el-piloto-windows/).
 
 ## Qué vas a comprobar
 
-Que un agente puede pagar un quote de Setareh con USDC en `stellar:testnet` y
-obtener una orden Shopify real, y que repetir el pago del mismo quote no cobra
-ni crea una orden por segunda vez. Todo ocurre en testnet: no hay dinero real,
-no hay despacho físico y Setareh nunca recibe tu clave privada.
+Que un agente de IA puede comprar en una tienda Shopify real pagando con USDC
+de prueba en Stellar testnet, y que si intenta pagar la misma compra dos
+veces, Setareh rechaza la segunda sin cobrar ni crear otra orden.
 
-Los comandos están escritos para **PowerShell en Windows 10 u 11**, que es la
-terminal por defecto. Al final hay una nota para macOS y Linux.
+Tú no escribes comandos de pago ni tocas la red Stellar. Conversas en
+español con un agente (Claude Code) que tiene las herramientas de Setareh
+y una wallet de prueba que controlas tú. No hay dinero real, no se despacha
+nada y Setareh nunca ve tu clave secreta: se queda en un archivo de tu
+computador que sólo lee el agente local.
 
-Tiempo estimado: 30 minutos la primera vez, incluido el fondeo de la wallet.
-La guía tiene ocho pasos; los pasos 0 a 4 se pueden hacer con calma, los pasos
-5 a 7 van seguidos porque el quote vence a los 10 minutos.
+Tiempo estimado: 45 minutos la primera vez, incluida la instalación.
 
 ## Antes de empezar: lo que te envía Setareh
 
@@ -23,238 +26,237 @@ Por el canal privado recibes tres datos. Sin ellos no sigas:
 
 | Dato | Para qué |
 | --- | --- |
-| Día y hora de la ventana de prueba | Durante la ventana el fundador está disponible, pero no interviene |
-| Nombre del producto de prueba | Lo buscas en el catálogo en el paso 4 |
-| Un canal para enviar el reporte | El reporte y las capturas no se publican sin tu autorización |
+| Día y hora de la ventana de prueba | Durante la ventana el fundador está disponible por chat, pero no interviene |
+| Nombre del producto de prueba | Se lo pedirás al agente en el paso 5 |
+| Un canal para enviar la evidencia | Nada se publica sin tu autorización |
 
-## 0. Requisitos
+También necesitas una cuenta de Claude con acceso a Claude Code (plan Pro o
+Max). Si no la tienes, díselo a Setareh antes de la ventana.
 
-Abre PowerShell (tecla Windows, escribe `PowerShell`, Enter) y comprueba:
+## 1. Instalar tres programas
 
-```powershell
-node --version
-git --version
-```
+Todo es "Continuar, Continuar, Instalar" con las opciones por defecto.
 
-Necesitas **Node.js 24 o superior** y Git. Si falta alguno, instálalo desde
-[nodejs.org](https://nodejs.org/) (versión LTS) y
-[git-scm.com](https://git-scm.com/) y vuelve a abrir PowerShell.
+1. **Node.js**: descarga la versión LTS para macOS en [nodejs.org](https://nodejs.org/)
+   e instala el `.pkg`.
+2. **Git**: abre la app **Terminal** (pulsa Cmd+Espacio, escribe `Terminal`,
+   Enter), pega esta línea y pulsa Enter. Si Git ya está instalado, muestra su
+   versión; si no, macOS ofrece instalar las herramientas de línea de
+   comandos: acepta y espera a que termine.
 
-En esta guía npm se invoca como `npm.cmd`. Así funciona aunque PowerShell
-tenga deshabilitada la ejecución de scripts, que es lo habitual en un Windows
-recién instalado.
+   ```sh
+   git --version
+   ```
 
-## 1. Crear y fondear tu wallet de testnet
+3. **Claude Code**: en la misma Terminal pega esta línea y pulsa Enter:
 
-Necesitas una cuenta Stellar **testnet** nueva, creada por ti, con XLM para
-comisiones y USDC de testnet con su trustline.
+   ```sh
+   curl -fsSL https://claude.ai/install.sh | bash
+   ```
 
-1. Entra en [Stellar Lab](https://lab.stellar.org/account/create), elige la
-   red **Testnet** arriba a la derecha y pulsa **Generate keypair**. Copia la
-   clave pública (`G...`) y la clave secreta (`S...`). La secreta se queda sólo
-   en tu máquina; nunca la pegues en un chat ni en el reporte.
-2. En la misma página pulsa **Fund account with Friendbot**. Eso crea la
-   cuenta con 10 000 XLM de testnet.
-3. Entra en el [faucet de Circle](https://faucet.circle.com/), elige
-   **Stellar Testnet**, pega tu clave pública y pide USDC. El faucet crea la
-   trustline y deposita 10 USDC de testnet. Si el faucet falla, mira la tabla
-   final: Setareh puede transferirte USDC de testnet a tu cuenta pública.
+Cierra la Terminal (Cmd+Q) y vuelve a abrirla para que reconozca los tres
+programas. Escribe `claude` y pulsa Enter: la primera vez te abre el navegador
+para que inicies sesión con tu cuenta de Claude. Cuando termine, escribe
+`/exit`.
 
-## 2. Clonar e instalar
+## 2. Crear tu wallet de prueba
 
-```powershell
+1. Entra en [Stellar Lab](https://lab.stellar.org/account/create). Arriba a
+   la derecha elige la red **Testnet**. Pulsa **Generate keypair**.
+2. Verás dos claves. La **pública** empieza con `G` y la **secreta** con `S`.
+   Copia las dos en un bloc de notas de tu computador. La secreta no se
+   comparte con nadie, ni con Setareh ni con el agente en el chat.
+3. Pulsa **Fund account with Friendbot**. Eso crea la cuenta con XLM de
+   prueba para las comisiones.
+4. Entra en el [faucet de Circle](https://faucet.circle.com/). Elige
+   **Stellar Testnet**, pega tu clave **pública** y pide USDC. Recibes 10 USDC
+   de prueba. Si el faucet falla, mira la tabla final: Setareh puede
+   enviarte USDC de prueba a tu clave pública.
+
+## 3. Descargar Setareh
+
+En la Terminal pega estas líneas una por una, pulsando Enter tras cada una.
+La última tarda uno o dos minutos:
+
+```sh
 cd ~
 git clone https://github.com/Micoh18/setareh.git
-cd setareh\backend
-npm.cmd ci
-git rev-parse --short HEAD
+cd setareh/backend
+npm ci
 ```
 
-Anota la salida del último comando: es el commit que estás evaluando y va en
-tu reporte. Crea también la carpeta donde guardarás la evidencia:
+## 4. Guardar tu clave en el archivo de la wallet
 
-```powershell
-New-Item -ItemType Directory -Force evidencia | Out-Null
+Sigue en la misma ventana de la Terminal:
+
+```sh
+touch agent.env
+open -e agent.env
 ```
 
-## 3. Configurar la wallet local y comprobar todo
+Se abre TextEdit con un archivo vacío. Pega estas tres líneas, cambia
+`<tu clave secreta S...>` por tu clave secreta (sin los signos `<` `>`) y
+guarda con Cmd+S:
 
-Crea `agent.env` con tres líneas. Sustituye `<tu clave secreta S...>` por tu
-clave secreta, sin los signos `<` `>`, y no cambies nada más:
-
-```powershell
-@"
+```ini
 SETAREH_API_URL=https://api.setareh.site
 AGENT_MAX_USDC=5
 AGENT_STELLAR_PRIVATE_KEY=<tu clave secreta S...>
-"@ | Set-Content -Path agent.env -Encoding ascii
 ```
 
-`AGENT_MAX_USDC` es tu tope local por pago. El cliente de referencia rechaza
-cualquier desafío por encima de ese valor antes de firmar. El producto de
-prueba cuesta menos de 5 USDC.
+`AGENT_MAX_USDC=5` es tu tope: el agente local se niega a firmar cualquier
+pago mayor a 5 USDC, aunque alguien se lo pida. El producto de prueba cuesta
+menos.
 
-Ahora ejecuta el chequeo previo. No firma ni paga nada: verifica Node, el
-archivo, que la API responde, que tu cuenta existe en testnet, que tiene XLM
-y que tiene la trustline y saldo de USDC.
+Ese archivo nunca se envía a nadie. Puedes cerrar TextEdit.
 
-```powershell
-npm.cmd run --silent demo:check 2>&1 | ForEach-Object { "$_" } | Tee-Object -FilePath evidencia\01-check.txt
+## 5. Abrir el agente y hacer la compra
+
+En la Terminal:
+
+```sh
+cd ~/setareh
+claude
 ```
 
-El resultado esperado termina en `"ok": true`. Si algún punto sale con
-`"ok": false`, el campo `detail` dice qué corregir; no pases al siguiente paso
-hasta que todo esté en verde.
+Claude Code detecta que el proyecto trae un servidor MCP llamado `setareh`
+y pregunta si lo autorizas: elige **Yes**. Desde ahí todo es conversación.
+Pega los mensajes siguientes **uno por uno**, en este orden, y espera la
+respuesta de cada uno. Cuando el agente pida permiso para usar una
+herramienta de Setareh o para crear un archivo, responde **Yes**.
 
-## 4. Elegir el producto de prueba
+El agente ya sabe cómo funciona el piloto: conoce las herramientas, el orden
+de los pasos y qué hacer en cada uno. Tú sólo le hablas como le hablarías a
+una persona. No necesitas nombrar herramientas ni códigos; si prefieres
+decirlo con tus palabras, hazlo, siempre que pidas lo mismo.
 
-Busca en el catálogo del comercio piloto el producto reservado para la
-evaluación. Su nombre contiene "evaluador":
-
-```powershell
-$catalogo = Invoke-RestMethod "https://api.setareh.site/v1/catalog?merchantId=micohstore&query=evaluador"
-$catalogo.products | ForEach-Object { [pscustomobject]@{ titulo = $_.product.title; variantId = $_.variant.id; precio = $_.variant.price; comprable = $_.availability.canPurchase } }
-```
-
-Debe aparecer una fila con el nombre que te confirmó Setareh y `comprable`
-en `True`. Guarda el `variantId` en una variable; tiene la forma
-`gid://shopify/ProductVariant/...`:
-
-```powershell
-$variantId = "gid://shopify/ProductVariant/REEMPLAZA"
-```
-
-Si la lista sale vacía, el producto aún no está publicado: avísalo por el
-canal privado antes de continuar.
-
-## 5. Crear el quote
-
-Usa un correo y una dirección ficticios pero con forma válida. El quote crea
-un draft real en Shopify y **vence a los 10 minutos**, así que haz este paso
-justo antes de pagar. El `X-Request-Id` es tuyo: Setareh lo devuelve y sirve
-para correlacionar sus logs con tu reporte.
-
-```powershell
-$requestId = "eval-" + [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-$body = @{
-  merchantId = "micohstore"
-  items = @(@{ variantId = $variantId; quantity = 1 })
-  email = "evaluacion@example.com"
-  shippingAddress = @{
-    firstName = "Prueba"; lastName = "Setareh"
-    address1 = "Calle de prueba 123"; city = "Santiago"
-    country = "CL"; zip = "8320000"
-  }
-  userConfirmed = $true
-} | ConvertTo-Json -Depth 5
-
-$quote = Invoke-RestMethod -Method Post -Uri "https://api.setareh.site/v1/quotes" -ContentType "application/json" -Headers @{ "X-Request-Id" = $requestId } -Body $body
-$quote | ConvertTo-Json -Depth 5 | Tee-Object -FilePath evidencia\02-quote.json
-$quoteId = $quote.quoteId
-"requestId=$requestId`nquoteId=$quoteId" | Set-Content evidencia\00-ids.txt
-```
-
-La respuesta incluye `quoteId`, `shopifyDraftOrder.total` en moneda de la
-tienda, `payment.amount` en USDC y `payment.expiresAt`. Comprueba que
-`payment.amount` es menor que 5 y que `payment.network` es `stellar:testnet`.
-
-## 6. Pagar y crear la orden
-
-```powershell
-npm.cmd run --silent demo:pay -- $quoteId 2>&1 | ForEach-Object { "$_" } | Tee-Object -FilePath evidencia\03-pago.txt
-```
-
-El cliente hace primero una petición sin pago, recibe el desafío `402`,
-verifica red, activo, destinatario y tu tope local, y sólo entonces firma el
-pago y reintenta. Tarda entre 10 y 30 segundos. El resultado esperado es un
-JSON con `"status": "created"`, un `shopifyOrder.name` (por ejemplo `#1005`)
-y `payment.transactionHash`.
-
-Verifica el hash en Horizon, que es público:
-
-```powershell
-$hash = (Get-Content evidencia\03-pago.txt -Raw | ConvertFrom-Json).payment.transactionHash
-Invoke-RestMethod "https://horizon-testnet.stellar.org/transactions/$hash" | Select-Object successful, ledger, created_at | Tee-Object -FilePath evidencia\04-horizon.txt
-```
-
-Debe mostrar `successful` en `True`.
-
-## 7. Reintento controlado
-
-Vuelve a ejecutar exactamente el mismo comando con el mismo `quoteId`:
-
-```powershell
-npm.cmd run --silent demo:pay -- $quoteId 2>&1 | ForEach-Object { "$_" } | Tee-Object -FilePath evidencia\05-reintento.txt
-```
-
-El resultado esperado es una sola línea de rechazo, emitida **antes** de
-firmar nada:
+**Mensaje 1, comprobar que todo está listo**
 
 ```text
-Expected 402 before payment, received 409: {"error":{"code":"request_rejected","message":"Quote is not payable in status created."}}
+¿Está todo listo para hacer la compra de prueba? Revisa mi wallet y dime si falta algo. Todavía no compres nada.
 ```
 
-Comprueba que no hubo segundo cobro ni segunda orden:
+Debes ver todos los puntos en ok, tu clave pública (la que empieza con `G`)
+y tu saldo de USDC de prueba. Si algo falla, corrígelo antes de seguir.
 
-```powershell
-Invoke-RestMethod "https://api.setareh.site/v1/orders/$quoteId" | ConvertTo-Json -Depth 5 | Tee-Object -FilePath evidencia\06-orden-final.json
+**Mensaje 2, encontrar el producto** (cambia el nombre por el que te dio Setareh)
+
+```text
+Busca en la tienda el producto "Prueba evaluador Setareh" y dime cuánto cuesta y si está disponible.
 ```
 
-El estado sigue siendo `created`, con el mismo `transactionHash` y la misma
-orden que en el paso 6. Si quieres, confirma que tu saldo de USDC bajó una
-sola vez volviendo a ejecutar `npm.cmd run demo:check`.
+**Mensaje 3, pedir la cotización**
 
-## 8. Qué enviar como evidencia
+```text
+Quiero comprar una unidad. Mis datos: Prueba Setareh, evaluacion@example.com, Calle de prueba 123, Santiago, Chile, código postal 8320000.
+```
 
-Al terminar, la carpeta `evidencia` tiene estos archivos:
+El agente prepara la cotización sin pagar y te muestra su identificador (el
+`quoteId`), un `requestId`, el total en USDC y la hora de vencimiento, y te
+pregunta si confirmas. Si pagara en este paso sin preguntar, anótalo: es un
+hallazgo. La cotización vence a los 10 minutos. Sigue de inmediato con los
+mensajes 4 y 5.
 
-| Archivo | Contenido |
+**Mensaje 4, pagar**
+
+```text
+Sí, confirmo. Págala.
+```
+
+El agente paga, te muestra el comprobante completo y, por su cuenta,
+confirma el pago en la red Stellar y consulta el estado de la compra. Debes
+ver `status: created`, un nombre de orden como `#1005`, un hash largo (el
+`transactionHash`) y la verificación en Stellar con `successful: true`. Esa
+es la compra.
+
+**Mensaje 5, el reintento controlado**
+
+```text
+Págala otra vez. Quiero ver qué pasa si intento cobrar la misma compra dos veces.
+```
+
+El agente no debe negarse ni preparar una cotización nueva: reintenta la
+misma, te muestra la respuesta tal cual y, por su cuenta, vuelve a consultar
+el estado de la compra. Debes ver `outcome: rejected_before_payment` con
+código `409`, el mensaje `Quote is not payable in status created` y un campo
+`meaning` que explica en español que Setareh rechazó el segundo cobro antes
+de que se firmara nada. El estado debe seguir siendo `created` con la misma
+orden y el mismo hash.
+
+**Mensaje 6, guardar la evidencia**
+
+```text
+Guarda la evidencia de todo lo que hicimos en una carpeta llamada evidencia dentro de backend, un archivo por paso y en orden. No incluyas nada de agent.env. Al final dime en qué commit está el código.
+```
+
+El agente crea siete archivos, de `01-check.json` a `07-orden-final.json`,
+y te dice un commit de 7 caracteres. Anota el commit que te diga. Luego haz una captura de pantalla de la
+respuesta del mensaje 4 y otra de la del mensaje 5 (Cmd+Shift+4 y arrastra
+sobre la ventana; la imagen queda en el Escritorio).
+Escribe `/exit` para cerrar el agente.
+
+## 6. Qué enviar
+
+Por el canal privado:
+
+- La carpeta `evidencia` comprimida. Está en `/Users/<tu usuario>/setareh/backend/evidencia`
+  (en Finder: menú Ir, Carpeta personal, `setareh`, `backend`). Clic
+  secundario sobre la carpeta y **Comprimir "evidencia"**.
+- Las dos capturas de pantalla.
+- El commit del mensaje 6.
+- Cualquier cosa que no haya salido como describe esta página, con tus
+  palabras. Un fallo es un hallazgo válido, no un motivo para repetir hasta
+  que salga bien.
+
+Nunca envíes `agent.env` ni tu clave secreta. El `transactionHash` es público
+y puede publicarse.
+
+## Qué debes ver en cada paso
+
+| Paso | Señal de que fue bien |
 | --- | --- |
-| `00-ids.txt` | Tu `X-Request-Id` y el `quoteId` |
-| `01-check.txt` | Salida de `demo:check` |
-| `02-quote.json` | Respuesta del quote |
-| `03-pago.txt` | Salida completa del pago (éxito) |
-| `04-horizon.txt` | `successful`, `ledger` y `created_at` del hash |
-| `05-reintento.txt` | Salida completa del reintento (`409`) |
-| `06-orden-final.json` | Respuesta final de `/v1/orders/<quoteId>` |
-
-Envía la carpeta comprimida por el canal privado junto con el commit del paso
-2 y cualquier cosa que no haya salido como describe esta página. Ninguno de
-esos archivos contiene tu clave secreta. **No envíes `agent.env`.** El
-`transactionHash` es público y puede publicarse.
+| Mensaje 1 | Todos los puntos en ok y un saldo de USDC mayor que el precio del producto |
+| Mensaje 2 | El producto aparece con `canPurchase: true` |
+| Mensaje 3 | Un `quoteId`, un total menor a 5 USDC y una hora de vencimiento a 10 minutos |
+| Mensaje 4 | `status: created`, nombre de orden, hash y `successful: true` en Horizon |
+| Mensaje 5 | `rejected_before_payment`, código `409`, un `meaning` en español, y el estado sigue con una sola orden y el mismo hash |
+| Mensaje 6 | Siete archivos en la carpeta y un commit de 7 caracteres |
 
 ## Si algo falla
 
-| Síntoma | Qué significa | Qué hacer |
+| Qué ves | Qué significa | Qué hacer |
 | --- | --- | --- |
-| El faucet de Circle no entrega USDC | El faucet tiene cupo diario y a veces falla | Envía tu clave pública (`G...`) por el canal privado; Setareh te transfiere USDC de testnet y el hash de esa transferencia queda en la evidencia |
-| `demo:check` dice que la cuenta no existe | Friendbot no llegó a fondearla | Repite "Fund account with Friendbot" en Stellar Lab |
-| `demo:check` dice que falta la trustline | El faucet no corrió o usaste otra cuenta | Pide USDC en el faucet con la misma clave pública de `agent.env` |
-| PowerShell muestra un error rojo en `Invoke-RestMethod` | La API respondió `4xx` o `5xx` | Lee el detalle con `$Error[0].ErrorDetails.Message` y guárdalo en la evidencia |
-| `429` al crear el quote | Límite de 10 quotes por cliente y hora | Espera el `Retry-After` |
-| `resulting balance is not within the allowed range` | La wallet no tiene USDC suficiente o falta la trustline | Vuelve al faucet; no se firmó ningún pago |
-| `Quote exceeds the local ... spending limit` | El producto cuesta más que `AGENT_MAX_USDC` | Sube el tope sólo si el precio es el acordado |
-| `409` con `Quote expired` | Pasaron más de 10 minutos desde el quote | Crea un quote nuevo desde el paso 5 (es un pedido nuevo, no un reintento) |
-| Timeout o error `5xx` durante el pago | El cobro pudo o no haber ocurrido | **No crees otro quote.** Consulta `/v1/orders/<quoteId>`; si ves `payment_unknown` o `manual_review`, repórtalo tal cual |
+| El faucet de Circle no entrega USDC | El faucet tiene cupo diario y a veces falla | Envía tu clave **pública** (`G...`) por el canal privado; Setareh te transfiere USDC de prueba y anota el hash de esa transferencia |
+| En el mensaje 1 falla `account` | Friendbot no llegó a crear la cuenta | Repite **Fund account with Friendbot** en Stellar Lab y vuelve a enviar el mensaje 1 |
+| En el mensaje 1 falla `usdc` | El faucet no corrió o usaste otra clave | Pide USDC en el faucet con la misma clave pública que muestra el agente |
+| En el mensaje 1 falla `AGENT_STELLAR_PRIVATE_KEY` | La clave quedó mal pegada en `agent.env` | Abre de nuevo `open -e agent.env`, revisa que empieza con `S`, tiene 56 caracteres y no tiene espacios ni `<` `>` |
+| Claude Code no muestra el servidor `setareh` | Abriste `claude` en otra carpeta o dijiste No a la autorización | Escribe `/exit`, ejecuta `cd ~/setareh` y vuelve a abrir `claude` |
+| El agente no encuentra el producto | Aún no está publicado o el nombre es distinto | Confirma el nombre exacto con Setareh por el canal privado |
+| En el mensaje 5 el agente dice que ya está pagada y no reintenta | Ignoró las instrucciones del servidor | Insiste: "Sí, ya sé que está pagada; quiero que intentes cobrarla de nuevo con la misma cotización". Anota que hizo falta insistir: es un hallazgo |
+| Código `429` al crear el quote | Límite de 10 quotes por hora | Espera los segundos que indique y repite el mensaje 3 |
+| `Quote expired` en el mensaje 4 | Pasaron más de 10 minutos | Repite el mensaje 3 para pedir una cotización nueva. Es una compra nueva, no un reintento |
+| Error extraño o tiempo de espera durante el mensaje 4 | El cobro pudo o no haber ocurrido | **No pidas otra cotización.** Pregunta al agente "¿cómo quedó la compra?" y envía lo que responda, aunque diga `payment_unknown` o `manual_review` |
 
-Un fallo es un hallazgo válido del reporte, no un motivo para repetir hasta que
-salga bien. Los estados y su recuperación están en
+Los estados y su recuperación están en
 [Estados y recuperación](/operaciones/estados-y-recuperacion/).
 
-## Si usas macOS o Linux
+## Para evaluadores técnicos
 
-Los pasos son los mismos; cambian la sintaxis de la terminal y las rutas:
+El servidor MCP que usa el agente es `backend/src/agent-mcp.ts` y está
+declarado en `.mcp.json` en la raíz del repositorio. Expone `check_setup`,
+`search_catalog`, `check_availability`, `create_quote`,
+`pay_and_place_order`, `get_order_status` y `verify_payment`, todas contra
+la API pública; la firma x402 ocurre dentro de ese proceso con la clave de
+`agent.env`. Si prefieres no usar un agente, el mismo flujo existe como
+comandos: `npm run demo:check` y `npm run demo:pay -- <quoteId>`
+desde `backend`, con el quote creado por `POST /v1/quotes`; ver
+[Checkout para agentes](/agentes/checkout/) y la
+[referencia MCP](/referencia/mcp/). Con Codex CLI, el mismo servidor se
+declara en `~/.codex/config.toml`:
 
-```bash
-git clone https://github.com/Micoh18/setareh.git && cd setareh/backend && npm ci
-mkdir -p evidencia
-printf 'SETAREH_API_URL=https://api.setareh.site\nAGENT_MAX_USDC=5\nAGENT_STELLAR_PRIVATE_KEY=<tu clave secreta S...>\n' > agent.env
-npm run --silent demo:check 2>&1 | tee evidencia/01-check.txt
-curl -s "https://api.setareh.site/v1/catalog?merchantId=micohstore&query=evaluador"
-curl -s -X POST https://api.setareh.site/v1/quotes -H "Content-Type: application/json" \
-  -H "X-Request-Id: eval-$(date +%s)" -d '{ ...mismo cuerpo del paso 5... }' | tee evidencia/02-quote.json
-npm run --silent demo:pay -- <quoteId> 2>&1 | tee evidencia/03-pago.txt
-curl -s https://horizon-testnet.stellar.org/transactions/<transactionHash> | tee evidencia/04-horizon.txt
-npm run --silent demo:pay -- <quoteId> 2>&1 | tee evidencia/05-reintento.txt
-curl -s https://api.setareh.site/v1/orders/<quoteId> | tee evidencia/06-orden-final.json
+```toml
+[mcp_servers.setareh]
+command = "node"
+args = ["backend/node_modules/tsx/dist/cli.mjs", "backend/src/agent-mcp.ts"]
+cwd = "/Users/<tu usuario>/setareh"
 ```
