@@ -139,35 +139,40 @@ Busca en la tienda el producto "Prueba evaluador Setareh" y dime cuánto cuesta 
 **Mensaje 3, pedir la cotización**
 
 ```text
-Quiero comprar una unidad. Mis datos: Prueba Setareh, evaluacion@example.com, Calle de prueba 123, Santiago, Chile, código postal 8320000. Prepara la cotización y dime cuánto es en USDC y hasta cuándo vale. No pagues todavía.
+Quiero comprar una unidad. Mis datos: Prueba Setareh, evaluacion@example.com, Calle de prueba 123, Santiago, Chile, código postal 8320000.
 ```
 
-El agente te muestra un identificador de la cotización (el `quoteId`), un
-`requestId`, el total en USDC y la hora de vencimiento. La cotización vence
-a los 10 minutos. Sigue de inmediato con los mensajes 4 y 5.
+El agente prepara la cotización sin pagar y te muestra su identificador (el
+`quoteId`), un `requestId`, el total en USDC y la hora de vencimiento, y te
+pregunta si confirmas. Si pagara en este paso sin preguntar, anótalo: es un
+hallazgo. La cotización vence a los 10 minutos. Sigue de inmediato con los
+mensajes 4 y 5.
 
 **Mensaje 4, pagar**
 
 ```text
-Sí, confirmo. Págala y muéstrame el comprobante completo tal como lo devuelve Setareh. Después confirma en la red Stellar que el pago realmente pasó.
+Sí, confirmo. Págala.
 ```
 
-Debes ver `status: created`, un nombre de orden como `#1005`, un hash largo
-(el `transactionHash`) y la verificación en Stellar con `successful: true`.
-Esa es la compra.
+El agente paga, te muestra el comprobante completo y, por su cuenta,
+confirma el pago en la red Stellar y consulta el estado de la compra. Debes
+ver `status: created`, un nombre de orden como `#1005`, un hash largo (el
+`transactionHash`) y la verificación en Stellar con `successful: true`. Esa
+es la compra.
 
 **Mensaje 5, el reintento controlado**
 
 ```text
-Págala otra vez. Quiero ver qué pasa si intento cobrar la misma compra dos veces. Muéstrame la respuesta tal cual, sin resumirla, y luego dime si sigue habiendo una sola orden y un solo pago.
+Págala otra vez. Quiero ver qué pasa si intento cobrar la misma compra dos veces.
 ```
 
 El agente no debe negarse ni preparar una cotización nueva: reintenta la
-misma. Debes ver `outcome: rejected_before_payment` con código `409`, el
-mensaje `Quote is not payable in status created` y un campo `meaning` que
-explica en español que Setareh rechazó el segundo cobro antes de que se
-firmara nada. El estado debe seguir siendo `created` con la misma orden y
-el mismo hash.
+misma, te muestra la respuesta tal cual y, por su cuenta, vuelve a consultar
+el estado de la compra. Debes ver `outcome: rejected_before_payment` con
+código `409`, el mensaje `Quote is not payable in status created` y un campo
+`meaning` que explica en español que Setareh rechazó el segundo cobro antes
+de que se firmara nada. El estado debe seguir siendo `created` con la misma
+orden y el mismo hash.
 
 **Mensaje 6, guardar la evidencia**
 
