@@ -37,6 +37,10 @@ test("the buyer-side MCP exposes the evaluator tools, relays the request id and 
     await client.connect(clientTransport);
     const { tools } = await client.listTools();
     assert.deepEqual(tools.map((tool) => tool.name).sort(), ["check_availability", "check_setup", "create_quote", "get_order_status", "pay_and_place_order", "search_catalog", "verify_payment"]);
+    const instructions = client.getInstructions() ?? "";
+    assert.match(instructions, /mismo quoteId/, "the pilot playbook tells the agent to retry with the same quote");
+    assert.match(instructions, /06-reintento\.json/, "the evidence file names live in the server, not in the person's message");
+    assert.match(tools.find((tool) => tool.name === "pay_and_place_order")?.description ?? "", /pagar otra vez/);
 
     const catalog = (await client.callTool({ name: "search_catalog", arguments: { query: "evaluador" } })).structuredContent as { products: Array<{ product: { title: string } }> };
     assert.equal(catalog.products[0]?.product.title, "Prueba evaluador Setareh");
@@ -45,10 +49,11 @@ test("the buyer-side MCP exposes the evaluator tools, relays the request id and 
     assert.equal(quote.requestId, "eval-test-1");
     assert.equal(calls.find((call) => call.path === "/v1/quotes")?.requestId, "eval-test-1");
 
-    const payment = (await client.callTool({ name: "pay_and_place_order", arguments: { quoteId: quote.quoteId, userConfirmed: true } })).structuredContent as { outcome: string; httpStatus: number; message: string };
+    const payment = (await client.callTool({ name: "pay_and_place_order", arguments: { quoteId: quote.quoteId, userConfirmed: true } })).structuredContent as { outcome: string; httpStatus: number; message: string; meaning: string };
     assert.equal(payment.outcome, "rejected_before_payment");
     assert.equal(payment.httpStatus, 409);
     assert.match(payment.message, /not payable/);
+    assert.match(payment.meaning, /no se movió USDC ni se creó otra orden/, "a plain-language reading travels with the raw 409");
     assert.equal(calls.filter((call) => call.path.endsWith("/pay-and-place")).length, 1, "a non-402 answer must not trigger a signed retry");
 
     const serialized = JSON.stringify(await client.callTool({ name: "check_setup", arguments: {} }));

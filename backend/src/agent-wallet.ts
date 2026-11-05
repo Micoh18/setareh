@@ -100,9 +100,26 @@ export async function checkSetup(env: AgentEnv, options: { fetchImpl?: typeof fe
 
 export type PayOutcome =
   | { outcome: "created"; httpStatus: number; order: unknown }
-  | { outcome: "refused_locally"; message: string }
-  | { outcome: "rejected_before_payment"; httpStatus: number; message: string }
-  | { outcome: "failed_after_payment_attempt"; httpStatus: number; message: string };
+  | { outcome: "refused_locally"; message: string; meaning: string }
+  | { outcome: "rejected_before_payment"; httpStatus: number; message: string; meaning: string }
+  | { outcome: "failed_after_payment_attempt"; httpStatus: number; message: string; meaning: string };
+
+/**
+ * Plain-language reading of a non-created outcome, so the agent that relays it to a non-technical
+ * person explains it the same way regardless of how the person phrased the request.
+ */
+export function describePayOutcome(outcome: "refused_locally" | "rejected_before_payment" | "failed_after_payment_attempt", httpStatus?: number) {
+  switch (outcome) {
+    case "refused_locally":
+      return "La wallet local se negó a firmar: no se movió USDC ni se creó ninguna orden.";
+    case "rejected_before_payment":
+      return httpStatus === 409
+        ? "Setareh rechazó este cobro antes de que la wallet firmara nada: no se movió USDC ni se creó otra orden. Si el quote ya estaba pagado, ese rechazo es exactamente lo esperado y la orden original sigue intacta."
+        : "Setareh no aceptó la solicitud antes de que la wallet firmara nada: no se movió USDC ni se creó ninguna orden.";
+    case "failed_after_payment_attempt":
+      return "La wallet firmó el pago pero Setareh no confirmó la orden. No pidas otro quote: consulta el estado con el mismo quoteId para saber si el cobro ocurrió.";
+  }
+}
 
 function decodePaymentRequired(response: Response) {
   const encoded = response.headers.get("payment-required");
@@ -120,10 +137,10 @@ export async function payQuote(input: { apiUrl: string; quoteId: string; secret:
   const endpoint = new URL(`/v1/quotes/${input.quoteId}/pay-and-place`, input.apiUrl).toString();
   const request = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userConfirmed: true }) };
   const preview = await fetchImpl(endpoint, request);
-  if (preview.status !== 402) return { outcome: "rejected_before_payment", httpStatus: preview.status, message: await preview.text() };
+  if (preview.status !== 402) return { outcome: "rejected_before_payment", httpStatus: preview.status, message: await preview.text(), meaning: describePayOutcome("rejected_before_payment", preview.status) };
   const requirement = decodePaymentRequired(preview).accepts[0];
-  if (!requirement || requirement.network !== "stellar:testnet" || requirement.asset !== USDC_TESTNET_ADDRESS) return { outcome: "refused_locally", message: "Setareh requested an unsupported payment network or asset." };
-  if (BigInt(requirement.amount) > BigInt(Math.round(input.maxUsdc * 10_000_000))) return { outcome: "refused_locally", message: `Quote exceeds the local ${input.maxUsdc} USDC spending limit.` };
+  if (!requirement || requirement.network !== "stellar:testnet" || requirement.asset !== USDC_TESTNET_ADDRESS) return { outcome: "refused_locally", message: "Setareh requested an unsupported payment network or asset.", meaning: describePayOutcome("refused_locally") };
+  if (BigInt(requirement.amount) > BigInt(Math.round(input.maxUsdc * 10_000_000))) return { outcome: "refused_locally", message: `Quote exceeds the local ${input.maxUsdc} USDC spending limit.`, meaning: describePayOutcome("refused_locally") };
 
   const signer = createEd25519Signer(input.secret, "stellar:testnet");
   // x402 defaults to a conservative $1 cap. Keep the SDK cap aligned with the explicit local
@@ -133,7 +150,7 @@ export async function payQuote(input: { apiUrl: string; quoteId: string; secret:
     spendControls: { maxAmountPerPayment: `$${input.maxUsdc}` },
   });
   const response = await wrapFetchWithPayment(fetchImpl, client)(endpoint, request);
-  if (!response.ok) return { outcome: "failed_after_payment_attempt", httpStatus: response.status, message: await response.text() };
+  if (!response.ok) return { outcome: "failed_after_payment_attempt", httpStatus: response.status, message: await response.text(), meaning: describePayOutcome("failed_after_payment_attempt", response.status) };
   return { outcome: "created", httpStatus: response.status, order: await response.json() };
 }
 
