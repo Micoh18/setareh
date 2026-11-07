@@ -23,11 +23,18 @@ liquidación sin exponer información operativa o personal.
 | 2026-10-01 23:18:47 | USDC testnet · 15.0000000 | [`3063f6…4842be`](https://horizon-testnet.stellar.org/transactions/3063f64132db89c90d2bbf1a8b96f7801ac0837c68b6a9f84f380a7b424842be) | 4,974,628 |
 | 2026-10-26 01:10:12 | USDC testnet · 15.0000000 | [`0f1260…d7d41f`](https://horizon-testnet.stellar.org/transactions/0f12600a192ef219137a667dde25631bc42bd26569dab066c256b88036d7d41f) | 5,390,685 |
 | 2026-10-27 00:56:32 | USDC testnet · 10.0000000 | [`2faf68…bed52f`](https://horizon-testnet.stellar.org/transactions/2faf68f8e2946d26153a3658281486063b18508ff629173554df539864bed52f) | 5,407,801 |
+| 2026-11-05 02:18:00 | USDC testnet · 4.0000000 | [`641805…36c6eb`](https://horizon-testnet.stellar.org/transactions/6418057b75cbf85fa0058fe81a902e4cf018805958c06b128c9e1c4a9936c6eb) | 5,564,288 |
+| 2026-11-06 21:07:16 | USDC testnet · 8.0000000 | [`917dbf…d007cec`](https://horizon-testnet.stellar.org/transactions/917dbf9b448f93bcfa8cd690979523731efbb4477a05f7f3bcc453163d007cec) | 5,595,119 |
 
-Las dos últimas se ejecutaron contra el entorno publicado
+Las de octubre 26 y 27 se ejecutaron contra el entorno publicado
 (`api.setareh.site`) con el código de la semana 2, cada una seguida de un
 reintento del mismo quote que fue rechazado con `409` sin segundo cobro ni
-segunda orden; las órdenes Shopify resultantes son `#1003` y `#1004`. Todas
+segunda orden; las órdenes Shopify resultantes son `#1003` y `#1004`. Las dos
+de noviembre son las de la semana 3, pagadas por un agente a través del MCP
+del lado comprador: la del día 5 contra el entorno publicado (orden `#1005`,
+conciliada contra la red tras un `504` del facilitador) y la del día 6 contra
+una instancia local conectada a la misma tienda y a la misma red (orden
+`#1006`, seguida de un reintento rechazado con `409`). Todas
 las trazas deben mostrar `successful: true` en Horizon. Stellar testnet puede
 reiniciarse o borrar historial; esta página no debe interpretarse como
 evidencia duradera de fondos reales.
@@ -88,6 +95,30 @@ facilitador se trataba como fallo definitivo; las respuestas `500` devolvían
 texto interno; el estado `out_of_stock` nunca era observable; las llamadas a
 Shopify no tenían plazo.
 
+## Evaluadora independiente y MCP comprador
+
+Semana 3 del sprint: kit para que una persona ajena al proyecto repita la
+compra hablándole a un agente, y primera compra dirigida por esa persona.
+Estado al 6 de noviembre de 2026:
+
+| Evidencia | Dónde comprobarla |
+| --- | --- |
+| Guía para la persona evaluadora | [Reproducir el piloto](/agentes/reproducir-el-piloto/) (macOS) y [versión para Windows](/agentes/reproducir-el-piloto-windows/): tres programas que instalar, wallet propia en testnet y seis mensajes en español para el agente |
+| MCP del lado comprador | [Servidor MCP del lado comprador](/referencia/mcp/#servidor-mcp-del-lado-comprador): el agente comprueba la wallet, busca, cotiza, paga con la wallet de quien lo usa, consulta el estado y verifica el hash en Horizon; las instrucciones del piloto van embebidas para que la persona no necesite nombrar herramientas |
+| Compra de ensayo con el MCP | 5 de noviembre, contra el entorno publicado: testnet acababa de subir al Protocolo 30 y el facilitador público respondió `504` con la transacción ya enviada; el quote quedó en `payment_unknown`, se concilió contra la red con [`reconcile:payment`](/operaciones/estados-y-recuperacion/#conciliar-un-pago-incierto-payment_unknown) y salió la orden `#1005` con un solo cobro (transacción `641805…36c6eb` en la tabla superior). Dos quotes anteriores se cerraron sin cobro |
+| Compra dirigida por la evaluadora | 6 de noviembre: Cristina, evaluadora independiente y sin formación técnica, dirigió la compra en la tienda Shopify de Artesmako hablándole al agente con sus propias palabras durante trece turnos, incluidas dos preguntas fuera de guion que el agente respondió sin inventar. Cotización de dos líneas, orden `#1006`, transacción `917dbf…d007cec` en la tabla superior |
+| Reintento controlado | "Intentemos recomprar lo mismo" sobre el mismo quote: `409` antes de firmar, estado `created`, misma orden y mismo hash, saldo sin cambios |
+| Cómo se hizo la prueba | Sesión compartida en el computador del fundador, con la wallet de pruebas del piloto; por un error puntual de configuración el agente apuntó a una instancia local conectada a la misma tienda y red, no a `api.setareh.site`. Cristina autorizó publicar su nombre, el resultado y su opinión, grabada en video el mismo día; Artesmako autorizó nombrar la tienda |
+| Pruebas automatizadas | 69 pruebas en `backend/src/*.test.ts` (67 en la semana 2), incluidas dos del MCP comprador |
+| CI por cambio | PRs [#14](https://github.com/Micoh18/setareh/pull/14), [#16](https://github.com/Micoh18/setareh/pull/16), [#17](https://github.com/Micoh18/setareh/pull/17), [#18](https://github.com/Micoh18/setareh/pull/18) y [#19](https://github.com/Micoh18/setareh/pull/19) con CI en verde; `main` cerró la semana en `7e2f14b` |
+| Corrección desplegada | `@stellar/stellar-sdk` 17.4 y `@x402/*` 2.30 para decodificar el XDR del Protocolo 30 de testnet |
+
+Hallazgos de la semana: un `504` del facilitador puede llegar con la
+transacción ya enviada a la red, así que un `504` no significa "no se cobró";
+el chequeo previo no detecta un cambio de protocolo de testnet porque sólo
+consulta JSON; y la instalación previa (Node, Git, Claude Code, wallet,
+faucet) sigue siendo el mayor obstáculo para una persona no técnica.
+
 ## Criterio para declarar un piloto externo
 
 La guía [Reproducir el piloto](/agentes/reproducir-el-piloto/) (macOS; hay [versión para Windows](/agentes/reproducir-el-piloto-windows/)) describe el
@@ -100,3 +131,10 @@ del comercio, confirmación independiente del evaluador, fecha y alcance del
 sprint, hash de una transacción de prueba, resultado de la orden y reporte de
 incidencias. Hasta entonces, las transacciones anteriores siguen siendo
 evidencia técnica interna, no una validación comercial independiente.
+
+La sesión del 6 de noviembre de 2026 cumple parte de ese criterio: una persona
+ajena al proyecto dirigió la compra y el reintento, con autorización suya y
+del comercio para publicarlo. No cumple el resto: la wallet y el computador
+eran del fundador, y la confirmación fue verbal, con un video como respaldo,
+no escrita. Una repetición desde la máquina y con la wallet de la persona
+evaluadora, con su confirmación por escrito, es lo que completaría el criterio.

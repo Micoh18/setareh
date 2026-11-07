@@ -380,10 +380,15 @@ Pega los mensajes siguientes **uno por uno**, en este orden, y espera la
 respuesta de cada uno. Cuando el agente pida permiso para usar una
 herramienta de Setareh o para crear un archivo, responde **Yes**.
 
+El agente ya sabe cómo funciona el piloto: conoce las herramientas, el orden
+de los pasos y qué hacer en cada uno. Tú sólo le hablas como le hablarías a
+una persona. No necesitas nombrar herramientas ni códigos; si prefieres
+decirlo con tus palabras, hazlo, siempre que pidas lo mismo.
+
 **Mensaje 1, comprobar que todo está listo**
 
 ```text
-Usa la herramienta check_setup de Setareh y dime si todos los puntos están ok. Si alguno falla, explícamelo en palabras simples. No crees ningún quote todavía.
+¿Está todo listo para hacer la compra de prueba? Revisa mi wallet y dime si falta algo. Todavía no compres nada.
 ```
 
 Debes ver todos los puntos en ok, tu clave pública (la que empieza con `G`)
@@ -392,44 +397,55 @@ y tu saldo de USDC de prueba. Si algo falla, corrígelo antes de seguir.
 **Mensaje 2, encontrar el producto** (cambia el nombre por el que te dio Setareh)
 
 ```text
-Busca en el catálogo de Setareh el producto "Prueba evaluador Setareh". Dime su precio en pesos, si se puede comprar y guarda su variantId para los siguientes pasos.
+Busca en la tienda el producto "Prueba evaluador Setareh" y dime cuánto cuesta y si está disponible.
 ```
 
-**Mensaje 3, crear el quote**
+**Mensaje 3, pedir la cotización**
 
 ```text
-Crea un quote para 1 unidad de ese producto con estos datos: email evaluacion@example.com, nombre Prueba, apellido Setareh, dirección Calle de prueba 123, ciudad Santiago, país CL, código postal 8320000. Muéstrame el quoteId, el requestId, el total en USDC y a qué hora vence. No pagues todavía.
+Quiero comprar una unidad. Mis datos: Prueba Setareh, evaluacion@example.com, Calle de prueba 123, Santiago, Chile, código postal 8320000.
 ```
 
-El quote vence a los 10 minutos. Sigue de inmediato con los mensajes 4 y 5.
+El agente prepara la cotización sin pagar y te muestra su identificador (el
+`quoteId`), un `requestId`, el total en USDC y la hora de vencimiento, y te
+pregunta si confirmas. Si pagara en este paso sin preguntar, anótalo: es un
+hallazgo. La cotización vence a los 10 minutos. Sigue de inmediato con los
+mensajes 4 y 5.
 
 **Mensaje 4, pagar**
 
 ```text
-Confirmo la compra. Paga ese quote con pay_and_place_order y muéstrame el resultado completo tal como lo devuelve la herramienta: status, nombre de la orden Shopify y transactionHash. Después verifica ese transactionHash con verify_payment y dime si fue exitoso, en qué ledger y a qué hora.
+Sí, confirmo. Págala.
 ```
 
-Debes ver `status: created`, un nombre de orden como `#1005`, un hash largo
-y la verificación con `successful: true`. Esa es la compra.
+El agente paga, te muestra el comprobante completo y, por su cuenta,
+confirma el pago en la red Stellar y consulta el estado de la compra. Debes
+ver `status: created`, un nombre de orden como `#1005`, un hash largo (el
+`transactionHash`) y la verificación en Stellar con `successful: true`. Esa
+es la compra.
 
 **Mensaje 5, el reintento controlado**
 
 ```text
-Ahora intenta pagar exactamente el mismo quote otra vez, con el mismo quoteId, usando pay_and_place_order. Muéstrame la respuesta completa sin interpretarla. Luego consulta get_order_status con ese quoteId y dime si sigue habiendo una sola orden y el mismo transactionHash de antes.
+Págala otra vez. Quiero ver qué pasa si intento cobrar la misma compra dos veces.
 ```
 
-Debes ver `outcome: rejected_before_payment` con código `409` y el mensaje
-`Quote is not payable in status created`. Eso significa que Setareh rechazó
-el segundo pago antes de que se firmara nada. El estado debe seguir siendo
-`created` con la misma orden y el mismo hash.
+El agente no debe negarse ni preparar una cotización nueva: reintenta la
+misma, te muestra la respuesta tal cual y, por su cuenta, vuelve a consultar
+el estado de la compra. Debes ver `outcome: rejected_before_payment` con
+código `409`, el mensaje `Quote is not payable in status created` y un campo
+`meaning` que explica en español que Setareh rechazó el segundo cobro antes
+de que se firmara nada. El estado debe seguir siendo `created` con la misma
+orden y el mismo hash.
 
 **Mensaje 6, guardar la evidencia**
 
 ```text
-Crea la carpeta evidencia dentro de backend y guarda ahí un archivo por cada herramienta que usaste, con la respuesta completa en el orden en que ocurrió: 01-check.json, 02-catalogo.json, 03-quote.json, 04-pago.json, 05-horizon.json, 06-reintento.json, 07-orden-final.json. No copies nada del archivo agent.env. Al final dime el commit actual del repositorio con git rev-parse --short HEAD.
+Guarda la evidencia de todo lo que hicimos en una carpeta llamada evidencia dentro de backend, un archivo por paso y en orden. No incluyas nada de agent.env. Al final dime en qué commit está el código.
 ```
 
-Anota el commit que te diga. Luego haz una captura de pantalla de la
+El agente crea siete archivos, de `01-check.json` a `07-orden-final.json`,
+y te dice un commit de 7 caracteres. Anota el commit que te diga. Luego haz una captura de pantalla de la
 respuesta del mensaje 4 y otra de la del mensaje 5 (tecla Windows+Shift+S).
 Escribe `/exit` para cerrar el agente.
 
@@ -456,7 +472,7 @@ y puede publicarse.
 | Mensaje 2 | El producto aparece con `canPurchase: true` |
 | Mensaje 3 | Un `quoteId`, un total menor a 5 USDC y una hora de vencimiento a 10 minutos |
 | Mensaje 4 | `status: created`, nombre de orden, hash y `successful: true` en Horizon |
-| Mensaje 5 | `rejected_before_payment`, código `409`, y el estado sigue con una sola orden y el mismo hash |
+| Mensaje 5 | `rejected_before_payment`, código `409`, un `meaning` en español, y el estado sigue con una sola orden y el mismo hash |
 | Mensaje 6 | Siete archivos en la carpeta y un commit de 7 caracteres |
 
 ## Si algo falla
@@ -469,9 +485,10 @@ y puede publicarse.
 | En el mensaje 1 falla `AGENT_STELLAR_PRIVATE_KEY` | La clave quedó mal pegada en `agent.env` | Abre de nuevo `notepad agent.env`, revisa que empieza con `S`, tiene 56 caracteres y no tiene espacios ni `<` `>` |
 | Claude Code no muestra el servidor `setareh` | Abriste `claude` en otra carpeta o dijiste No a la autorización | Escribe `/exit`, ejecuta `cd ~\setareh` y vuelve a abrir `claude` |
 | El agente no encuentra el producto | Aún no está publicado o el nombre es distinto | Confirma el nombre exacto con Setareh por el canal privado |
+| En el mensaje 5 el agente dice que ya está pagada y no reintenta | Ignoró las instrucciones del servidor | Insiste: "Sí, ya sé que está pagada; quiero que intentes cobrarla de nuevo con la misma cotización". Anota que hizo falta insistir: es un hallazgo |
 | Código `429` al crear el quote | Límite de 10 quotes por hora | Espera los segundos que indique y repite el mensaje 3 |
-| `Quote expired` en el mensaje 4 | Pasaron más de 10 minutos | Repite el mensaje 3 para crear un quote nuevo. Es una compra nueva, no un reintento |
-| Error extraño o tiempo de espera durante el mensaje 4 | El cobro pudo o no haber ocurrido | **No pidas otro quote.** Pide al agente `get_order_status` con el mismo quoteId y envía lo que responda, aunque diga `payment_unknown` o `manual_review` |
+| `Quote expired` en el mensaje 4 | Pasaron más de 10 minutos | Repite el mensaje 3 para pedir una cotización nueva. Es una compra nueva, no un reintento |
+| Error extraño o tiempo de espera durante el mensaje 4 | El cobro pudo o no haber ocurrido | **No pidas otra cotización.** Pregunta al agente "¿cómo quedó la compra?" y envía lo que responda, aunque diga `payment_unknown` o `manual_review` |
 
 Los estados y su recuperación están en
 [Estados y recuperación](/operaciones/estados-y-recuperacion/).
@@ -623,10 +640,15 @@ Pega los mensajes siguientes **uno por uno**, en este orden, y espera la
 respuesta de cada uno. Cuando el agente pida permiso para usar una
 herramienta de Setareh o para crear un archivo, responde **Yes**.
 
+El agente ya sabe cómo funciona el piloto: conoce las herramientas, el orden
+de los pasos y qué hacer en cada uno. Tú sólo le hablas como le hablarías a
+una persona. No necesitas nombrar herramientas ni códigos; si prefieres
+decirlo con tus palabras, hazlo, siempre que pidas lo mismo.
+
 **Mensaje 1, comprobar que todo está listo**
 
 ```text
-Usa la herramienta check_setup de Setareh y dime si todos los puntos están ok. Si alguno falla, explícamelo en palabras simples. No crees ningún quote todavía.
+¿Está todo listo para hacer la compra de prueba? Revisa mi wallet y dime si falta algo. Todavía no compres nada.
 ```
 
 Debes ver todos los puntos en ok, tu clave pública (la que empieza con `G`)
@@ -635,44 +657,55 @@ y tu saldo de USDC de prueba. Si algo falla, corrígelo antes de seguir.
 **Mensaje 2, encontrar el producto** (cambia el nombre por el que te dio Setareh)
 
 ```text
-Busca en el catálogo de Setareh el producto "Prueba evaluador Setareh". Dime su precio en pesos, si se puede comprar y guarda su variantId para los siguientes pasos.
+Busca en la tienda el producto "Prueba evaluador Setareh" y dime cuánto cuesta y si está disponible.
 ```
 
-**Mensaje 3, crear el quote**
+**Mensaje 3, pedir la cotización**
 
 ```text
-Crea un quote para 1 unidad de ese producto con estos datos: email evaluacion@example.com, nombre Prueba, apellido Setareh, dirección Calle de prueba 123, ciudad Santiago, país CL, código postal 8320000. Muéstrame el quoteId, el requestId, el total en USDC y a qué hora vence. No pagues todavía.
+Quiero comprar una unidad. Mis datos: Prueba Setareh, evaluacion@example.com, Calle de prueba 123, Santiago, Chile, código postal 8320000.
 ```
 
-El quote vence a los 10 minutos. Sigue de inmediato con los mensajes 4 y 5.
+El agente prepara la cotización sin pagar y te muestra su identificador (el
+`quoteId`), un `requestId`, el total en USDC y la hora de vencimiento, y te
+pregunta si confirmas. Si pagara en este paso sin preguntar, anótalo: es un
+hallazgo. La cotización vence a los 10 minutos. Sigue de inmediato con los
+mensajes 4 y 5.
 
 **Mensaje 4, pagar**
 
 ```text
-Confirmo la compra. Paga ese quote con pay_and_place_order y muéstrame el resultado completo tal como lo devuelve la herramienta: status, nombre de la orden Shopify y transactionHash. Después verifica ese transactionHash con verify_payment y dime si fue exitoso, en qué ledger y a qué hora.
+Sí, confirmo. Págala.
 ```
 
-Debes ver `status: created`, un nombre de orden como `#1005`, un hash largo
-y la verificación con `successful: true`. Esa es la compra.
+El agente paga, te muestra el comprobante completo y, por su cuenta,
+confirma el pago en la red Stellar y consulta el estado de la compra. Debes
+ver `status: created`, un nombre de orden como `#1005`, un hash largo (el
+`transactionHash`) y la verificación en Stellar con `successful: true`. Esa
+es la compra.
 
 **Mensaje 5, el reintento controlado**
 
 ```text
-Ahora intenta pagar exactamente el mismo quote otra vez, con el mismo quoteId, usando pay_and_place_order. Muéstrame la respuesta completa sin interpretarla. Luego consulta get_order_status con ese quoteId y dime si sigue habiendo una sola orden y el mismo transactionHash de antes.
+Págala otra vez. Quiero ver qué pasa si intento cobrar la misma compra dos veces.
 ```
 
-Debes ver `outcome: rejected_before_payment` con código `409` y el mensaje
-`Quote is not payable in status created`. Eso significa que Setareh rechazó
-el segundo pago antes de que se firmara nada. El estado debe seguir siendo
-`created` con la misma orden y el mismo hash.
+El agente no debe negarse ni preparar una cotización nueva: reintenta la
+misma, te muestra la respuesta tal cual y, por su cuenta, vuelve a consultar
+el estado de la compra. Debes ver `outcome: rejected_before_payment` con
+código `409`, el mensaje `Quote is not payable in status created` y un campo
+`meaning` que explica en español que Setareh rechazó el segundo cobro antes
+de que se firmara nada. El estado debe seguir siendo `created` con la misma
+orden y el mismo hash.
 
 **Mensaje 6, guardar la evidencia**
 
 ```text
-Crea la carpeta evidencia dentro de backend y guarda ahí un archivo por cada herramienta que usaste, con la respuesta completa en el orden en que ocurrió: 01-check.json, 02-catalogo.json, 03-quote.json, 04-pago.json, 05-horizon.json, 06-reintento.json, 07-orden-final.json. No copies nada del archivo agent.env. Al final dime el commit actual del repositorio con git rev-parse --short HEAD.
+Guarda la evidencia de todo lo que hicimos en una carpeta llamada evidencia dentro de backend, un archivo por paso y en orden. No incluyas nada de agent.env. Al final dime en qué commit está el código.
 ```
 
-Anota el commit que te diga. Luego haz una captura de pantalla de la
+El agente crea siete archivos, de `01-check.json` a `07-orden-final.json`,
+y te dice un commit de 7 caracteres. Anota el commit que te diga. Luego haz una captura de pantalla de la
 respuesta del mensaje 4 y otra de la del mensaje 5 (Cmd+Shift+4 y arrastra
 sobre la ventana; la imagen queda en el Escritorio).
 Escribe `/exit` para cerrar el agente.
@@ -701,7 +734,7 @@ y puede publicarse.
 | Mensaje 2 | El producto aparece con `canPurchase: true` |
 | Mensaje 3 | Un `quoteId`, un total menor a 5 USDC y una hora de vencimiento a 10 minutos |
 | Mensaje 4 | `status: created`, nombre de orden, hash y `successful: true` en Horizon |
-| Mensaje 5 | `rejected_before_payment`, código `409`, y el estado sigue con una sola orden y el mismo hash |
+| Mensaje 5 | `rejected_before_payment`, código `409`, un `meaning` en español, y el estado sigue con una sola orden y el mismo hash |
 | Mensaje 6 | Siete archivos en la carpeta y un commit de 7 caracteres |
 
 ## Si algo falla
@@ -714,9 +747,10 @@ y puede publicarse.
 | En el mensaje 1 falla `AGENT_STELLAR_PRIVATE_KEY` | La clave quedó mal pegada en `agent.env` | Abre de nuevo `open -e agent.env`, revisa que empieza con `S`, tiene 56 caracteres y no tiene espacios ni `<` `>` |
 | Claude Code no muestra el servidor `setareh` | Abriste `claude` en otra carpeta o dijiste No a la autorización | Escribe `/exit`, ejecuta `cd ~/setareh` y vuelve a abrir `claude` |
 | El agente no encuentra el producto | Aún no está publicado o el nombre es distinto | Confirma el nombre exacto con Setareh por el canal privado |
+| En el mensaje 5 el agente dice que ya está pagada y no reintenta | Ignoró las instrucciones del servidor | Insiste: "Sí, ya sé que está pagada; quiero que intentes cobrarla de nuevo con la misma cotización". Anota que hizo falta insistir: es un hallazgo |
 | Código `429` al crear el quote | Límite de 10 quotes por hora | Espera los segundos que indique y repite el mensaje 3 |
-| `Quote expired` en el mensaje 4 | Pasaron más de 10 minutos | Repite el mensaje 3 para crear un quote nuevo. Es una compra nueva, no un reintento |
-| Error extraño o tiempo de espera durante el mensaje 4 | El cobro pudo o no haber ocurrido | **No pidas otro quote.** Pide al agente `get_order_status` con el mismo quoteId y envía lo que responda, aunque diga `payment_unknown` o `manual_review` |
+| `Quote expired` en el mensaje 4 | Pasaron más de 10 minutos | Repite el mensaje 3 para pedir una cotización nueva. Es una compra nueva, no un reintento |
+| Error extraño o tiempo de espera durante el mensaje 4 | El cobro pudo o no haber ocurrido | **No pidas otra cotización.** Pregunta al agente "¿cómo quedó la compra?" y envía lo que responda, aunque diga `payment_unknown` o `manual_review` |
 
 Los estados y su recuperación están en
 [Estados y recuperación](/operaciones/estados-y-recuperacion/).
@@ -918,11 +952,18 @@ liquidación sin exponer información operativa o personal.
 | 2026-10-01 23:18:47 | USDC testnet · 15.0000000 | [`3063f6…4842be`](https://horizon-testnet.stellar.org/transactions/3063f64132db89c90d2bbf1a8b96f7801ac0837c68b6a9f84f380a7b424842be) | 4,974,628 |
 | 2026-10-26 01:10:12 | USDC testnet · 15.0000000 | [`0f1260…d7d41f`](https://horizon-testnet.stellar.org/transactions/0f12600a192ef219137a667dde25631bc42bd26569dab066c256b88036d7d41f) | 5,390,685 |
 | 2026-10-27 00:56:32 | USDC testnet · 10.0000000 | [`2faf68…bed52f`](https://horizon-testnet.stellar.org/transactions/2faf68f8e2946d26153a3658281486063b18508ff629173554df539864bed52f) | 5,407,801 |
+| 2026-11-05 02:18:00 | USDC testnet · 4.0000000 | [`641805…36c6eb`](https://horizon-testnet.stellar.org/transactions/6418057b75cbf85fa0058fe81a902e4cf018805958c06b128c9e1c4a9936c6eb) | 5,564,288 |
+| 2026-11-06 21:07:16 | USDC testnet · 8.0000000 | [`917dbf…d007cec`](https://horizon-testnet.stellar.org/transactions/917dbf9b448f93bcfa8cd690979523731efbb4477a05f7f3bcc453163d007cec) | 5,595,119 |
 
-Las dos últimas se ejecutaron contra el entorno publicado
+Las de octubre 26 y 27 se ejecutaron contra el entorno publicado
 (`api.setareh.site`) con el código de la semana 2, cada una seguida de un
 reintento del mismo quote que fue rechazado con `409` sin segundo cobro ni
-segunda orden; las órdenes Shopify resultantes son `#1003` y `#1004`. Todas
+segunda orden; las órdenes Shopify resultantes son `#1003` y `#1004`. Las dos
+de noviembre son las de la semana 3, pagadas por un agente a través del MCP
+del lado comprador: la del día 5 contra el entorno publicado (orden `#1005`,
+conciliada contra la red tras un `504` del facilitador) y la del día 6 contra
+una instancia local conectada a la misma tienda y a la misma red (orden
+`#1006`, seguida de un reintento rechazado con `409`). Todas
 las trazas deben mostrar `successful: true` en Horizon. Stellar testnet puede
 reiniciarse o borrar historial; esta página no debe interpretarse como
 evidencia duradera de fondos reales.
@@ -983,6 +1024,30 @@ facilitador se trataba como fallo definitivo; las respuestas `500` devolvían
 texto interno; el estado `out_of_stock` nunca era observable; las llamadas a
 Shopify no tenían plazo.
 
+## Evaluadora independiente y MCP comprador
+
+Semana 3 del sprint: kit para que una persona ajena al proyecto repita la
+compra hablándole a un agente, y primera compra dirigida por esa persona.
+Estado al 6 de noviembre de 2026:
+
+| Evidencia | Dónde comprobarla |
+| --- | --- |
+| Guía para la persona evaluadora | [Reproducir el piloto](/agentes/reproducir-el-piloto/) (macOS) y [versión para Windows](/agentes/reproducir-el-piloto-windows/): tres programas que instalar, wallet propia en testnet y seis mensajes en español para el agente |
+| MCP del lado comprador | [Servidor MCP del lado comprador](/referencia/mcp/#servidor-mcp-del-lado-comprador): el agente comprueba la wallet, busca, cotiza, paga con la wallet de quien lo usa, consulta el estado y verifica el hash en Horizon; las instrucciones del piloto van embebidas para que la persona no necesite nombrar herramientas |
+| Compra de ensayo con el MCP | 5 de noviembre, contra el entorno publicado: testnet acababa de subir al Protocolo 30 y el facilitador público respondió `504` con la transacción ya enviada; el quote quedó en `payment_unknown`, se concilió contra la red con [`reconcile:payment`](/operaciones/estados-y-recuperacion/#conciliar-un-pago-incierto-payment_unknown) y salió la orden `#1005` con un solo cobro (transacción `641805…36c6eb` en la tabla superior). Dos quotes anteriores se cerraron sin cobro |
+| Compra dirigida por la evaluadora | 6 de noviembre: Cristina, evaluadora independiente y sin formación técnica, dirigió la compra en la tienda Shopify de Artesmako hablándole al agente con sus propias palabras durante trece turnos, incluidas dos preguntas fuera de guion que el agente respondió sin inventar. Cotización de dos líneas, orden `#1006`, transacción `917dbf…d007cec` en la tabla superior |
+| Reintento controlado | "Intentemos recomprar lo mismo" sobre el mismo quote: `409` antes de firmar, estado `created`, misma orden y mismo hash, saldo sin cambios |
+| Cómo se hizo la prueba | Sesión compartida en el computador del fundador, con la wallet de pruebas del piloto; por un error puntual de configuración el agente apuntó a una instancia local conectada a la misma tienda y red, no a `api.setareh.site`. Cristina autorizó publicar su nombre, el resultado y su opinión, grabada en video el mismo día; Artesmako autorizó nombrar la tienda |
+| Pruebas automatizadas | 69 pruebas en `backend/src/*.test.ts` (67 en la semana 2), incluidas dos del MCP comprador |
+| CI por cambio | PRs [#14](https://github.com/Micoh18/setareh/pull/14), [#16](https://github.com/Micoh18/setareh/pull/16), [#17](https://github.com/Micoh18/setareh/pull/17), [#18](https://github.com/Micoh18/setareh/pull/18) y [#19](https://github.com/Micoh18/setareh/pull/19) con CI en verde; `main` cerró la semana en `7e2f14b` |
+| Corrección desplegada | `@stellar/stellar-sdk` 17.4 y `@x402/*` 2.30 para decodificar el XDR del Protocolo 30 de testnet |
+
+Hallazgos de la semana: un `504` del facilitador puede llegar con la
+transacción ya enviada a la red, así que un `504` no significa "no se cobró";
+el chequeo previo no detecta un cambio de protocolo de testnet porque sólo
+consulta JSON; y la instalación previa (Node, Git, Claude Code, wallet,
+faucet) sigue siendo el mayor obstáculo para una persona no técnica.
+
 ## Criterio para declarar un piloto externo
 
 La guía [Reproducir el piloto](/agentes/reproducir-el-piloto/) (macOS; hay [versión para Windows](/agentes/reproducir-el-piloto-windows/)) describe el
@@ -995,6 +1060,13 @@ del comercio, confirmación independiente del evaluador, fecha y alcance del
 sprint, hash de una transacción de prueba, resultado de la orden y reporte de
 incidencias. Hasta entonces, las transacciones anteriores siguen siendo
 evidencia técnica interna, no una validación comercial independiente.
+
+La sesión del 6 de noviembre de 2026 cumple parte de ese criterio: una persona
+ajena al proyecto dirigió la compra y el reintento, con autorización suya y
+del comercio para publicarlo. No cumple el resto: la wallet y el computador
+eran del fundador, y la confirmación fue verbal, con un video como respaldo,
+no escrita. Una repetición desde la máquina y con la wallet de la persona
+evaluadora, con su confirmación por escrito, es lo que completaría el criterio.
 
 ## Documentación de Setareh
 
@@ -1683,12 +1755,17 @@ cwd = "C:/ruta/a/setareh"
 | `check_setup` | Verifica Node, `agent.env`, la API y la wallet (cuenta, XLM, trustline y saldo USDC) sin firmar nada |
 | `search_catalog`, `check_availability` | Igual que las del comercio, vía `GET /v1/catalog` y `GET /v1/availability/:variantId` |
 | `create_quote` | `POST /v1/quotes` con un `X-Request-Id` propio (`requestId` opcional) que vuelve en la respuesta |
-| `pay_and_place_order` | Paga de verdad: pide el `402`, verifica red, activo y `AGENT_MAX_USDC`, firma y crea la orden. Un quote ya pagado devuelve `rejected_before_payment` con `409` sin firmar |
+| `pay_and_place_order` | Paga de verdad: pide el `402`, verifica red, activo y `AGENT_MAX_USDC`, firma y crea la orden. Un quote ya pagado devuelve `rejected_before_payment` con `409` sin firmar, más un campo `meaning` en español que explica el rechazo |
 | `get_order_status` | `GET /v1/orders/:quoteId` |
 | `verify_payment` | Consulta pública del hash en Horizon testnet |
 
-La guía [Reproducir el piloto](/agentes/reproducir-el-piloto/) usa este
-servidor de principio a fin.
+El servidor declara además `instructions` MCP: un guion del piloto que el
+cliente entrega al modelo al conectar. Ahí vive la traducción de lo que dice
+una persona no técnica ("¿está todo listo?", "págala otra vez") a la
+herramienta correcta, la regla de reintentar con el mismo `quoteId` sin crear
+otro quote, y los nombres de los siete archivos de evidencia. Por eso la guía
+[Reproducir el piloto](/agentes/reproducir-el-piloto/) habla en español
+corriente y no nombra herramientas.
 
 ## Seguridad, límites y modelo de amenazas
 
