@@ -25,6 +25,7 @@ liquidación sin exponer información operativa o personal.
 | 2026-10-27 00:56:32 | USDC testnet · 10.0000000 | [`2faf68…bed52f`](https://horizon-testnet.stellar.org/transactions/2faf68f8e2946d26153a3658281486063b18508ff629173554df539864bed52f) | 5,407,801 |
 | 2026-11-05 02:18:00 | USDC testnet · 4.0000000 | [`641805…36c6eb`](https://horizon-testnet.stellar.org/transactions/6418057b75cbf85fa0058fe81a902e4cf018805958c06b128c9e1c4a9936c6eb) | 5,564,288 |
 | 2026-11-06 21:07:16 | USDC testnet · 8.0000000 | [`917dbf…d007cec`](https://horizon-testnet.stellar.org/transactions/917dbf9b448f93bcfa8cd690979523731efbb4477a05f7f3bcc453163d007cec) | 5,595,119 |
+| 2026-11-08 13:40:57 | USDC testnet · 4.0000000 | [`374e3b…606736`](https://horizon-testnet.stellar.org/transactions/374e3b35329bf6362eb4284fde4b0dd30bdf61b735bf9de053232fb4a1606736) | 5,624,323 |
 
 Las de octubre 26 y 27 se ejecutaron contra el entorno publicado
 (`api.setareh.site`) con el código de la semana 2, cada una seguida de un
@@ -34,7 +35,11 @@ de noviembre son las de la semana 3, pagadas por un agente a través del MCP
 del lado comprador: la del día 5 contra el entorno publicado (orden `#1005`,
 conciliada contra la red tras un `504` del facilitador) y la del día 6 contra
 una instancia local conectada a la misma tienda y a la misma red (orden
-`#1006`, seguida de un reintento rechazado con `409`). Todas
+`#1006`, seguida de un reintento rechazado con `409`). La del 8 de noviembre
+es la compra de humo de la semana 4, hecha contra el entorno publicado justo
+después de que la persona dueña de la tienda reinstalara la app desde su
+propia sesión (orden `#1007`, conciliada contra la red tras otro `504` del
+facilitador, seguida de un reintento rechazado con `409`). Todas
 las trazas deben mostrar `successful: true` en Horizon. Stellar testnet puede
 reiniciarse o borrar historial; esta página no debe interpretarse como
 evidencia duradera de fondos reales.
@@ -118,6 +123,35 @@ transacción ya enviada a la red, así que un `504` no significa "no se cobró";
 el chequeo previo no detecta un cambio de protocolo de testnet porque sólo
 consulta JSON; y la instalación previa (Node, Git, Claude Code, wallet,
 faucet) sigue siendo el mayor obstáculo para una persona no técnica.
+
+## Instalación aprobada por la persona dueña de la tienda
+
+Semana 4 del sprint: la persona dueña de la tienda piloto revoca y vuelve a
+aprobar la app desde su propia sesión de Shopify, sin compartir secretos, y el
+servicio demuestra el ciclo completo con logs y preflight. Estado al 8 de
+noviembre de 2026:
+
+| Evidencia | Dónde comprobarla |
+| --- | --- |
+| Desinstalación por la persona dueña | 8 de noviembre, 13:17:52 UTC: Shopify envió el webhook `app/uninstalled`, el servicio lo verificó (`200` en 2 ms) y borró sus copias de los tokens; el preflight pasó a «not installed». Antes no había ningún quote en vuelo |
+| Reinstalación desde su sesión | 13:24:16 UTC: callback OAuth verificado (firma, dominio, `state` de un solo uso), tokens nuevos cifrados y webhook de desinstalación recreado. El preflight `doctor -- --verify` volvió a `installed: true`, `active`, con catálogo y facilitador conectados a las 13:25:36 |
+| Qué no se pidió | Contraseña, códigos de verificación, tokens, instalar programas, acceso remoto, claves de wallet ni datos de clientes. La [guía para comercios](/comercios/shopify/) lo deja por escrito |
+| Lo que la persona dueña vio | La pantalla «Instalar app» de Shopify: un aviso de app no revisada y tres categorías en lenguaje llano (clientes, empleados y colaboradores, tienda), no los cinco scopes técnicos. Preguntó por ello; la guía se corrigió para explicar cada categoría |
+| Compra de humo tras la reinstalación | Quote de 4 USDC contra `api.setareh.site`; el facilitador respondió `402` vacío con la transacción ya enviada (tercera vez en el piloto); el quote quedó en `payment_unknown` y se concilió con `reconcile:payment --tx`; orden `#1007`, transacción `374e3b…606736` en la tabla superior |
+| Reintento controlado | Mismo quote: `409` antes de firmar, estado `created`, misma orden y mismo hash, saldo sin cambios |
+| Confirmación de la persona dueña | Autoriza publicar el nombre de la tienda, su URL y el resultado de la sesión; confirmación escrita y firmada **[pendiente de recibir]** |
+| Documentación de seguridad | [Seguridad](/seguridad/): modelo de amenazas revisado, inventario de secretos y riesgos abiertos; [Logs y retención](/operaciones/logs-y-retencion/): qué se escribe, qué se redacta y por cuánto tiempo; [Desinstalar](/comercios/shopify/#desinstalar) |
+| Auditoría de dependencias | Sin excepciones activas desde el 7 de noviembre: `@x402/*` 2.30 depende de zod 4 ([#21](https://github.com/Micoh18/setareh/pull/21)) |
+| Retención de datos personales | `npm run purge` aplica la política declarada ([#23](https://github.com/Micoh18/setareh/pull/23)); pendiente de desplegar en el piloto |
+
+Hallazgos de la semana: la pantalla de consentimiento de Shopify habla de
+«datos sensibles de clientes» aunque el único acceso a clientes sea leer el
+pedido recién creado, y la guía debe prepararlo; una dirección con provincia
+`RM` hace fallar el borrador en Shopify y el servicio devolvió `500` en vez de
+un error de validación; el chequeo previo del agente no avisa de saldo
+insuficiente antes de intentar pagar; y el facilitador público volvió a no
+responder con la transacción ya enviada, por lo que la conciliación manual
+sigue siendo parte del flujo.
 
 ## Criterio para declarar un piloto externo
 
