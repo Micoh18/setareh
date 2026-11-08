@@ -4,15 +4,8 @@
 import { execFileSync } from "node:child_process";
 
 const ACCEPTED = [
-  {
-    advisory: "GHSA-mrhx-c7xc-m3w5",
-    package: "zod",
-    // Only the zod 3 copy that @x402 pins; our own zod must stay patched.
-    paths: ["node_modules/@x402/core/node_modules/zod", "node_modules/@x402/extensions/node_modules/zod"],
-    expires: "2026-11-30",
-    reason: "No patched zod 3 exists and @x402/core@2.28.0 (latest) requires zod ^3.24.2; it cannot run on zod 4. "
-      + "x402 only validates the PAYMENT-SIGNATURE header (bounded by Node's 16 KB header limit) and responses from the configured facilitator.",
-  },
+  // Empty since 2026-11-07: @x402 2.30 depends on zod 4, so GHSA-mrhx-c7xc-m3w5 (zod 3) no longer applies.
+  // Shape of an entry: { advisory, package, paths: [...], expires: "YYYY-MM-DD", reason }.
 ];
 
 let report;
