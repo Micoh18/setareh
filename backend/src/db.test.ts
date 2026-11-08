@@ -164,3 +164,46 @@ test("freezes configured demo shipping in the Shopify draft and quote", async ()
     assert.deepEqual(quote.exchangeRate, { shopifyPerUsdc: "0.001", source: "configured_demo_rate" });
   } finally { database.close(); rmSync(directory, { recursive: true, force: true }); }
 });
+
+test("purges buyer email, address and raw receipt only after the retention window, never for quotes an operator still needs", () => {
+  const { database, directory } = fixture();
+  try {
+    const day = 24 * 60 * 60 * 1000;
+    const longAgo = new Date(Date.now() - 40 * day).toISOString();
+    const recently = new Date(Date.now() - 10 * day).toISOString();
+    database.createQuote(quote("expired-old", longAgo));
+    database.createQuote(quote("expired-recent", recently));
+    database.createQuote(quote("ordered", new Date(Date.now() + 60_000).toISOString()));
+    database.recordPaymentSettled({ quoteId: "ordered", network: "stellar:testnet", asset: "USDC", amount: "10.000000", payTo: "GTEST", paymentPayloadHash: "h", transactionHash: "tx", receipt: { raw: "facilitator receipt" } });
+    database.createOrder({ quoteId: "ordered", shopifyOrderId: "gid://shopify/Order/1", shopifyOrderName: "#1001", status: "created" });
+    database.createQuote(quote("unknown", longAgo));
+    database.updateQuoteStatus("unknown", "payment_unknown");
+
+    const dryRun = database.purgePersonalData({ expiredAfterDays: 30, orderedAfterDays: 90, apply: false });
+    assert.deepEqual(dryRun.map((entry) => [entry.quoteId, entry.reason, entry.purged]), [["expired-old", "unpaid", false]]);
+    assert.equal(database.getQuote("expired-old")?.email, "buyer@example.com");
+
+    const applied = database.purgePersonalData({ expiredAfterDays: 30, orderedAfterDays: 90, apply: true });
+    assert.deepEqual(applied.map((entry) => [entry.quoteId, entry.purged]), [["expired-old", true]]);
+    const purged = database.getQuote("expired-old");
+    assert.equal(purged?.email, "");
+    assert.equal(purged?.shippingAddressJson, "{}");
+    assert.equal(purged?.totalUsdc, "10.000000");
+    assert.ok(database.personalDataPurgedAt("expired-old"));
+    assert.equal(database.getQuote("expired-recent")?.email, "buyer@example.com");
+    assert.equal(database.getQuote("unknown")?.email, "buyer@example.com");
+    assert.equal(database.getQuote("ordered")?.email, "buyer@example.com");
+
+    // 100 days later the ordered quote crosses its window; the receipt goes with the address, the hash stays.
+    const later = database.purgePersonalData({ expiredAfterDays: 30, orderedAfterDays: 90, now: new Date(Date.now() + 100 * day), apply: true });
+    // The quote that expired 10 days ago also crosses its 30-day window by then.
+    assert.deepEqual(later.map((entry) => [entry.quoteId, entry.reason]), [["expired-recent", "unpaid"], ["ordered", "ordered"]]);
+    assert.equal(database.getQuote("ordered")?.email, "");
+    const payment = database.getPayment("ordered");
+    assert.equal(payment?.facilitator_receipt_json, null);
+    assert.equal(payment?.stellar_transaction_hash, "tx");
+    assert.equal(database.getQuote("unknown")?.email, "buyer@example.com");
+    // Idempotent: nothing left to purge.
+    assert.deepEqual(database.purgePersonalData({ expiredAfterDays: 30, orderedAfterDays: 90, now: new Date(Date.now() + 100 * day), apply: true }), []);
+  } finally { database.close(); rmSync(directory, { recursive: true, force: true }); }
+});

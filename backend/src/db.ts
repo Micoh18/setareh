@@ -127,6 +127,9 @@ export class SetarehDatabase {
     if (!quoteColumns.some((column) => column.name === "fx_source")) {
       this.db.exec("ALTER TABLE quote ADD COLUMN fx_source TEXT NOT NULL DEFAULT 'configured_demo_rate'");
     }
+    if (!quoteColumns.some((column) => column.name === "personal_data_purged_at")) {
+      this.db.exec("ALTER TABLE quote ADD COLUMN personal_data_purged_at TEXT");
+    }
   }
 
   upsertMerchant(merchant: { id: string; name: string; shopDomain: string; shopifyCredentialsRef?: string; stellarRecipient: string }) {
@@ -329,6 +332,48 @@ export class SetarehDatabase {
   }
 
   markManualReview(quoteId: string) { this.updateQuoteStatus(quoteId, "manual_review"); }
+
+  /**
+   * Retention policy for personal data (see Docs/operaciones/logs-y-retencion.md). The buyer's email and
+   * shipping address are only needed until Shopify has the order or the quote expired unpaid, so they are
+   * blanked after a grace period; the raw facilitator receipt goes with them once the order is old enough.
+   * Quotes that still need an operator (payment_unknown, manual_review, shopify_failed, in-flight states)
+   * are never touched. Amounts, statuses, hashes and the audit trail stay. Dry run unless `apply` is true.
+   */
+  purgePersonalData(input: { expiredAfterDays: number; orderedAfterDays: number; now?: Date; apply: boolean }): Array<{ quoteId: string; status: QuoteStatus; reason: "unpaid" | "ordered"; purged: boolean }> {
+    const at = input.now ?? new Date();
+    const day = 24 * 60 * 60 * 1000;
+    const expiredCutoff = new Date(at.getTime() - input.expiredAfterDays * day).toISOString();
+    const orderedCutoff = new Date(at.getTime() - input.orderedAfterDays * day).toISOString();
+    const candidates = this.db.prepare(`
+      SELECT q.id, q.status, CASE WHEN o.id IS NULL THEN 'unpaid' ELSE 'ordered' END AS reason
+      FROM quote q LEFT JOIN orders o ON o.quote_id = q.id
+      WHERE q.personal_data_purged_at IS NULL
+        AND ((o.id IS NULL AND q.status IN ('quoted', 'payment_required', 'expired', 'out_of_stock', 'payment_failed') AND q.expires_at <= ?)
+          OR (o.id IS NOT NULL AND q.status = 'created' AND o.created_at <= ?))
+      ORDER BY q.created_at`).all(expiredCutoff, orderedCutoff) as Array<{ id: string; status: QuoteStatus; reason: "unpaid" | "ordered" }>;
+    if (!input.apply) return candidates.map((row) => ({ quoteId: row.id, status: row.status, reason: row.reason, purged: false }));
+    const purgeQuote = this.db.prepare("UPDATE quote SET email = '', shipping_address_json = '{}', personal_data_purged_at = ? WHERE id = ? AND personal_data_purged_at IS NULL");
+    const purgeReceipt = this.db.prepare("UPDATE payment SET facilitator_receipt_json = NULL WHERE quote_id = ?");
+    const purgedAt = at.toISOString();
+    this.db.exec("BEGIN");
+    try {
+      for (const row of candidates) {
+        purgeQuote.run(purgedAt, row.id);
+        if (row.reason === "ordered") purgeReceipt.run(row.id);
+      }
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    return candidates.map((row) => ({ quoteId: row.id, status: row.status, reason: row.reason, purged: true }));
+  }
+
+  personalDataPurgedAt(quoteId: string): string | null {
+    const row = this.db.prepare("SELECT personal_data_purged_at FROM quote WHERE id = ?").get(quoteId) as { personal_data_purged_at: string | null } | undefined;
+    return row?.personal_data_purged_at ?? null;
+  }
   close() { this.db.close(); }
 
   private quoteFromRow(row: Record<string, unknown>): QuoteRecord {
