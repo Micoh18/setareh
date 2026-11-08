@@ -19,6 +19,7 @@
     "reconcile:payment": "node ./node_modules/tsx/dist/cli.mjs src/reconcile-payment.ts",
     "reconcile:stuck": "node ./node_modules/tsx/dist/cli.mjs src/reconcile-stuck.ts",
     "metrics": "node ./node_modules/tsx/dist/cli.mjs src/metrics.ts",
+    "purge": "node ./node_modules/tsx/dist/cli.mjs src/purge.ts",
     "webhooks:ensure": "node ./node_modules/tsx/dist/cli.mjs src/webhooks-ensure.ts"
   },
   "dependencies": {
