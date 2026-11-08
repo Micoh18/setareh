@@ -74,6 +74,7 @@ export default defineConfig({
             { slug: 'operaciones/estados-y-recuperacion' },
             { slug: 'operaciones/despliegue' },
             { slug: 'operaciones/metricas' },
+            { slug: 'operaciones/logs-y-retencion' },
           ],
         },
         {

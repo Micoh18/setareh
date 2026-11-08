@@ -14,13 +14,26 @@ Las credenciales de la app pertenecen al entorno seguro del backend.
 
 ## Instalar la app
 
-La tienda recibe un enlace de instalación del equipo de Setareh, lo abre con
-su sesión de Shopify y aprueba los permisos. Shopify devuelve el control a
-Setareh, que verifica la firma de Shopify y un identificador de un solo uso
-antes de guardar el acceso. La tienda no envía credenciales por chat ni correo.
+La persona dueña o administradora recibe un enlace de instalación del equipo
+de Setareh, lo abre con su propia sesión de Shopify y aprueba los permisos en
+la pantalla de Shopify. Shopify devuelve el control a Setareh, que verifica la
+firma de Shopify, el dominio de la tienda y un identificador de un solo uso que
+vence a los 10 minutos antes de guardar el acceso cifrado. Ese acceso se
+renueva solo.
 
-El acceso queda guardado cifrado y se renueva solo. Si la tienda desinstala la
-app, Shopify avisa a Setareh y este borra sus tokens.
+Para instalar, Setareh **nunca** pide:
+
+- la contraseña de Shopify ni códigos MFA o de recuperación;
+- copiar o enviar tokens, client ID o client secret;
+- instalar programas ni dar acceso remoto al computador;
+- claves de ninguna wallet;
+- datos de clientes de la tienda.
+
+Si alguien pide alguna de esas cosas en nombre de Setareh, no es Setareh. El
+enlace legítimo lleva siempre a la pantalla de permisos de Shopify con el
+nombre de la app registrada y los scopes de la tabla siguiente. Shopify puede
+mostrar cuatro permisos en lugar de cinco porque agrupa `read_orders` dentro de
+`write_orders`; es normal y el preflight lo acepta.
 
 ## Permisos solicitados
 
@@ -56,10 +69,43 @@ El preflight debe confirmar conexión, scopes, una consulta de catálogo y
 capacidad x402 para `stellar:testnet`. Realiza después una compra de prueba de
 bajo importe y verifica una orden real en Shopify Admin.
 
-## Operación y revocación
+## Operación
 
 En Shopify Admin el comercio puede revisar drafts, nuevas órdenes, stock y el
-metafield de evidencia. Para pausar el piloto, deshabilita el comercio en el
-entorno Setareh. Para revocar el acceso a la tienda, desinstala la app desde
-**Settings → Apps and sales channels**; esto no borra productos ni órdenes ya
-existentes.
+metafield de evidencia. Para pausar el piloto sin desinstalar, pide al equipo
+de Setareh que deshabilite el comercio en su entorno.
+
+## Desinstalar
+
+La persona dueña revoca el acceso por completo desde su sesión, sin avisar ni
+entregar nada:
+
+1. Shopify Admin → **Settings → Apps and sales channels**.
+2. Localizar **Setareh** → **Uninstall** → confirmar.
+3. Opcional: borrar en **Orders → Drafts** los drafts de prueba con etiqueta
+   `setareh` que no se completaron. Setareh no los necesita.
+
+Qué ocurre después:
+
+| Quién | Qué |
+| --- | --- |
+| Shopify | Revoca los tokens de la app y envía a Setareh el webhook `app/uninstalled`, firmado. |
+| Setareh | Verifica la firma, marca la instalación como desinstalada y borra sus copias de los tokens. Cualquier intento de cotizar en esa tienda falla con un error de instalación, no con datos. |
+
+Qué permanece y quién lo borra, si quiere:
+
+| Permanece | Dónde | Quién lo borra |
+| --- | --- | --- |
+| Productos, inventario, órdenes creadas por Setareh con su nota, etiqueta y metafield `setareh.stellar_payment`. | Shopify | El comercio, con las herramientas normales de Shopify. Setareh no toca la tienda al desinstalar. |
+| Historial de quotes, pagos y órdenes, y la pista de auditoría. | Setareh | Según la [política de retención](/operaciones/logs-y-retencion/). |
+| Un registro de que hubo una instalación y cuándo terminó, sin tokens. | Setareh | Se conserva. |
+
+Lo que desaparece: los tokens (revocados por Shopify y borrados por Setareh) y
+la capacidad de Setareh de leer catálogo, crear drafts o completar órdenes en
+esa tienda.
+
+Para volver a conectar la tienda se repite la instalación; Shopify entrega
+tokens nuevos. Antes de desinstalar conviene que no haya quotes en
+`payment_pending`, `payment_unknown` ni `manual_review`, porque Setareh no
+podrá completar sus órdenes después (ver
+[estados y recuperación](/operaciones/estados-y-recuperacion/)).
