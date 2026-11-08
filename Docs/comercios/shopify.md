@@ -47,9 +47,11 @@ tres categorías en lenguaje llano. Así se vio en el piloto:
   compra (nombre, dirección, correo). Setareh sólo lee el pedido que acaba de
   crear, para conciliarlo; en el piloto esos datos son los que el propio agente
   envió al cotizar.
-- **«Ver datos de empleados y colaboradores: propietario de tienda».** Shopify
-  lo agrupa con el acceso a la tienda y a los pedidos. Setareh no consulta
-  empleados ni colaboradores.
+- **«Ver datos de empleados y colaboradores: propietario de tienda».** Lo
+  muestra para cualquier app: según Shopify, toda app instalada tiene acceso a
+  los datos de contacto de la cuenta propietaria de la tienda, pida el scope
+  que pida. No corresponde a un permiso de Setareh que se pueda quitar, y
+  Setareh no consulta empleados ni colaboradores.
 - **«Ver y editar datos de la tienda: productos, pedidos».** Es el uso real:
   leer catálogo y stock, crear el borrador de pedido y completarlo tras el pago.
 
