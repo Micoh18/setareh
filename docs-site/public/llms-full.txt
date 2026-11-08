@@ -878,13 +878,26 @@ Las credenciales de la app pertenecen al entorno seguro del backend.
 
 ## Instalar la app
 
-La tienda recibe un enlace de instalación del equipo de Setareh, lo abre con
-su sesión de Shopify y aprueba los permisos. Shopify devuelve el control a
-Setareh, que verifica la firma de Shopify y un identificador de un solo uso
-antes de guardar el acceso. La tienda no envía credenciales por chat ni correo.
+La persona dueña o administradora recibe un enlace de instalación del equipo
+de Setareh, lo abre con su propia sesión de Shopify y aprueba los permisos en
+la pantalla de Shopify. Shopify devuelve el control a Setareh, que verifica la
+firma de Shopify, el dominio de la tienda y un identificador de un solo uso que
+vence a los 10 minutos antes de guardar el acceso cifrado. Ese acceso se
+renueva solo.
 
-El acceso queda guardado cifrado y se renueva solo. Si la tienda desinstala la
-app, Shopify avisa a Setareh y este borra sus tokens.
+Para instalar, Setareh **nunca** pide:
+
+- la contraseña de Shopify ni códigos MFA o de recuperación;
+- copiar o enviar tokens, client ID o client secret;
+- instalar programas ni dar acceso remoto al computador;
+- claves de ninguna wallet;
+- datos de clientes de la tienda.
+
+Si alguien pide alguna de esas cosas en nombre de Setareh, no es Setareh. El
+enlace legítimo lleva siempre a la pantalla de permisos de Shopify con el
+nombre de la app registrada y los scopes de la tabla siguiente. Shopify puede
+mostrar cuatro permisos en lugar de cinco porque agrupa `read_orders` dentro de
+`write_orders`; es normal y el preflight lo acepta.
 
 ## Permisos solicitados
 
@@ -920,13 +933,46 @@ El preflight debe confirmar conexión, scopes, una consulta de catálogo y
 capacidad x402 para `stellar:testnet`. Realiza después una compra de prueba de
 bajo importe y verifica una orden real en Shopify Admin.
 
-## Operación y revocación
+## Operación
 
 En Shopify Admin el comercio puede revisar drafts, nuevas órdenes, stock y el
-metafield de evidencia. Para pausar el piloto, deshabilita el comercio en el
-entorno Setareh. Para revocar el acceso a la tienda, desinstala la app desde
-**Settings → Apps and sales channels**; esto no borra productos ni órdenes ya
-existentes.
+metafield de evidencia. Para pausar el piloto sin desinstalar, pide al equipo
+de Setareh que deshabilite el comercio en su entorno.
+
+## Desinstalar
+
+La persona dueña revoca el acceso por completo desde su sesión, sin avisar ni
+entregar nada:
+
+1. Shopify Admin → **Settings → Apps and sales channels**.
+2. Localizar **Setareh** → **Uninstall** → confirmar.
+3. Opcional: borrar en **Orders → Drafts** los drafts de prueba con etiqueta
+   `setareh` que no se completaron. Setareh no los necesita.
+
+Qué ocurre después:
+
+| Quién | Qué |
+| --- | --- |
+| Shopify | Revoca los tokens de la app y envía a Setareh el webhook `app/uninstalled`, firmado. |
+| Setareh | Verifica la firma, marca la instalación como desinstalada y borra sus copias de los tokens. Cualquier intento de cotizar en esa tienda falla con un error de instalación, no con datos. |
+
+Qué permanece y quién lo borra, si quiere:
+
+| Permanece | Dónde | Quién lo borra |
+| --- | --- | --- |
+| Productos, inventario, órdenes creadas por Setareh con su nota, etiqueta y metafield `setareh.stellar_payment`. | Shopify | El comercio, con las herramientas normales de Shopify. Setareh no toca la tienda al desinstalar. |
+| Historial de quotes, pagos y órdenes, y la pista de auditoría. | Setareh | Según la [política de retención](/operaciones/logs-y-retencion/). |
+| Un registro de que hubo una instalación y cuándo terminó, sin tokens. | Setareh | Se conserva. |
+
+Lo que desaparece: los tokens (revocados por Shopify y borrados por Setareh) y
+la capacidad de Setareh de leer catálogo, crear drafts o completar órdenes en
+esa tienda.
+
+Para volver a conectar la tienda se repite la instalación; Shopify entrega
+tokens nuevos. Antes de desinstalar conviene que no haya quotes en
+`payment_pending`, `payment_unknown` ni `manual_review`, porque Setareh no
+podrá completar sus órdenes después (ver
+[estados y recuperación](/operaciones/estados-y-recuperacion/)).
 
 ## Evidencia pública de referencia
 
@@ -1304,6 +1350,83 @@ liquidado. Primero consulta `get_order_status` o concilia el `quoteId` original;
 si el estado es `payment_unknown`, usa `reconcile:payment` antes que nada.
 Setareh vincula un pago y una orden a cada quote para mantener idempotencia,
 pero las personas que operan el sistema deben conservar esa misma disciplina.
+
+## Logs y retención de datos
+
+URL canónica: /operaciones/logs-y-retencion/
+
+Los logs sirven para diagnosticar una compra por su `correlationId` sin
+revelar quién compró ni con qué clave. La pista de auditoría durable es la base
+de datos, no el stream de logs.
+
+## Qué se escribe
+
+- **Formato.** Una línea JSON por evento en `stderr` (stdout lleva el protocolo
+  MCP). Campos fijos: `ts`, `level`, `event` y `correlationId` cuando existe.
+- **Lista permitida.** Sólo se escriben estos campos; cualquier otro se descarta
+  antes de serializar: `quoteId`, `orderId`, `shopifyOrderName`, `from`, `to`,
+  `status`, `outcome`, `verdict`, `reason`, `errorCode`, `message`,
+  `transactionHash`, `network`, `amount`, `method`, `route`, `httpStatus`,
+  `durationMs`, `operation`, `attempt`, `tool`, `shop`, `action`, `transport`,
+  `url`, `authMode`, `oauthRoutes`.
+- **Redacción.** Todo texto pasa por filtros antes de escribirse: correos →
+  `[email]`; seeds Stellar → `[stellar-secret]`; tokens de Shopify →
+  `[shopify-token]`; cabeceras `Bearer`/`Basic` → `[credential]`; blobs
+  codificados largos (pagos firmados, XDR) → `[blob]`. Los textos se truncan a
+  300 caracteres.
+- **Nunca se registran.** Variables de las llamadas a Shopify, argumentos de las
+  tools MCP, cuerpos HTTP, direcciones de envío, el payload firmado x402, el
+  receipt crudo del facilitador ni valores de configuración.
+- **Errores `500`.** La respuesta al cliente es genérica; el detalle interno
+  queda sólo en el log redactado bajo el `correlationId`.
+- **Correlación.** Cada request HTTP y cada tool MCP recibe un `correlationId`
+  (el `X-Request-Id` del cliente si es un token opaco, o un UUID). Se devuelve
+  en la respuesta, acompaña cada línea de log y se persiste en `quote_event`.
+
+Estas reglas están cubiertas por pruebas automáticas que fallan si un campo
+fuera de la lista o un secreto sin redactar llega a una línea de log.
+
+## Dónde se guarda cada dato y por cuánto tiempo
+
+| Fuente | Contenido | Retención |
+| --- | --- | --- |
+| Stream de logs del servidor | Líneas JSON redactadas. | La del proveedor de despliegue: corta y no garantizada. Setareh no la extiende ni exporta automáticamente. |
+| `quote_event` | Transiciones de estado por quote con `correlationId` y hora. Sin datos personales. | Mientras exista el piloto: es la pista de auditoría. |
+| `payment_attempt` | Resultado de cada intento de pago: motivo, dirección pública del pagador, monto, ledger de expiración. | Mientras exista el piloto. |
+| `quote`, `payment`, `orders` | Líneas, montos, correo y dirección de envío de la persona compradora, hash Stellar, receipt del facilitador, IDs de orden. | Hoy indefinida. Objetivo declarado más abajo. |
+| Snapshots del volumen | Copia de la base de datos. | Valores por defecto del proveedor. Contienen datos personales y tokens cifrados, sin la clave de cifrado. |
+| Métricas | Agregados por estado, latencias y tasas de error, calculados bajo demanda. Sin datos personales. | Se publican agregados en [Evidencia](/evidencia/). |
+| Shopify | Draft, orden, nota, etiqueta `setareh` y metafield `setareh.stellar_payment`. | Política de Shopify y del comercio. |
+| Stellar testnet | Transacciones públicas. | Permanente en la cadena; el RPC público conserva alrededor de 7 días consultables. |
+
+## Política de retención
+
+1. **Logs del servidor:** efímeros. Sólo se exportan para evidencia de un
+   incidente o de una compra de evaluador, filtrados por `correlationId` y
+   guardados en canales privados.
+2. **Pista de auditoría (`quote_event`, `payment_attempt`):** se conserva
+   mientras exista el piloto. No contiene datos personales.
+3. **Datos personales de quotes (correo, dirección):** sólo hacen falta hasta
+   que la orden existe en Shopify o el quote vence sin pago. Objetivo: purgar
+   esos campos de los quotes vencidos sin orden a los 30 días del vencimiento y
+   de los quotes con orden a los 90 días de creada la orden, conservando
+   montos, estados y hash. **Estado: no implementado todavía**; figura como
+   riesgo abierto en [Seguridad](/seguridad/).
+4. **Receipt del facilitador:** se conserva como prueba del settlement y nunca
+   se expone por API. Misma purga de 90 días una vez conciliada la orden.
+5. **Evidencia pública:** sólo hashes, IDs de orden truncados, `quoteId`,
+   agregados de métricas y lo que evaluadores y comercios autoricen por escrito.
+
+## Cómo se entrega un extracto a un evaluador o a un comercio
+
+1. Se pide el `quoteId` o el `X-Request-Id` que usó el cliente.
+2. En el servidor se filtran los logs por ese `correlationId`, se consultan las
+   filas de `quote_event` del quote y el estado público `GET /v1/orders/<quoteId>`.
+3. Se revisa a mano que no aparezca correo, dirección, seed ni token, y se
+   redacta el dominio de la tienda si no está autorizado.
+4. El extracto se guarda con fecha UTC y commit del servicio en canales
+   privados; en esta documentación sólo se publican hash, estado final y
+   `quoteId`.
 
 ## Métricas
 
@@ -1788,6 +1911,7 @@ URL canónica: /seguridad/
   Stellar) y todo texto se filtra contra emails, seeds Stellar, tokens Shopify,
   credenciales y blobs codificados como pagos firmados. Las variables de las
   llamadas a Shopify y los argumentos de las tools MCP nunca se registran.
+  Detalle y retención en [Logs y retención](/operaciones/logs-y-retencion/).
 - Cada request HTTP y cada tool MCP lleva un `correlationId` (el `X-Request-Id`
   del cliente si es un token opaco, o un UUID generado) que se devuelve en la
   respuesta y acompaña cada línea de log y cada cambio de estado del quote,
@@ -1815,17 +1939,61 @@ URL canónica: /seguridad/
 
 ### Amenazas, controles y riesgo residual
 
+Revisado el 2026-11-08 con lo observado en el piloto (semanas 1 a 3 de la
+[evidencia](/evidencia/)). Cada control está cubierto por una prueba
+automática o por un incidente real documentado.
+
 | Amenaza | Control actual | Riesgo que permanece |
 | --- | --- | --- |
-| Agente intenta pagar más, con otro activo/red/destino o tras expirar el quote | El backend compara red, activo, destinatario, monto y vencimiento contra el quote; la wallet tiene límites locales. | La configuración de límites y la wallet siguen siendo responsabilidad del operador/agente. |
-| Reintento concurrente crea dos órdenes o dos cargos | Una fila de pago/orden por quote; reclamación atómica del settlement (un solo pago llega al facilitador) y de la creación de orden. | Casos de infraestructura no probados deben pasar a conciliación, no asumirse como éxito. |
-| El facilitador no responde o responde de forma ambigua tras enviar la transacción | El quote queda en `payment_unknown`, bloqueado para nuevos pagos; `reconcile:payment` lo resuelve contra la red y sólo lo declara impago cuando la autorización firmada expiró. No se guarda el payload firmado. | Fuera de la retención del RPC (~7 días en testnet) la conciliación requiere un hash aportado por el operador. |
-| Shopify no responde o limita las llamadas | Cada llamada tiene un plazo; las lecturas reintentan con backoff acotado y `Retry-After`; crear y completar drafts no se reintenta nunca, porque una respuesta perdida puede haber creado la orden. | Un timeout al completar el draft deja el quote en `manual_review` hasta conciliar con `reconcile:order`. |
-| Shopify falla después de un settlement válido | Se conserva evidencia y el estado pasa a `manual_review`; el runbook impide reintentar el pago a ciegas. | No hay reembolso automático ni resolución comercial automatizada. |
-| Facilitador o respuesta x402 no coincide con el quote | Se valida el requisito de pago y su settlement antes de completar Shopify. | El facilitador sigue siendo una dependencia externa que debe evaluarse para producción. |
-| Se filtran claves, PII o receipts | `.env` está ignorado, `get_order_status` entrega un resumen, los logs se redactan con lista permitida y filtros, las respuestas `500` son genéricas y los docs prohíben publicar datos sensibles. | No hay gestor centralizado de secretos, DLP ni auditoría externa en el MVP; la retención de logs depende del proveedor. |
-| Instalación OAuth falsificada o repetida | El callback exige firma HMAC de Shopify, dominio `*.myshopify.com` anclado y un `state` de un solo uso que vence en 10 minutos; el webhook de desinstalación exige firma sobre el cuerpo crudo. | La clave de cifrado vive en el entorno del servidor; quien controle ese entorno puede descifrar los tokens. |
-| Endpoint público recibe abuso o tráfico no autorizado | La creación de quotes, que genera drafts reales en Shopify, está limitada por cliente y en total por hora (`429` con `Retry-After`); el despliegue termina HTTPS. | El límite vive en memoria de una sola instancia; no hay autenticación de agentes, WAF ni control de acceso por comercio. |
+| Agente intenta pagar más, con otro activo/red/destino o tras expirar el quote | El backend compara red, activo, destinatario, monto y vencimiento contra el quote congelado; tope por quote en el servidor; límite local en el cliente. | Los límites del lado agente los configura quien lo opera; el servidor sigue rechazando montos distintos al quote. |
+| Reintento concurrente crea dos órdenes o dos cargos | Una fila de pago y una orden por quote; reclamación atómica del settlement y de la creación de orden; `409` para un quote ya pagado. | Casos de infraestructura no probados pasan a conciliación, no se asumen como éxito. |
+| El facilitador no responde o responde `504` **después de haber enviado la transacción** | El quote queda en `payment_unknown`, bloqueado para nuevos pagos; `reconcile:payment` lo resuelve contra la red (con `--tx` si el RPC ya no tiene el historial) y sólo lo declara impago cuando la autorización firmada expiró. Ocurrió el 2026-11-05 y se resolvió así. | Requiere operador: no hay autoconciliación programada. El facilitador público no tiene SLA. |
+| Facilitador o RPC suplantados afirman un settlement que no ocurrió | El backend valida que el settlement coincida con el quote; la URL del facilitador es configuración del servidor, no del cliente; `reconcile:payment` consulta la red por hash. | No se verifica el hash en la red **antes** de crear la orden; se confía en la respuesta del facilitador configurado. |
+| Shopify no responde o limita las llamadas | Cada llamada tiene un plazo; las lecturas reintentan con backoff acotado y `Retry-After`; crear y completar drafts no se reintenta nunca. | Un timeout al completar el draft deja el quote en `manual_review` hasta conciliar con `reconcile:order`. |
+| Shopify falla después de un settlement válido | Se conserva evidencia y el estado pasa a `manual_review`; el runbook impide reintentar el pago a ciegas. | No hay reembolso automático. |
+| Se filtran claves, datos personales o receipts | Lista permitida y filtros en los logs; respuestas `500` genéricas; `get_order_status` entrega un resumen; CI revisa los docs; [política de logs y retención](/operaciones/logs-y-retencion/). | Datos personales de quotes sin purga automática; snapshots del proveedor contienen la base; sin gestor de secretos ni DLP. |
+| Instalación OAuth falsificada, repetida o con permisos insuficientes | El callback exige firma HMAC de Shopify, dominio `*.myshopify.com` anclado al configurado y un `state` de un solo uso que vence en 10 minutos; se verifican los scopes concedidos; los tokens se guardan cifrados. | Quien controle el entorno del servidor puede descifrar los tokens. |
+| Suplantación ante la persona dueña: alguien le envía un enlace de otra app haciéndose pasar por Setareh | El enlace legítimo lleva a la pantalla de permisos de Shopify con la app registrada y los scopes publicados; la [guía](/comercios/shopify/) dice qué no se pide nunca. | Setareh no puede impedir que la dueña apruebe otra app; el control es la guía y el canal privado. |
+| Desinstalación no propagada | El webhook `app/uninstalled` firmado borra los tokens; Shopify ya los revocó, así que cualquier llamada falla igual. | Si la suscripción al webhook se pierde, el registro local queda activo con tokens inútiles hasta que una llamada falle o un operador lo revoque. |
+| Endpoint público recibe abuso (drafts reales, stock agotado) | La creación de quotes está limitada por cliente y en total por hora (`429` con `Retry-After`); el despliegue termina HTTPS. | Límite en memoria de una sola instancia; sin autenticación de agentes, WAF ni control por comercio. |
+| El agente altera datos de la persona compradora sin avisar | Las instrucciones del MCP comprador exigen mostrar el quote completo antes de pedir confirmación y avisar de cualquier corrección. | Depende del modelo que ejecute el agente; no hay validación estructural de que lo mostrado sea lo enviado. |
+| La red cambia de protocolo y el cliente o el servidor dejan de decodificar | SDK de Stellar fijado en una versión mínima y requisito en la guía; ocurrió con el Protocolo 30 el 2026-11-05. | El preflight consulta JSON, no XDR: la incompatibilidad se detecta en el primer pago. |
+| Dependencias vulnerables en producción | La CI falla ante cualquier aviso de `npm audit` no aceptado; las excepciones llevan paquete, ruta y fecha de vencimiento. Desde el 2026-11-07 no hay excepciones activas. | El árbol incluye dos copias del SDK de Stellar (la principal y una anidada en la librería x402), que hay que vigilar en cada cambio de protocolo. |
+
+## Secretos: qué existe y quién lo custodia
+
+| Secreto | Custodio | Dónde vive | Si se expone |
+| --- | --- | --- | --- |
+| Secreto de la app Shopify (`SHOPIFY_CLIENT_SECRET`) | Operador de Setareh | Gestor de secretos del despliegue; nunca en Git. | Se regenera en Shopify y se redespliega; las instalaciones existentes siguen válidas. |
+| Clave de cifrado de tokens (`SETAREH_TOKEN_ENCRYPTION_KEY`) | Operador de Setareh | Gestor de secretos del despliegue. | Se rota y las tiendas reinstalan; sin la base de datos la clave sola no sirve. |
+| Tokens OAuth de cada tienda | Setareh, derivados de la aprobación de la dueña | Base de datos, cifrados; duran 1 hora y se renuevan solos. | La dueña desinstala desde Shopify y quedan revocados. |
+| Clave de la wallet compradora (`AGENT_STELLAR_PRIVATE_KEY`) | Quien opera el agente | `agent.env` en la máquina del agente; nunca llega al servidor. | Se vacía la wallet a una nueva. |
+| Clave de la wallet receptora del comercio | Comercio | Fuera de Setareh; Setareh sólo conoce la dirección pública. | Fuera de Setareh. |
+
+Configuración sensible que no es secreta pero cambia el comportamiento
+(dirección receptora, tasa, tope por quote, dominio de tienda, URL del
+facilitador) vive en la configuración del despliegue, se refleja en la salida
+de `doctor` y queda congelada en cada quote.
+
+Lo que Setareh no tiene ni pide: contraseña, MFA ni códigos de recuperación de
+la tienda; tokens entregados por chat o correo; claves de ninguna wallet;
+datos de clientes de la tienda más allá de la dirección y el correo que la
+persona compradora entrega para su propia orden.
+
+## Riesgos abiertos (2026-11-08)
+
+1. Facilitador x402 público sin SLA que puede liquidar y responder `504`.
+2. Sin autoconciliación programada de `payment_unknown`; requiere operador.
+3. Datos personales de quotes sin purga automática; política declarada,
+   implementación pendiente.
+4. Sin gestor de secretos ni rotación automatizada; la clave de cifrado vive
+   en el entorno del servidor.
+5. Rate limit en memoria y sin autenticación de agentes; no apto para
+   exposición productiva.
+6. Preflight ciego a cambios de XDR; se detectan en el primer pago.
+7. Dos copias del SDK de Stellar en el árbol de dependencias.
+8. Instalar el entorno del agente sigue costando unos 45 minutos a una persona
+   no técnica. No es un riesgo de seguridad, pero sí de adopción.
 
 ## Datos que nunca deben aparecer en este sitio
 
