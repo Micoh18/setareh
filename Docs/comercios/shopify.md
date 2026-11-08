@@ -30,9 +30,31 @@ Para instalar, Setareh **nunca** pide:
 - datos de clientes de la tienda.
 
 Si alguien pide alguna de esas cosas en nombre de Setareh, no es Setareh. El
-enlace legítimo lleva siempre a la pantalla de permisos de Shopify con el
-nombre de la app registrada y los scopes de la tabla siguiente. Shopify puede
-mostrar cuatro permisos en lugar de cinco porque agrupa `read_orders` dentro de
+enlace legítimo lleva siempre a la pantalla «Instalar app» de Shopify con el
+nombre de la app registrada.
+
+## Qué muestra la pantalla de Shopify
+
+Shopify no enseña los scopes técnicos de la tabla siguiente, sino un aviso y
+tres categorías en lenguaje llano. Así se vio en el piloto:
+
+- **«Esta app aún no se ha revisado».** Es normal: Setareh se instala por
+  distribución personalizada en una sola tienda y no pasa por la revisión de la
+  App Store de Shopify. El aviso pide confiar en el desarrollador; esta guía y
+  la [evidencia](/evidencia/) existen para que esa confianza tenga base.
+- **«Ver datos de clientes: datos sensibles, datos del dispositivo y de la
+  actividad».** Aparece porque el acceso a pedidos incluye los datos de quien
+  compra (nombre, dirección, correo). Setareh sólo lee el pedido que acaba de
+  crear, para conciliarlo; en el piloto esos datos son los que el propio agente
+  envió al cotizar.
+- **«Ver datos de empleados y colaboradores: propietario de tienda».** Shopify
+  lo agrupa con el acceso a la tienda y a los pedidos. Setareh no consulta
+  empleados ni colaboradores.
+- **«Ver y editar datos de la tienda: productos, pedidos».** Es el uso real:
+  leer catálogo y stock, crear el borrador de pedido y completarlo tras el pago.
+
+Al desplegar cada categoría se ven los permisos técnicos. Shopify puede
+mostrar cuatro en lugar de cinco porque agrupa `read_orders` dentro de
 `write_orders`; es normal y el preflight lo acepta.
 
 ## Permisos solicitados
