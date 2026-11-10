@@ -894,9 +894,33 @@ Para instalar, Setareh **nunca** pide:
 - datos de clientes de la tienda.
 
 Si alguien pide alguna de esas cosas en nombre de Setareh, no es Setareh. El
-enlace legítimo lleva siempre a la pantalla de permisos de Shopify con el
-nombre de la app registrada y los scopes de la tabla siguiente. Shopify puede
-mostrar cuatro permisos en lugar de cinco porque agrupa `read_orders` dentro de
+enlace legítimo lleva siempre a la pantalla «Instalar app» de Shopify con el
+nombre de la app registrada.
+
+## Qué muestra la pantalla de Shopify
+
+Shopify no enseña los scopes técnicos de la tabla siguiente, sino un aviso y
+tres categorías en lenguaje llano. Así se vio en el piloto:
+
+- **«Esta app aún no se ha revisado».** Es normal: Setareh se instala por
+  distribución personalizada en una sola tienda y no pasa por la revisión de la
+  App Store de Shopify. El aviso pide confiar en el desarrollador; esta guía y
+  la [evidencia](/evidencia/) existen para que esa confianza tenga base.
+- **«Ver datos de clientes: datos sensibles, datos del dispositivo y de la
+  actividad».** Aparece porque el acceso a pedidos incluye los datos de quien
+  compra (nombre, dirección, correo). Setareh sólo lee el pedido que acaba de
+  crear, para conciliarlo; en el piloto esos datos son los que el propio agente
+  envió al cotizar.
+- **«Ver datos de empleados y colaboradores: propietario de tienda».** Lo
+  muestra para cualquier app: según Shopify, toda app instalada tiene acceso a
+  los datos de contacto de la cuenta propietaria de la tienda, pida el scope
+  que pida. No corresponde a un permiso de Setareh que se pueda quitar, y
+  Setareh no consulta empleados ni colaboradores.
+- **«Ver y editar datos de la tienda: productos, pedidos».** Es el uso real:
+  leer catálogo y stock, crear el borrador de pedido y completarlo tras el pago.
+
+Al desplegar cada categoría se ven los permisos técnicos. Shopify puede
+mostrar cuatro en lugar de cinco porque agrupa `read_orders` dentro de
 `write_orders`; es normal y el preflight lo acepta.
 
 ## Permisos solicitados
@@ -1000,6 +1024,7 @@ liquidación sin exponer información operativa o personal.
 | 2026-10-27 00:56:32 | USDC testnet · 10.0000000 | [`2faf68…bed52f`](https://horizon-testnet.stellar.org/transactions/2faf68f8e2946d26153a3658281486063b18508ff629173554df539864bed52f) | 5,407,801 |
 | 2026-11-05 02:18:00 | USDC testnet · 4.0000000 | [`641805…36c6eb`](https://horizon-testnet.stellar.org/transactions/6418057b75cbf85fa0058fe81a902e4cf018805958c06b128c9e1c4a9936c6eb) | 5,564,288 |
 | 2026-11-06 21:07:16 | USDC testnet · 8.0000000 | [`917dbf…d007cec`](https://horizon-testnet.stellar.org/transactions/917dbf9b448f93bcfa8cd690979523731efbb4477a05f7f3bcc453163d007cec) | 5,595,119 |
+| 2026-11-08 13:40:57 | USDC testnet · 4.0000000 | [`374e3b…606736`](https://horizon-testnet.stellar.org/transactions/374e3b35329bf6362eb4284fde4b0dd30bdf61b735bf9de053232fb4a1606736) | 5,624,323 |
 
 Las de octubre 26 y 27 se ejecutaron contra el entorno publicado
 (`api.setareh.site`) con el código de la semana 2, cada una seguida de un
@@ -1009,7 +1034,11 @@ de noviembre son las de la semana 3, pagadas por un agente a través del MCP
 del lado comprador: la del día 5 contra el entorno publicado (orden `#1005`,
 conciliada contra la red tras un `504` del facilitador) y la del día 6 contra
 una instancia local conectada a la misma tienda y a la misma red (orden
-`#1006`, seguida de un reintento rechazado con `409`). Todas
+`#1006`, seguida de un reintento rechazado con `409`). La del 8 de noviembre
+es la compra de humo de la semana 4, hecha contra el entorno publicado justo
+después de que la persona dueña de la tienda reinstalara la app desde su
+propia sesión (orden `#1007`, conciliada contra la red tras otro `504` del
+facilitador, seguida de un reintento rechazado con `409`). Todas
 las trazas deben mostrar `successful: true` en Horizon. Stellar testnet puede
 reiniciarse o borrar historial; esta página no debe interpretarse como
 evidencia duradera de fondos reales.
@@ -1093,6 +1122,112 @@ transacción ya enviada a la red, así que un `504` no significa "no se cobró";
 el chequeo previo no detecta un cambio de protocolo de testnet porque sólo
 consulta JSON; y la instalación previa (Node, Git, Claude Code, wallet,
 faucet) sigue siendo el mayor obstáculo para una persona no técnica.
+
+## Instalación aprobada por la persona dueña de la tienda
+
+Semana 4 del sprint: la persona dueña de la tienda piloto revoca y vuelve a
+aprobar la app desde su propia sesión de Shopify, sin compartir secretos, y el
+servicio demuestra el ciclo completo con logs y preflight. Estado al 8 de
+noviembre de 2026:
+
+| Evidencia | Dónde comprobarla |
+| --- | --- |
+| Desinstalación por la persona dueña | 8 de noviembre, 13:17:52 UTC: Shopify envió el webhook `app/uninstalled`, el servicio lo verificó (`200` en 2 ms) y borró sus copias de los tokens; el preflight pasó a «not installed». Antes no había ningún quote en vuelo |
+| Reinstalación desde su sesión | 13:24:16 UTC: callback OAuth verificado (firma, dominio, `state` de un solo uso), tokens nuevos cifrados y webhook de desinstalación recreado. El preflight `doctor -- --verify` volvió a `installed: true`, `active`, con catálogo y facilitador conectados a las 13:25:36 |
+| Qué no se pidió | Contraseña, códigos de verificación, tokens, instalar programas, acceso remoto, claves de wallet ni datos de clientes. La [guía para comercios](/comercios/shopify/) lo deja por escrito |
+| Lo que la persona dueña vio | La pantalla «Instalar app» de Shopify: un aviso de app no revisada y tres categorías en lenguaje llano (clientes, empleados y colaboradores, tienda), no los cinco scopes técnicos. Preguntó por ello; la guía se corrigió para explicar cada categoría |
+| Compra de humo tras la reinstalación | Quote de 4 USDC contra `api.setareh.site`; el facilitador respondió `402` vacío con la transacción ya enviada (tercera vez en el piloto); el quote quedó en `payment_unknown` y se concilió con `reconcile:payment --tx`; orden `#1007`, transacción `374e3b…606736` en la tabla superior |
+| Reintento controlado | Mismo quote: `409` antes de firmar, estado `created`, misma orden y mismo hash, saldo sin cambios |
+| Confirmación de la persona dueña | Autoriza publicar el nombre de la tienda, su URL y el resultado de la sesión; la confirmación firmada de la sesión se incorporará cuando llegue |
+| Documentación de seguridad | [Seguridad](/seguridad/): modelo de amenazas revisado, inventario de secretos y riesgos abiertos; [Logs y retención](/operaciones/logs-y-retencion/): qué se escribe, qué se redacta y por cuánto tiempo; [Desinstalar](/comercios/shopify/#desinstalar) |
+| Auditoría de dependencias | Sin excepciones activas desde el 7 de noviembre: `@x402/*` 2.30 depende de zod 4 ([#21](https://github.com/Micoh18/setareh/pull/21)) |
+| Retención de datos personales | `npm run purge` aplica la política declarada ([#23](https://github.com/Micoh18/setareh/pull/23)); pendiente de desplegar en el piloto |
+
+Hallazgos de la semana: la pantalla de consentimiento de Shopify habla de
+«datos sensibles de clientes» aunque el único acceso a clientes sea leer el
+pedido recién creado, y la guía debe prepararlo; una dirección con provincia
+`RM` hace fallar el borrador en Shopify y el servicio devolvió `500` en vez de
+un error de validación; el chequeo previo del agente no avisa de saldo
+insuficiente antes de intentar pagar; y el facilitador público volvió a no
+responder con la transacción ya enviada, por lo que la conciliación manual
+sigue siendo parte del flujo.
+
+## Reporte final del sprint
+
+Cierre del sprint Instawards (19 de octubre a 13 de noviembre de 2026). Cada
+fila enlaza la evidencia pública que la sostiene; lo que no está demostrado se
+dice tal cual.
+
+**Objetivo aprobado.** Convertir el prototipo en un piloto externo,
+reproducible y auditable de comercio agentic sobre Stellar: servicio MCP/x402
+por HTTPS con CI, pruebas de fallos, logs y métricas redactados, modelo de
+amenazas y repetición por una persona evaluadora autorizada con USDC en
+`stellar:testnet`.
+
+**Resultado en una frase.** El servicio está publicado por HTTPS con CI; siete
+compras en testnet prueban que un reintento nunca duplica cobro ni orden; una
+evaluadora ajena al proyecto dirigió una compra; la persona dueña de la tienda
+revocó y volvió a aprobar la app desde su propia sesión sin compartir
+secretos; el modelo de amenazas, el inventario de secretos, la política de
+logs y la guía de desinstalación están publicados. Tres veces el facilitador
+público no respondió con la transacción ya enviada y las tres veces el
+servicio se detuvo y se concilió contra la red sin adivinar: ese es el riesgo
+abierto principal.
+
+### Hitos del sprint
+
+| Hito | Entregable | Estado | Evidencia |
+| --- | --- | --- | --- |
+| 1 · Servicio reproducible con CI | HTTPS, configuración por entorno, guía de release, CI | Entregado, semana 1 (19 al 23 de octubre) | [Entorno de piloto y CI](#entorno-de-piloto-y-ci), [Despliegue](/operaciones/despliegue/) |
+| 2 · Piloto auditable | Matriz de fallos F1 a F13, logs con `correlationId`, métricas, herramientas `reconcile:*` | Entregado, semana 2 (26 al 30 de octubre) | [Matriz de fallos, logs y métricas](#matriz-de-fallos-logs-y-métricas), [Estados y recuperación](/operaciones/estados-y-recuperacion/) |
+| 3 · Reproducción por un tercero | Guía para la persona evaluadora, MCP comprador, guía de instalación, preflight, modelo de amenazas, política de secretos y logs, reporte de repetición | Entregado, semanas 3 y 4 (2 al 13 de noviembre) | [Evaluadora independiente y MCP comprador](#evaluadora-independiente-y-mcp-comprador), [Instalación aprobada por la persona dueña de la tienda](#instalación-aprobada-por-la-persona-dueña-de-la-tienda), [Seguridad](/seguridad/) |
+
+### Criterios de éxito, uno por uno
+
+| Criterio aprobado | Cumplido | Cómo se demuestra | Matices |
+| --- | --- | --- | --- |
+| Servicio HTTPS reproducible con CI | Sí | Semana 1; CI en cada PR desde el [#1](https://github.com/Micoh18/setareh/pull/1) | Un solo proveedor y una sola región; sin alta disponibilidad |
+| Reintentos y fallos no producen doble cobro ni doble orden | Sí | Matriz F1 a F13 (70 pruebas automatizadas); órdenes `#1003` a `#1007`, cada una con un reintento rechazado con `409` | — |
+| Logs y métricas redactados, con correlación | Sí | Semana 2; [Logs y retención](/operaciones/logs-y-retencion/) | Los datos personales de los quotes se purgan con `npm run purge`, todavía manual, no programado |
+| Una persona evaluadora autorizada obtiene una orden por quote y el reintento no duplica | Sí, con límites | Orden `#1006` y reintento `409`, dirigidos por Cristina el 6 de noviembre | Sesión compartida en el computador del fundador y con su wallet; la repetición desde su propia máquina queda fuera del sprint |
+| La persona dueña aprueba los scopes sin compartir secretos | Sí | Ciclo revocar y reinstalar desde su sesión el 8 de noviembre, con logs y preflight | El equipo de Setareh también tiene acceso de administración a la tienda; la aprobación la hizo ella desde su sesión. Autorizó por escrito publicar nombre, URL y resultado; la confirmación firmada de la sesión se incorporará cuando llegue |
+| Una persona evaluadora puede repetir el flujo con la guía | Parcial | [Reproducir el piloto](/agentes/reproducir-el-piloto/) y MCP comprador; prueba de Cristina | La instalación previa cuesta unos 45 minutos a una persona no técnica |
+| Limitaciones y riesgos abiertos declarados | Sí | [Riesgos abiertos](/seguridad/#riesgos-abiertos-2026-11-08) | — |
+
+### Limitaciones y riesgos abiertos, sin suavizar
+
+Son los mismos que declara la página de [Seguridad](/seguridad/#riesgos-abiertos-2026-11-08):
+el facilitador x402 público no tiene SLA y puede liquidar y responder `504`;
+no hay autoconciliación programada de `payment_unknown`; la purga de datos
+personales es manual; no hay gestor de secretos ni rotación automatizada; el
+rate limit vive en memoria y no hay autenticación de agentes; el preflight no
+detecta cambios de XDR; el árbol de dependencias lleva dos copias del SDK de
+Stellar; y la instalación para personas no técnicas sigue siendo larga. El
+incidente del facilitador se declara aquí como riesgo abierto; reportarlo al
+operador del facilitador queda como paso siguiente, fuera del sprint, igual que
+un facilitador propio.
+
+### Qué sigue, fuera de este sprint
+
+- Verificar el hash en la red antes de completar el borrador de orden, para
+  no depender de la respuesta del facilitador.
+- Autoconciliación de `payment_unknown` y purga de datos personales
+  programadas.
+- Instalador único para personas evaluadoras no técnicas, sin que Setareh
+  custodie la wallet.
+- Multi-tenant, autenticación de agentes y mainnet, que requieren una revisión
+  de seguridad independiente.
+
+### Índice de evidencia
+
+| Semana | Sección de esta página | Código |
+| --- | --- | --- |
+| 1 (19 al 23 de octubre) | [Entorno de piloto y CI](#entorno-de-piloto-y-ci) | PRs [#1](https://github.com/Micoh18/setareh/pull/1) a [#3](https://github.com/Micoh18/setareh/pull/3), releases v1 a v8 |
+| 2 (26 al 30 de octubre) | [Matriz de fallos, logs y métricas](#matriz-de-fallos-logs-y-métricas) | PRs [#6](https://github.com/Micoh18/setareh/pull/6) a [#13](https://github.com/Micoh18/setareh/pull/13), releases v9 a v12 |
+| 3 (2 al 6 de noviembre) | [Evaluadora independiente y MCP comprador](#evaluadora-independiente-y-mcp-comprador) | PRs [#14](https://github.com/Micoh18/setareh/pull/14) a [#20](https://github.com/Micoh18/setareh/pull/20) |
+| 4 (9 al 13 de noviembre) | [Instalación aprobada por la persona dueña de la tienda](#instalación-aprobada-por-la-persona-dueña-de-la-tienda) | PRs [#21](https://github.com/Micoh18/setareh/pull/21) a [#24](https://github.com/Micoh18/setareh/pull/24) y el PR de cierre |
+| Transacciones | [Transacciones Stellar testnet](#transacciones-stellar-testnet) (siete, del 1 de octubre al 8 de noviembre) | — |
+| Repositorio | — | [github.com/Micoh18/setareh](https://github.com/Micoh18/setareh), licencia MIT |
 
 ## Criterio para declarar un piloto externo
 
@@ -1953,7 +2088,7 @@ automática o por un incidente real documentado.
 | Shopify falla después de un settlement válido | Se conserva evidencia y el estado pasa a `manual_review`; el runbook impide reintentar el pago a ciegas. | No hay reembolso automático. |
 | Se filtran claves, datos personales o receipts | Lista permitida y filtros en los logs; respuestas `500` genéricas; `get_order_status` entrega un resumen; CI revisa los docs; [política de logs y retención](/operaciones/logs-y-retencion/). | Datos personales de quotes sin purga automática; snapshots del proveedor contienen la base; sin gestor de secretos ni DLP. |
 | Instalación OAuth falsificada, repetida o con permisos insuficientes | El callback exige firma HMAC de Shopify, dominio `*.myshopify.com` anclado al configurado y un `state` de un solo uso que vence en 10 minutos; se verifican los scopes concedidos; los tokens se guardan cifrados. | Quien controle el entorno del servidor puede descifrar los tokens. |
-| Suplantación ante la persona dueña: alguien le envía un enlace de otra app haciéndose pasar por Setareh | El enlace legítimo lleva a la pantalla de permisos de Shopify con la app registrada y los scopes publicados; la [guía](/comercios/shopify/) dice qué no se pide nunca. | Setareh no puede impedir que la dueña apruebe otra app; el control es la guía y el canal privado. |
+| Suplantación ante la persona dueña: alguien le envía un enlace de otra app haciéndose pasar por Setareh | El enlace legítimo lleva a la pantalla de permisos de Shopify con la app registrada y los scopes publicados; la [guía](/comercios/shopify/) dice qué no se pide nunca. | Setareh no puede impedir que quien administra la tienda apruebe otra app; el control es la guía y el canal privado. |
 | Desinstalación no propagada | El webhook `app/uninstalled` firmado borra los tokens; Shopify ya los revocó, así que cualquier llamada falla igual. | Si la suscripción al webhook se pierde, el registro local queda activo con tokens inútiles hasta que una llamada falle o un operador lo revoque. |
 | Endpoint público recibe abuso (drafts reales, stock agotado) | La creación de quotes está limitada por cliente y en total por hora (`429` con `Retry-After`); el despliegue termina HTTPS. | Límite en memoria de una sola instancia; sin autenticación de agentes, WAF ni control por comercio. |
 | El agente altera datos de la persona compradora sin avisar | Las instrucciones del MCP comprador exigen mostrar el quote completo antes de pedir confirmación y avisar de cualquier corrección. | Depende del modelo que ejecute el agente; no hay validación estructural de que lo mostrado sea lo enviado. |
@@ -1966,7 +2101,7 @@ automática o por un incidente real documentado.
 | --- | --- | --- | --- |
 | Secreto de la app Shopify (`SHOPIFY_CLIENT_SECRET`) | Operador de Setareh | Gestor de secretos del despliegue; nunca en Git. | Se regenera en Shopify y se redespliega; las instalaciones existentes siguen válidas. |
 | Clave de cifrado de tokens (`SETAREH_TOKEN_ENCRYPTION_KEY`) | Operador de Setareh | Gestor de secretos del despliegue. | Se rota y las tiendas reinstalan; sin la base de datos la clave sola no sirve. |
-| Tokens OAuth de cada tienda | Setareh, derivados de la aprobación de la dueña | Base de datos, cifrados; duran 1 hora y se renuevan solos. | La dueña desinstala desde Shopify y quedan revocados. |
+| Tokens OAuth de cada tienda | Setareh, derivados de la aprobación de quien administra la tienda | Base de datos, cifrados; duran 1 hora y se renuevan solos. | La tienda desinstala la app desde Shopify y quedan revocados. |
 | Clave de la wallet compradora (`AGENT_STELLAR_PRIVATE_KEY`) | Quien opera el agente | `agent.env` en la máquina del agente; nunca llega al servidor. | Se vacía la wallet a una nueva. |
 | Clave de la wallet receptora del comercio | Comercio | Fuera de Setareh; Setareh sólo conoce la dirección pública. | Fuera de Setareh. |
 
