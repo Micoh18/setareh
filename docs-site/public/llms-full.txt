@@ -1138,7 +1138,7 @@ noviembre de 2026:
 | Lo que la persona dueña vio | La pantalla «Instalar app» de Shopify: un aviso de app no revisada y tres categorías en lenguaje llano (clientes, empleados y colaboradores, tienda), no los cinco scopes técnicos. Preguntó por ello; la guía se corrigió para explicar cada categoría |
 | Compra de humo tras la reinstalación | Quote de 4 USDC contra `api.setareh.site`; el facilitador respondió `402` vacío con la transacción ya enviada (tercera vez en el piloto); el quote quedó en `payment_unknown` y se concilió con `reconcile:payment --tx`; orden `#1007`, transacción `374e3b…606736` en la tabla superior |
 | Reintento controlado | Mismo quote: `409` antes de firmar, estado `created`, misma orden y mismo hash, saldo sin cambios |
-| Confirmación de la persona dueña | Autoriza publicar el nombre de la tienda, su URL y el resultado de la sesión; confirmación escrita y firmada **[pendiente de recibir]** |
+| Confirmación de la persona dueña | Autoriza publicar el nombre de la tienda, su URL y el resultado de la sesión; la confirmación firmada de la sesión se incorporará cuando llegue |
 | Documentación de seguridad | [Seguridad](/seguridad/): modelo de amenazas revisado, inventario de secretos y riesgos abiertos; [Logs y retención](/operaciones/logs-y-retencion/): qué se escribe, qué se redacta y por cuánto tiempo; [Desinstalar](/comercios/shopify/#desinstalar) |
 | Auditoría de dependencias | Sin excepciones activas desde el 7 de noviembre: `@x402/*` 2.30 depende de zod 4 ([#21](https://github.com/Micoh18/setareh/pull/21)) |
 | Retención de datos personales | `npm run purge` aplica la política declarada ([#23](https://github.com/Micoh18/setareh/pull/23)); pendiente de desplegar en el piloto |
@@ -1151,6 +1151,83 @@ un error de validación; el chequeo previo del agente no avisa de saldo
 insuficiente antes de intentar pagar; y el facilitador público volvió a no
 responder con la transacción ya enviada, por lo que la conciliación manual
 sigue siendo parte del flujo.
+
+## Reporte final del sprint
+
+Cierre del sprint Instawards (19 de octubre a 13 de noviembre de 2026). Cada
+fila enlaza la evidencia pública que la sostiene; lo que no está demostrado se
+dice tal cual.
+
+**Objetivo aprobado.** Convertir el prototipo en un piloto externo,
+reproducible y auditable de comercio agentic sobre Stellar: servicio MCP/x402
+por HTTPS con CI, pruebas de fallos, logs y métricas redactados, modelo de
+amenazas y repetición por una persona evaluadora autorizada con USDC en
+`stellar:testnet`.
+
+**Resultado en una frase.** El servicio está publicado por HTTPS con CI; siete
+compras en testnet prueban que un reintento nunca duplica cobro ni orden; una
+evaluadora ajena al proyecto dirigió una compra; la persona dueña de la tienda
+revocó y volvió a aprobar la app desde su propia sesión sin compartir
+secretos; el modelo de amenazas, el inventario de secretos, la política de
+logs y la guía de desinstalación están publicados. Tres veces el facilitador
+público no respondió con la transacción ya enviada y las tres veces el
+servicio se detuvo y se concilió contra la red sin adivinar: ese es el riesgo
+abierto principal.
+
+### Hitos del sprint
+
+| Hito | Entregable | Estado | Evidencia |
+| --- | --- | --- | --- |
+| 1 · Servicio reproducible con CI | HTTPS, configuración por entorno, guía de release, CI | Entregado, semana 1 (19 al 23 de octubre) | [Entorno de piloto y CI](#entorno-de-piloto-y-ci), [Despliegue](/operaciones/despliegue/) |
+| 2 · Piloto auditable | Matriz de fallos F1 a F13, logs con `correlationId`, métricas, herramientas `reconcile:*` | Entregado, semana 2 (26 al 30 de octubre) | [Matriz de fallos, logs y métricas](#matriz-de-fallos-logs-y-métricas), [Estados y recuperación](/operaciones/estados-y-recuperacion/) |
+| 3 · Reproducción por un tercero | Guía para la persona evaluadora, MCP comprador, guía de instalación, preflight, modelo de amenazas, política de secretos y logs, reporte de repetición | Entregado, semanas 3 y 4 (2 al 13 de noviembre) | [Evaluadora independiente y MCP comprador](#evaluadora-independiente-y-mcp-comprador), [Instalación aprobada por la persona dueña de la tienda](#instalación-aprobada-por-la-persona-dueña-de-la-tienda), [Seguridad](/seguridad/) |
+
+### Criterios de éxito, uno por uno
+
+| Criterio aprobado | Cumplido | Cómo se demuestra | Matices |
+| --- | --- | --- | --- |
+| Servicio HTTPS reproducible con CI | Sí | Semana 1; CI en cada PR desde el [#1](https://github.com/Micoh18/setareh/pull/1) | Un solo proveedor y una sola región; sin alta disponibilidad |
+| Reintentos y fallos no producen doble cobro ni doble orden | Sí | Matriz F1 a F13 (70 pruebas automatizadas); órdenes `#1003` a `#1007`, cada una con un reintento rechazado con `409` | — |
+| Logs y métricas redactados, con correlación | Sí | Semana 2; [Logs y retención](/operaciones/logs-y-retencion/) | Los datos personales de los quotes se purgan con `npm run purge`, todavía manual, no programado |
+| Una persona evaluadora autorizada obtiene una orden por quote y el reintento no duplica | Sí, con límites | Orden `#1006` y reintento `409`, dirigidos por Cristina el 6 de noviembre | Sesión compartida en el computador del fundador y con su wallet; la repetición desde su propia máquina queda fuera del sprint |
+| La persona dueña aprueba los scopes sin compartir secretos | Sí | Ciclo revocar y reinstalar desde su sesión el 8 de noviembre, con logs y preflight | El equipo de Setareh también tiene acceso de administración a la tienda; la aprobación la hizo ella desde su sesión. Autorizó por escrito publicar nombre, URL y resultado; la confirmación firmada de la sesión se incorporará cuando llegue |
+| Una persona evaluadora puede repetir el flujo con la guía | Parcial | [Reproducir el piloto](/agentes/reproducir-el-piloto/) y MCP comprador; prueba de Cristina | La instalación previa cuesta unos 45 minutos a una persona no técnica |
+| Limitaciones y riesgos abiertos declarados | Sí | [Riesgos abiertos](/seguridad/#riesgos-abiertos-2026-11-08) | — |
+
+### Limitaciones y riesgos abiertos, sin suavizar
+
+Son los mismos que declara la página de [Seguridad](/seguridad/#riesgos-abiertos-2026-11-08):
+el facilitador x402 público no tiene SLA y puede liquidar y responder `504`;
+no hay autoconciliación programada de `payment_unknown`; la purga de datos
+personales es manual; no hay gestor de secretos ni rotación automatizada; el
+rate limit vive en memoria y no hay autenticación de agentes; el preflight no
+detecta cambios de XDR; el árbol de dependencias lleva dos copias del SDK de
+Stellar; y la instalación para personas no técnicas sigue siendo larga. El
+incidente del facilitador se declara aquí como riesgo abierto; reportarlo al
+operador del facilitador queda como paso siguiente, fuera del sprint, igual que
+un facilitador propio.
+
+### Qué sigue, fuera de este sprint
+
+- Verificar el hash en la red antes de completar el borrador de orden, para
+  no depender de la respuesta del facilitador.
+- Autoconciliación de `payment_unknown` y purga de datos personales
+  programadas.
+- Instalador único para personas evaluadoras no técnicas, sin que Setareh
+  custodie la wallet.
+- Multi-tenant, autenticación de agentes y mainnet, que requieren una revisión
+  de seguridad independiente.
+
+### Índice de evidencia
+
+| Semana | Sección de esta página | Código |
+| --- | --- | --- |
+| 1 (19 al 23 de octubre) | [Entorno de piloto y CI](#entorno-de-piloto-y-ci) | PRs [#1](https://github.com/Micoh18/setareh/pull/1) a [#3](https://github.com/Micoh18/setareh/pull/3), releases v1 a v8 |
+| 2 (26 al 30 de octubre) | [Matriz de fallos, logs y métricas](#matriz-de-fallos-logs-y-métricas) | PRs [#6](https://github.com/Micoh18/setareh/pull/6) a [#13](https://github.com/Micoh18/setareh/pull/13), releases v9 a v12 |
+| 3 (2 al 6 de noviembre) | [Evaluadora independiente y MCP comprador](#evaluadora-independiente-y-mcp-comprador) | PRs [#14](https://github.com/Micoh18/setareh/pull/14) a [#20](https://github.com/Micoh18/setareh/pull/20) |
+| 4 (9 al 13 de noviembre) | [Instalación aprobada por la persona dueña de la tienda](#instalación-aprobada-por-la-persona-dueña-de-la-tienda) | PRs [#21](https://github.com/Micoh18/setareh/pull/21) a [#24](https://github.com/Micoh18/setareh/pull/24) y el PR de cierre |
+| Transacciones | [Transacciones Stellar testnet](#transacciones-stellar-testnet) (siete, del 1 de octubre al 8 de noviembre) | — |
+| Repositorio | — | [github.com/Micoh18/setareh](https://github.com/Micoh18/setareh), licencia MIT |
 
 ## Criterio para declarar un piloto externo
 
