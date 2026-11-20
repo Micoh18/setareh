@@ -56,8 +56,8 @@ automática o por un incidente real documentado.
 | --- | --- | --- |
 | Agente intenta pagar más, con otro activo/red/destino o tras expirar el quote | El backend compara red, activo, destinatario, monto y vencimiento contra el quote congelado; tope por quote en el servidor; límite local en el cliente. | Los límites del lado agente los configura quien lo opera; el servidor sigue rechazando montos distintos al quote. |
 | Reintento concurrente crea dos órdenes o dos cargos | Una fila de pago y una orden por quote; reclamación atómica del settlement y de la creación de orden; `409` para un quote ya pagado. | Casos de infraestructura no probados pasan a conciliación, no se asumen como éxito. |
-| El facilitador no responde o responde `504` **después de haber enviado la transacción** | El quote queda en `payment_unknown`, bloqueado para nuevos pagos; `reconcile:payment` lo resuelve contra la red (con `--tx` si el RPC ya no tiene el historial) y sólo lo declara impago cuando la autorización firmada expiró. Ocurrió el 2026-11-05 y se resolvió así. | Requiere operador: no hay autoconciliación programada. El facilitador público no tiene SLA. |
-| Facilitador o RPC suplantados afirman un settlement que no ocurrió | El backend valida que el settlement coincida con el quote; la URL del facilitador es configuración del servidor, no del cliente; `reconcile:payment` consulta la red por hash. | No se verifica el hash en la red **antes** de crear la orden; se confía en la respuesta del facilitador configurado. |
+| El facilitador no responde o responde `504` **después de haber enviado la transacción** | El quote queda en `payment_unknown`, bloqueado para nuevos pagos. Desde el 2026-11-20 un proceso interno lo concilia contra la red cada 30 segundos sin operador: si encuentra la transferencia, la verifica en Stellar RPC y en Horizon y crea la orden; si la autorización firmada expiró sin transferencia, lo cierra como impago; si en cinco minutos no hay decisión, lo deja en `manual_review`. `reconcile:payment` sigue existiendo para el caso manual (con `--tx` si el RPC ya no tiene el historial). Ocurrió el 2026-11-05 y el 2026-11-08. | El facilitador público no tiene SLA; un pago que la red no muestra en cinco minutos termina igualmente con una persona. |
+| Facilitador o RPC suplantados afirman un settlement que no ocurrió | Ninguna orden se crea por la respuesta del facilitador sola: el hash se consulta en Stellar RPC **y** en Horizon, y ambos deben mostrar una transferencia USDC del monto exacto al comercio en el mismo ledger. Un hash de otra red se rechaza en el acto; un hash con otro monto, fallido o que una de las dos fuentes contradice deja el quote en `manual_review`; un hash que ninguna fuente ve todavía espera hasta cinco minutos y después se escala. | Si RPC y Horizon fueran suplantados a la vez (o la URL de ambos en el servidor), la verificación no lo detectaría. Las URLs son configuración del servidor. |
 | Shopify no responde o limita las llamadas | Cada llamada tiene un plazo; las lecturas reintentan con backoff acotado y `Retry-After`; crear y completar drafts no se reintenta nunca. | Un timeout al completar el draft deja el quote en `manual_review` hasta conciliar con `reconcile:order`. |
 | Shopify falla después de un settlement válido | Se conserva evidencia y el estado pasa a `manual_review`; el runbook impide reintentar el pago a ciegas. | No hay reembolso automático. |
 | Se filtran claves, datos personales o receipts | Lista permitida y filtros en los logs; respuestas `500` genéricas; `get_order_status` entrega un resumen; CI revisa los docs; [política de logs y retención](/operaciones/logs-y-retencion/). | Datos personales de quotes sin purga automática; snapshots del proveedor contienen la base; sin gestor de secretos ni DLP. |
@@ -66,7 +66,7 @@ automática o por un incidente real documentado.
 | Desinstalación no propagada | El webhook `app/uninstalled` firmado borra los tokens; Shopify ya los revocó, así que cualquier llamada falla igual. | Si la suscripción al webhook se pierde, el registro local queda activo con tokens inútiles hasta que una llamada falle o un operador lo revoque. |
 | Endpoint público recibe abuso (drafts reales, stock agotado) | La creación de quotes está limitada por cliente y en total por hora (`429` con `Retry-After`); el despliegue termina HTTPS. | Límite en memoria de una sola instancia; sin autenticación de agentes, WAF ni control por comercio. |
 | El agente altera datos de la persona compradora sin avisar | Las instrucciones del MCP comprador exigen mostrar el quote completo antes de pedir confirmación y avisar de cualquier corrección. | Depende del modelo que ejecute el agente; no hay validación estructural de que lo mostrado sea lo enviado. |
-| La red cambia de protocolo y el cliente o el servidor dejan de decodificar | SDK de Stellar fijado en una versión mínima y requisito en la guía; ocurrió con el Protocolo 30 el 2026-11-05. | El preflight consulta JSON, no XDR: la incompatibilidad se detecta en el primer pago. |
+| La red cambia de protocolo y el cliente o el servidor dejan de decodificar | SDK de Stellar fijado en una versión mínima y requisito en la guía; ocurrió con el Protocolo 30 el 2026-11-05. Desde el 2026-11-20 el arranque, `doctor -- --verify` y `/health` comparan la versión de protocolo que anuncian RPC y Horizon con la que esta versión probó (30) y avisan si la red va por delante. | El aviso no bloquea pagos: es la señal para hacer una compra de humo antes de aceptar cobros. |
 | Dependencias vulnerables en producción | La CI falla ante cualquier aviso de `npm audit` no aceptado; las excepciones llevan paquete, ruta y fecha de vencimiento. Desde el 2026-11-07 no hay excepciones activas. | El árbol incluye dos copias del SDK de Stellar (la principal y una anidada en la librería x402), que hay que vigilar en cada cambio de protocolo. |
 
 ## Secretos: qué existe y quién lo custodia
@@ -89,20 +89,25 @@ la tienda; tokens entregados por chat o correo; claves de ninguna wallet;
 datos de clientes de la tienda más allá de la dirección y el correo que la
 persona compradora entrega para su propia orden.
 
-## Riesgos abiertos (2026-11-08)
+## Riesgos abiertos (2026-11-20)
 
-1. Facilitador x402 público sin SLA que puede liquidar y responder `504`.
-2. Sin autoconciliación programada de `payment_unknown`; requiere operador.
-3. Datos personales de quotes sin purga automática; política declarada,
-   implementación pendiente.
-4. Sin gestor de secretos ni rotación automatizada; la clave de cifrado vive
+1. Facilitador x402 público sin SLA que puede liquidar y responder `504`. La
+   orden ya no depende de su respuesta (se completa por lo que dicen RPC y
+   Horizon), pero sigue siendo el único camino para enviar la transacción.
+2. Sin gestor de secretos ni rotación automatizada; la clave de cifrado vive
    en el entorno del servidor.
-5. Rate limit en memoria y sin autenticación de agentes; no apto para
+3. Rate limit en memoria y sin autenticación de agentes; no apto para
    exposición productiva.
-6. Preflight ciego a cambios de XDR; se detectan en el primer pago.
-7. Dos copias del SDK de Stellar en el árbol de dependencias.
-8. Instalar el entorno del agente sigue costando unos 45 minutos a una persona
+4. Dos copias del SDK de Stellar en el árbol de dependencias.
+5. Instalar el entorno del agente sigue costando unos 45 minutos a una persona
    no técnica. No es un riesgo de seguridad, pero sí de adopción.
+6. Si Stellar RPC y Horizon fueran suplantados a la vez, la verificación doble
+   no lo detectaría; ambas URLs son configuración del servidor.
+
+Cerrados el 2026-11-20 (sprint de noviembre, entregable D1): la
+autoconciliación de `payment_unknown` sin operador, la purga automática de
+datos personales y el preflight de protocolo. Los riesgos 2, 4, 5 y 7 de la
+lista del 2026-11-08 pasan a ser los 1, 2, 3 y 4 de esta.
 
 ## Datos que nunca deben aparecer en este sitio
 

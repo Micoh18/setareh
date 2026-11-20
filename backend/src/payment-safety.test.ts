@@ -6,6 +6,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { CommerceService } from "./commerce.js";
 import type { SetarehConfig } from "./config.js";
+import { confirmingChain } from "./chain-double.test-support.js";
 import { SetarehDatabase } from "./db.js";
 import { createHttpApp } from "./http.js";
 
@@ -36,7 +37,7 @@ async function harness(options: { quoteTtlMs: number; facilitator: FacilitatorHa
     completeDraftOrder: async () => { shopifyCalls.completeDraftOrder += 1; return { id: "gid://shopify/Order/1", name: "#1001" }; },
     attachPaymentEvidence: async () => undefined,
   };
-  const service = new CommerceService(config, database, shopify as any);
+  const service = new CommerceService(config, database, shopify as any, confirmingChain(config.stellarMerchantAddress, 100_000_000n));
   const quote = database.createQuote({ id: "7d0f8a52-5b8e-4c55-9d43-2b8f0f3f6a10", merchantId: "micohstore", status: "quoted", currencyShopify: "CLP", totalShopify: "10000.00", currencyPayment: "USDC", totalUsdc: "10.000000", fxRate: "0.001", expiresAt: new Date(Date.now() + options.quoteTtlMs).toISOString(), shippingAddressJson: "{}", lineItemsJson: JSON.stringify([{ variantId: "gid://shopify/ProductVariant/1", quantity: 1 }]), email: "buyer@example.com", shopifyDraftOrderId: "gid://shopify/DraftOrder/1", idempotencyKey: "quote:payment-safety" });
   const appServer = createHttpApp(service).listen(0, "127.0.0.1");
   await new Promise<void>((resolve) => appServer.on("listening", resolve));

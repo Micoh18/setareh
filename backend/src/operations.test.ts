@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { CommerceService } from "./commerce.js";
+import { confirmingChain } from "./chain-double.test-support.js";
 import { SetarehDatabase } from "./db.js";
 import { computeMetrics, findStuckQuotes, STUCK_AFTER_MS } from "./operations.js";
 
@@ -38,7 +39,7 @@ test("only quotes that sat in an intermediate status past the threshold are repo
 test("F11: a settlement interrupted by a restart becomes payment_unknown with the payer kept for reconciliation", () => {
   const run = fixture();
   try {
-    const service = new CommerceService(run.config, run.database, { domain: "micohstore.myshopify.com" } as any);
+    const service = new CommerceService(run.config, run.database, { domain: "micohstore.myshopify.com" } as any, confirmingChain("GTEST", 150_000_000n));
     run.quote("interrupted");
     service.getPayableQuote("interrupted");
     service.markPaymentSubmitted("interrupted", undefined);
@@ -65,7 +66,7 @@ test("F11: an interrupted order attempt adopts the Shopify order when the draft 
       completeDraftOrder: async () => { completions += 1; return { id: "gid://shopify/Order/88", name: "#1088" }; },
       attachPaymentEvidence: async () => undefined,
     };
-    const service = new CommerceService(run.config, run.database, shopify as any);
+    const service = new CommerceService(run.config, run.database, shopify as any, confirmingChain("GTEST", 150_000_000n));
     run.quote("adopt"); run.settle("adopt"); run.database.claimShopifyOrderCreation("adopt");
     run.quote("retry"); run.settle("retry"); run.database.claimShopifyOrderCreation("retry");
 

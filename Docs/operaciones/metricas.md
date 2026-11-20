@@ -13,7 +13,7 @@ npm.cmd run metrics
 npm.cmd run metrics -- --since 2026-10-26T00:00:00Z
 ```
 
-La salida es JSON con cuatro bloques.
+La salida es JSON con seis bloques.
 
 ## Embudo
 
@@ -46,11 +46,25 @@ p50 y p95 en milisegundos, con el número de muestras:
 | `settledToCreated` | Tiempo de Shopify en completar el draft y recibir la evidencia. |
 | `quotedToCreated` | Experiencia completa del comprador. |
 
+## Verificación y conciliación
+
+| Campo | Significado |
+| --- | --- |
+| `verification.verified` | Pagos liquidados que Stellar RPC y Horizon confirmaron; sólo estos pueden tener orden. |
+| `verification.unverified` | Pagos liquidados que todavía esperan una de las dos confirmaciones (el worker los reintenta) o que quedaron en `manual_review`. |
+| `reconciliation.unknownResolved` | Quotes que salieron de `payment_unknown` a `payment_settled` o `payment_failed` por conciliación contra la red, automática o manual. |
+| `reconciliation.unknownEscalated` | Quotes que pasaron de `payment_unknown` a `manual_review` (ambiguos, inconsistentes o sin decisión en cinco minutos). |
+| `reconciliation.settledHeld` | Pagos liquidados que la red contradijo y quedaron en `manual_review` sin orden. |
+
+En un piloto sano `unverified`, `unknownEscalated` y `settledHeld` son cero o
+tienen una explicación en el log (`settlement.worker`, acción `escalated:*`).
+
 ## Alertas
 
 - `stuck`: quotes que llevan más de cinco minutos en `payment_submitted`,
   `payment_settled` o `creating_shopify_order`. Ninguno debería quedarse ahí:
-  son señal de un proceso interrumpido. Se resuelven con `reconcile:stuck`.
+  son señal de un proceso interrumpido. El worker los retoma en su siguiente
+  pasada; `reconcile:stuck` sirve con el servicio detenido.
 - `needsReview`: quotes en `payment_unknown`, `manual_review` u
   `out_of_stock`, con la fecha desde la que esperan.
 

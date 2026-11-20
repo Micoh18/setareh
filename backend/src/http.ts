@@ -8,6 +8,7 @@ import { CommerceService } from "./commerce.js";
 import { correlationIdFrom, errorMessage, log, withCorrelation } from "./log.js";
 import { DEFAULT_QUOTE_RATE_LIMITS, SlidingWindowLimiter, clientKey, type QuoteRateLimits } from "./rate-limit.js";
 import { SHOPIFY_CALLBACK_PATH, SHOPIFY_INSTALL_PATH, SHOPIFY_UNINSTALLED_WEBHOOK_PATH, ShopifyOAuth, ShopifyOAuthError, isValidShopDomain, verifyQueryHmac, verifyWebhookHmac } from "./shopify-oauth.js";
+import { lastProtocolCheck } from "./stellar-preflight.js";
 
 const addressSchema = z.object({ address1: z.string().min(3), address2: z.string().optional(), city: z.string().min(2), province: z.string().optional(), country: z.string().min(2), zip: z.string().min(3), firstName: z.string().min(1), lastName: z.string().min(1), phone: z.string().optional() });
 const quoteSchema = z.object({ merchantId: z.string().min(1), items: z.array(z.object({ variantId: z.string().startsWith("gid://shopify/ProductVariant/"), quantity: z.number().int().min(1).max(20) })).min(1).max(10), email: z.string().email(), shippingAddress: addressSchema, userConfirmed: z.literal(true) });
@@ -124,7 +125,14 @@ export function createHttpApp(service: CommerceService, options: { shopifyOAuth?
   if (options.shopifyOAuth) registerShopifyOAuthRoutes(app, options.shopifyOAuth);
   app.use(express.json({ limit: "64kb" }));
 
-  app.get("/health", (_request: any, response: any) => response.json({ ok: true, service: "setareh", network: service.config.stellarNetwork }));
+  app.get("/health", (_request: any, response: any) => {
+    const protocol = lastProtocolCheck();
+    response.json({
+      ok: true, service: "setareh", network: service.config.stellarNetwork,
+      settlement: { verification: "rpc+horizon", worker: service.config.settlementWorker?.enabled === false ? "off" : "on" },
+      protocol: protocol ? { known: protocol.known, rpc: protocol.rpc.protocolVersion, horizon: protocol.horizon.protocolVersion, supported: protocol.supported, checkedAt: protocol.checkedAt } : null,
+    });
+  });
   app.get("/v1/merchants/:merchantId", (request: any, response: any) => {
     if (request.params.merchantId !== service.config.merchantId) return response.status(404).json({ error: { code: "merchant_not_found" } });
     return response.json({ id: service.config.merchantId, name: service.config.merchantName, shopDomain: service.shopify.domain, payment: { network: service.config.stellarNetwork, asset: service.config.stellarAsset } });
@@ -152,6 +160,13 @@ export function createHttpApp(service: CommerceService, options: { shopifyOAuth?
       if (!path) return;
       const quoteId = quoteIdFromPath(path);
       const hash = transactionHash(context.result);
+      const reportedNetwork = (context.result as { network?: unknown } | undefined)?.network;
+      if (typeof reportedNetwork === "string" && reportedNetwork !== service.config.stellarNetwork) {
+        // F16: a hash from another network can never settle this quote; hold it instead of recording a payment.
+        service.rejectSettlementNetwork(quoteId, reportedNetwork, context.paymentPayload);
+        log("warn", "payment.network_mismatch", { quoteId, transactionHash: hash, network: reportedNetwork });
+        return;
+      }
       try {
         service.recordSettlement(quoteId, { payload: context.paymentPayload, receipt: context.result, transactionHash: hash });
         log("info", "payment.settled", { quoteId, transactionHash: hash, network: service.config.stellarNetwork });
@@ -182,14 +197,25 @@ export function createHttpApp(service: CommerceService, options: { shopifyOAuth?
   app.post("/v1/quotes/:quoteId/pay-and-place", async (request: any, response: any, next: any) => {
     try {
       const body = z.object({ userConfirmed: z.literal(true) }).parse(request.body);
-      response.json(await service.placePaidOrder(request.params.quoteId, body.userConfirmed));
+      const quoteId = request.params.quoteId;
+      const quote = service.db.getQuote(quoteId);
+      if (quote?.status === "manual_review" && !service.db.getPayment(quoteId)) throw new Error("Payment is held for manual review: the facilitator reported it on another network.");
+      if (quote?.status === "payment_settled" && !service.db.getPayment(quoteId)?.verified_at) {
+        const verification = await service.verifySettlementWithRetries(quoteId);
+        if (verification.verdict === "disagree") throw new Error("Payment is held for manual review: the network does not confirm the reported transfer.");
+        if (verification.verdict === "pending") {
+          // The facilitator says settled but neither reader shows it yet; the settlement worker finishes or escalates.
+          return response.status(202).json({ ...service.getOrderStatus(quoteId), pending: "verification", message: "The payment is being verified on Stellar RPC and Horizon. Check the quote with get_order_status; the order is created automatically once both confirm it." });
+        }
+      }
+      response.json(await service.placePaidOrder(quoteId, body.userConfirmed));
     } catch (error) { next(error); }
   });
   app.get("/v1/orders/:orderId", (request: any, response: any, next: any) => { try { response.json(service.getOrderStatus(request.params.orderId)); } catch (error) { next(error); } });
 
   const errors: ErrorRequestHandler = (error: unknown, _request: any, response: any, _next: any) => {
     const message = error instanceof Error ? error.message : "Unexpected error";
-    const status = error instanceof z.ZodError ? 400 : /not found/i.test(message) ? 404 : /expired|not available|limit|not payable/i.test(message) ? 409 : 500;
+    const status = error instanceof z.ZodError ? 400 : /not found/i.test(message) ? 404 : /expired|not available|limit|not payable|manual review|not yet verified/i.test(message) ? 409 : 500;
     // Validation details may echo request fields; log only the class of a 400.
     log(status === 500 ? "error" : "info", "http.error", { httpStatus: status, message: status === 400 ? "invalid_request" : message });
     // A 500 may carry upstream text (Shopify, facilitator) that echoes buyer data; the redacted log keeps it.

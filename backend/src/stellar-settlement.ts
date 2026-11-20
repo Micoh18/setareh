@@ -52,7 +52,7 @@ export type SettlementLookup =
   | { found: true; transactionHash: string; ledger: number }
   | { found: false; reason: "transaction_failed" | "not_found" | "mismatch" };
 
-export type SettlementRpc = Pick<rpc.Server, "getTransaction" | "getEvents" | "getHealth">;
+export type SettlementRpc = Pick<rpc.Server, "getTransaction" | "getEvents" | "getHealth"> & Partial<Pick<rpc.Server, "getNetwork">>;
 
 /** Reads a SEP-41 transfer from an event's topics and data; undefined when the event is not one. */
 function transferFromEvent(topics: xdr.ScVal[], data: xdr.ScVal): { from: string; to: string; amount: bigint } | undefined {

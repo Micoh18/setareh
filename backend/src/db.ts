@@ -130,6 +130,12 @@ export class SetarehDatabase {
     if (!quoteColumns.some((column) => column.name === "personal_data_purged_at")) {
       this.db.exec("ALTER TABLE quote ADD COLUMN personal_data_purged_at TEXT");
     }
+    const paymentColumns = this.db.prepare("PRAGMA table_info(payment)").all() as Array<{ name: string }>;
+    if (!paymentColumns.some((column) => column.name === "verified_at")) {
+      // Set only once Stellar RPC and Horizon both confirmed the transfer; an order needs it.
+      this.db.exec("ALTER TABLE payment ADD COLUMN verified_at TEXT");
+      this.db.exec("ALTER TABLE payment ADD COLUMN verification_json TEXT");
+    }
   }
 
   upsertMerchant(merchant: { id: string; name: string; shopDomain: string; shopifyCredentialsRef?: string; stellarRecipient: string }) {
@@ -293,7 +299,28 @@ export class SetarehDatabase {
   }
 
   getPayment(quoteId: string) {
-    return this.db.prepare("SELECT network, asset, amount, pay_to, stellar_transaction_hash, facilitator_receipt_json, status, settled_at FROM payment WHERE quote_id = ?").get(quoteId) as Record<string, unknown> | undefined;
+    return this.db.prepare("SELECT network, asset, amount, pay_to, stellar_transaction_hash, facilitator_receipt_json, status, settled_at, verified_at, verification_json FROM payment WHERE quote_id = ?").get(quoteId) as Record<string, unknown> | undefined;
+  }
+
+  /** Stores the two-source check of a settlement; `verifiedAt` is set only on a verified verdict. */
+  recordPaymentVerification(quoteId: string, verification: unknown, verifiedAt: string | null) {
+    this.db.prepare("UPDATE payment SET verification_json = ?, verified_at = COALESCE(verified_at, ?) WHERE quote_id = ?").run(JSON.stringify(verification), verifiedAt, quoteId);
+  }
+
+  /** Quotes in the given statuses with the time they entered the current status, oldest first. */
+  listQuotesInStatuses(statuses: QuoteStatus[]): Array<{ quoteId: string; status: QuoteStatus; since: string }> {
+    if (statuses.length === 0) return [];
+    const rows = this.db.prepare(`
+      SELECT q.id AS quote_id, q.status, COALESCE(MAX(e.at), q.created_at) AS since
+      FROM quote q LEFT JOIN quote_event e ON e.quote_id = q.id
+      WHERE q.status IN (${statuses.map(() => "?").join(", ")}) GROUP BY q.id ORDER BY since`).all(...statuses) as Array<Record<string, unknown>>;
+    return rows.map((row) => ({ quoteId: String(row.quote_id), status: row.status as QuoteStatus, since: String(row.since) }));
+  }
+
+  /** Settled payments by verification state, for metrics. */
+  countPaymentsByVerification(): { verified: number; unverified: number } {
+    const row = this.db.prepare("SELECT SUM(CASE WHEN verified_at IS NULL THEN 0 ELSE 1 END) AS verified, SUM(CASE WHEN verified_at IS NULL THEN 1 ELSE 0 END) AS unverified FROM payment WHERE status = 'settled'").get() as { verified: number | null; unverified: number | null };
+    return { verified: Number(row.verified ?? 0), unverified: Number(row.unverified ?? 0) };
   }
 
   createOAuthState(state: string, shop: string, expiresAt: string) {

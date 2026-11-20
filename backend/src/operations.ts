@@ -57,6 +57,13 @@ export function computeMetrics(db: SetarehDatabase, options: { since?: string; n
       quotedToCreated: latency(events, "quoted", "created"),
     },
     currentStatuses: db.countQuotesByStatus(options.since),
+    // D1: settled payments confirmed by both readers, and how payment_unknown quotes were resolved.
+    verification: db.countPaymentsByVerification(),
+    reconciliation: {
+      unknownResolved: events.filter((event) => event.from === "payment_unknown" && (event.to === "payment_settled" || event.to === "payment_failed")).length,
+      unknownEscalated: events.filter((event) => event.from === "payment_unknown" && event.to === "manual_review").length,
+      settledHeld: events.filter((event) => event.from === "payment_settled" && event.to === "manual_review").length,
+    },
     alerts: { stuck: findStuckQuotes(db, now), needsReview: db.listQuotesNeedingReview() },
   };
 }

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { CommerceService } from "./commerce.js";
+import { confirmingChain } from "./chain-double.test-support.js";
 import { SetarehDatabase } from "./db.js";
 import { ShopifyClient } from "./shopify.js";
 
@@ -106,7 +107,7 @@ test("F7: Shopify failing to complete the draft after payment leaves manual_revi
   const run = paidQuote();
   try {
     let completions = 0;
-    const service = new CommerceService(run.config, run.database, { domain: "micohstore.myshopify.com", getVariant: async () => variant, completeDraftOrder: async () => { completions += 1; throw new Error("Shopify Admin API error (503): Service Unavailable"); } } as any);
+    const service = new CommerceService(run.config, run.database, { domain: "micohstore.myshopify.com", getVariant: async () => variant, completeDraftOrder: async () => { completions += 1; throw new Error("Shopify Admin API error (503): Service Unavailable"); } } as any, confirmingChain("GTEST", 150_000_000n));
     await assert.rejects(service.placePaidOrder(run.quote.id, true), /503/);
     assert.equal(completions, 1);
     assert.equal(run.database.getQuote(run.quote.id)?.status, "manual_review");
@@ -122,7 +123,7 @@ test("F10: stock gone between payment and order ends in out_of_stock without tou
   const run = paidQuote();
   try {
     let completions = 0;
-    const service = new CommerceService(run.config, run.database, { domain: "micohstore.myshopify.com", getVariant: async () => ({ ...variant, inventoryQuantity: 0, availableForSale: false }), completeDraftOrder: async () => { completions += 1; return { id: "gid://shopify/Order/1", name: "#1001" }; } } as any);
+    const service = new CommerceService(run.config, run.database, { domain: "micohstore.myshopify.com", getVariant: async () => ({ ...variant, inventoryQuantity: 0, availableForSale: false }), completeDraftOrder: async () => { completions += 1; return { id: "gid://shopify/Order/1", name: "#1001" }; } } as any, confirmingChain("GTEST", 150_000_000n));
     await assert.rejects(service.placePaidOrder(run.quote.id, true), /Inventory changed after payment/);
     assert.equal(completions, 0);
     assert.equal(run.database.getQuote(run.quote.id)?.status, "out_of_stock");

@@ -58,8 +58,11 @@ fuera de la lista o un secreto sin redactar llega a una línea de log.
    que la orden existe en Shopify o el quote vence sin pago. Objetivo: purgar
    esos campos de los quotes vencidos sin orden a los 30 días del vencimiento y
    de los quotes con orden a los 90 días de creada la orden, conservando
-   montos, estados y hash. **Estado: no implementado todavía**; figura como
-   riesgo abierto en [Seguridad](/seguridad/).
+   montos, estados y hash. **Implementado el 2026-11-20:** el servicio lo
+   ejecuta solo una vez al día (`retention.purged` en el log, con la cantidad)
+   y `npm run purge -- --apply` sigue disponible para hacerlo a mano. Los
+   plazos se ajustan con `SETAREH_RETENTION_EXPIRED_DAYS` y
+   `SETAREH_RETENTION_ORDERED_DAYS`; `SETAREH_RETENTION_AUTO=off` lo desactiva.
 4. **Receipt del facilitador:** se conserva como prueba del settlement y nunca
    se expone por API. Misma purga de 90 días una vez conciliada la orden.
 5. **Evidencia pública:** sólo hashes, IDs de orden truncados, `quoteId`,
