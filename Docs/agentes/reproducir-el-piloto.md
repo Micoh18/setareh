@@ -231,6 +231,7 @@ y puede publicarse.
 | En el mensaje 1 falla `usdc` | El faucet no corrió o usaste otra clave | Pide USDC en el faucet con la misma clave pública que muestra el agente |
 | En el mensaje 1 falla `AGENT_STELLAR_PRIVATE_KEY` | La clave quedó mal pegada en `agent.env` | Abre de nuevo `open -e agent.env`, revisa que empieza con `S`, tiene 56 caracteres y no tiene espacios ni `<` `>` |
 | Claude Code no muestra el servidor `setareh` | Abriste `claude` en otra carpeta o dijiste No a la autorización | Escribe `/exit`, ejecuta `cd ~/setareh` y vuelve a abrir `claude` |
+| Claude Code dice que `setareh` falló al conectar (`Connection closed`) | Faltan dependencias en `backend`: el `npm ci` del paso 3 no terminó o se ejecutó en otra carpeta | Escribe `/exit`, ejecuta `cd ~/setareh/backend` y `npm ci`, vuelve a abrir `claude` en `~/setareh` y, si sigue igual, escribe `/mcp` y elige reconectar `setareh` |
 | El agente no encuentra el producto | Aún no está publicado o el nombre es distinto | Confirma el nombre exacto con Setareh por el canal privado |
 | En el mensaje 5 el agente dice que ya está pagada y no reintenta | Ignoró las instrucciones del servidor | Insiste: "Sí, ya sé que está pagada; quiero que intentes cobrarla de nuevo con la misma cotización". Anota que hizo falta insistir: es un hallazgo |
 | Código `429` al crear el quote | Límite de 10 quotes por hora | Espera los segundos que indique y repite el mensaje 3 |
