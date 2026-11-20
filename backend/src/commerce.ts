@@ -2,14 +2,85 @@ import { createHash, randomUUID } from "node:crypto";
 import { USDC_TESTNET_ADDRESS } from "@x402/stellar";
 import type { SetarehConfig } from "./config.js";
 import { SetarehDatabase, type QuoteRecord } from "./db.js";
-import { describeSignedTransfer, usdcUnits } from "./stellar-settlement.js";
+import { rpc } from "@stellar/stellar-sdk";
+import { DEFAULT_TESTNET_HORIZON_URL, DEFAULT_TESTNET_RPC_URL } from "@x402/stellar";
+import { log } from "./log.js";
+import { verificationEvidence, verifySettlement, type ChainReaders, type VerificationResult } from "./settlement-verification.js";
+import { createHorizonClient } from "./stellar-horizon.js";
+import { describeSignedTransfer, usdcUnits, type ExpectedSettlement } from "./stellar-settlement.js";
 import { availability, type ShopifyAddress, type ShopifyLineItem, ShopifyClient } from "./shopify.js";
 
 export type QuoteInput = { merchantId: string; items: ShopifyLineItem[]; email: string; shippingAddress: ShopifyAddress; userConfirmed: true };
 
+export const DEFAULT_VERIFICATION_POLICY = { attempts: 4, delayMs: 2_000 };
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export class CommerceService {
-  constructor(readonly config: SetarehConfig, readonly db: SetarehDatabase, readonly shopify: ShopifyClient) {
+  private chainReaders?: ChainReaders;
+
+  constructor(readonly config: SetarehConfig, readonly db: SetarehDatabase, readonly shopify: ShopifyClient, chain?: ChainReaders) {
     db.upsertMerchant({ id: config.merchantId, name: config.merchantName, shopDomain: shopify.domain, shopifyCredentialsRef: config.shopifyCredentialsRef, stellarRecipient: config.stellarMerchantAddress });
+    this.chainReaders = chain;
+  }
+
+  /** Stellar RPC and Horizon, built from the configuration unless the caller injected readers (tests). */
+  get chain(): ChainReaders {
+    if (!this.chainReaders) {
+      // @x402/stellar bundles an older stellar-sdk; build the client from ours so XDR types match.
+      this.chainReaders = { rpc: new rpc.Server(this.config.stellarRpcUrl ?? DEFAULT_TESTNET_RPC_URL), horizon: createHorizonClient(this.config.stellarHorizonUrl ?? DEFAULT_TESTNET_HORIZON_URL) };
+    }
+    return this.chainReaders;
+  }
+
+  /** What the network must show for a quote to count as paid. */
+  expectedSettlement(quote: Pick<QuoteRecord, "totalUsdc">): ExpectedSettlement {
+    return { asset: USDC_TESTNET_ADDRESS, payTo: this.config.stellarMerchantAddress, amount: usdcUnits(quote.totalUsdc) };
+  }
+
+  /**
+   * Reads the settled payment's transaction on Stellar RPC and Horizon once and records what both said.
+   * Verified: the order may be placed. Disagree: the quote goes to manual_review and no order is created.
+   * Pending: neither source contradicts it yet; the caller may retry or leave it to the settlement worker.
+   */
+  async verifySettlementOnce(quoteId: string, now = new Date()): Promise<VerificationResult> {
+    const quote = this.db.getQuote(quoteId);
+    if (!quote) throw new Error("Quote not found.");
+    const payment = this.db.getPayment(quoteId);
+    if (!payment) throw new Error("No settled Stellar payment exists for this quote.");
+    const hash = typeof payment.stellar_transaction_hash === "string" ? payment.stellar_transaction_hash : "";
+    let result: VerificationResult;
+    if (!hash) {
+      result = { verdict: "disagree", transactionHash: hash, reason: "no_transaction_hash", rpc: { found: false, reason: "not_found" }, horizon: { found: false, reason: "not_found" } };
+    } else {
+      result = await verifySettlement(this.chain, hash, this.expectedSettlement(quote));
+    }
+    this.db.recordPaymentVerification(quoteId, verificationEvidence(result, now), result.verdict === "verified" ? now.toISOString() : null);
+    if (result.verdict === "disagree") {
+      // Only a payment that is still waiting to become an order is held; a created order is never reopened here.
+      this.db.transitionQuote(quoteId, "payment_settled", "manual_review");
+      log("warn", "payment.verification_disagree", { quoteId, transactionHash: hash, reason: result.reason, verdict: result.verdict });
+    } else {
+      log(result.verdict === "verified" ? "info" : "warn", `payment.verification_${result.verdict}`, { quoteId, transactionHash: hash, reason: "reason" in result ? result.reason : undefined, verdict: result.verdict });
+    }
+    return result;
+  }
+
+  /** In-request verification: a few quick re-reads, since a settled transaction is normally visible within seconds. */
+  async verifySettlementWithRetries(quoteId: string, policy = this.config.verification ?? DEFAULT_VERIFICATION_POLICY): Promise<VerificationResult> {
+    let result = await this.verifySettlementOnce(quoteId);
+    for (let attempt = 1; attempt < policy.attempts && result.verdict === "pending"; attempt += 1) {
+      await sleep(policy.delayMs);
+      result = await this.verifySettlementOnce(quoteId);
+    }
+    return result;
+  }
+
+  /** The facilitator reported a settlement on a network this service does not accept; nothing is completed. */
+  rejectSettlementNetwork(quoteId: string, network: string, paymentPayload: unknown) {
+    if (!this.db.transitionQuote(quoteId, "payment_submitted", "manual_review")) return undefined;
+    const transfer = describeSignedTransfer(paymentPayload);
+    return this.db.recordPaymentAttempt({ quoteId, outcome: "unknown", errorReason: `network_mismatch:${network}`.slice(0, 200), facilitatorTransaction: null, payer: transfer?.from ?? null, amount: transfer ? transfer.amount.toString() : null, payTo: transfer?.to ?? null, signatureExpirationLedger: transfer?.signatureExpirationLedger ?? null });
   }
 
   async searchCatalog(query: string, limit: number) {
@@ -105,14 +176,14 @@ export class CommerceService {
     });
   }
 
-  /** Records a payment_unknown quote's settlement once reconcile:payment has found it on-chain. */
-  recordReconciledSettlement(quoteId: string, transactionHash: string) {
+  /** Records a payment_unknown quote's settlement once reconciliation found it on-chain; it still needs verification before an order. */
+  recordReconciledSettlement(quoteId: string, transactionHash: string, source = "reconcile:payment") {
     const quote = this.db.getQuote(quoteId);
     if (!quote) throw new Error("Quote not found.");
     if (quote.status !== "payment_unknown") throw new Error(`Quote is ${quote.status}, not payment_unknown.`);
     const owner = this.db.getQuoteIdByTransaction(transactionHash);
     if (owner && owner !== quoteId) throw new Error(`Transaction already settles quote ${owner}.`);
-    this.db.recordPaymentSettled({ quoteId, network: this.config.stellarNetwork, asset: this.config.stellarAsset, amount: quote.totalUsdc, payTo: this.config.stellarMerchantAddress, paymentPayloadHash: "reconciled", transactionHash, receipt: { source: "reconcile:payment", transactionHash } });
+    this.db.recordPaymentSettled({ quoteId, network: this.config.stellarNetwork, asset: this.config.stellarAsset, amount: quote.totalUsdc, payTo: this.config.stellarMerchantAddress, paymentPayloadHash: "reconciled", transactionHash, receipt: { source, transactionHash } });
   }
 
   /** Closes a payment_unknown quote after reconcile:payment proved nothing was, or can still be, settled. */
@@ -138,7 +209,14 @@ export class CommerceService {
     const existing = this.db.getOrderByQuote(quoteId);
     if (existing) return this.presentOrder(existing);
     const quote = this.db.getUsableQuote(quoteId);
-    if (!this.db.getPayment(quoteId)) throw new Error("No settled Stellar payment exists for this quote.");
+    const settled = this.db.getPayment(quoteId);
+    if (!settled) throw new Error("No settled Stellar payment exists for this quote.");
+    // Never on the facilitator's word alone: Stellar RPC and Horizon must both confirm the transfer first.
+    if (!settled.verified_at) {
+      const verification = await this.verifySettlementOnce(quoteId);
+      if (verification.verdict === "disagree") throw new Error("Payment is held for manual review: the network does not confirm the reported transfer.");
+      if (verification.verdict === "pending") throw new Error("Payment is not yet verified on Stellar RPC and Horizon; the order is not created until it is.");
+    }
     if (!this.db.claimShopifyOrderCreation(quoteId)) {
       const completed = this.db.getOrderByQuote(quoteId);
       if (completed) return this.presentOrder(completed);
@@ -224,8 +302,17 @@ export class CommerceService {
         transactionHash: payment.stellar_transaction_hash,
         settledAt: payment.settled_at,
         receipt: { status: payment.status, transactionHash: payment.stellar_transaction_hash, settledAt: payment.settled_at },
+        verification: this.presentVerification(payment),
       } : null,
     };
+  }
+
+  /** Public summary of the two-source check: who confirmed the hash and when. */
+  private presentVerification(payment: Record<string, unknown>) {
+    const raw = typeof payment.verification_json === "string" ? payment.verification_json : "";
+    let detail: { verdict?: string; reason?: string; ledger?: number; rpc?: unknown; horizon?: unknown; checkedAt?: string } = {};
+    try { detail = raw ? JSON.parse(raw) as typeof detail : {}; } catch { detail = {}; }
+    return { verifiedAt: payment.verified_at ?? null, verdict: detail.verdict ?? "unchecked", reason: detail.reason, ledger: detail.ledger, sources: { rpc: detail.rpc ?? null, horizon: detail.horizon ?? null }, checkedAt: detail.checkedAt };
   }
 
   private presentQuote(quote: QuoteRecord, draftName: string) { return { quoteId: quote.id, status: quote.status, shopifyDraftOrder: { id: quote.shopifyDraftOrderId, name: draftName, currency: quote.currencyShopify, shipping: { title: this.config.shippingTitle ?? "Despacho Setareh", amount: (this.config.shippingFlatClp ?? 0).toFixed(2) }, total: quote.totalShopify }, payment: { network: this.config.stellarNetwork, asset: quote.currencyPayment, amount: quote.totalUsdc, payTo: this.config.stellarMerchantAddress, expiresAt: quote.expiresAt }, exchangeRate: { shopifyPerUsdc: quote.fxRate, source: quote.fxSource }, disclosure: "The USDC amount is fixed only until the quote expires. Ask for explicit confirmation before payment." }; }

@@ -20,7 +20,7 @@ description: Cómo interpretar una compra y conciliarla de forma segura sin dupl
 | --- | --- | --- |
 | `expired` | El quote venció. | Crear un quote nuevo; no pagar el anterior. |
 | `payment_failed` | El facilitador rechazó el pago de forma explícita y sin enviar transacción, o la conciliación probó que no hubo cobro. | Revisar challenge, red, activo, fondos y trustline; crear un quote nuevo. |
-| `payment_unknown` | El settlement no terminó con una respuesta definitiva: timeout, error de red, respuesta inválida o transacción enviada sin confirmar. Los fondos pueden haberse movido. | No pagar de nuevo ni crear otro quote. Ejecutar `reconcile:payment`. |
+| `payment_unknown` | El settlement no terminó con una respuesta definitiva: timeout, error de red, respuesta inválida o transacción enviada sin confirmar. Los fondos pueden haberse movido. | No pagar de nuevo ni crear otro quote. El servicio lo concilia solo en cinco minutos o menos (ver abajo); `reconcile:payment` queda para el caso manual. |
 | `out_of_stock` | Inventario cambió tras el pago. | Detener reintentos y revisar manualmente. |
 | `manual_review` | Fallo después de un efecto irreversible (por ejemplo, Shopify falla tras el pago o el settlement no pudo registrarse) o evidencia incompleta. | Conciliar antes de cualquier acción. |
 | `shopify_failed` | Estado reservado para fallos de Shopify. | Tratarlo como revisión manual hasta tener evidencia. |
@@ -31,7 +31,47 @@ El vencimiento del quote sólo impide iniciar pagos nuevos. Si el quote vence
 mientras su settlement ya está en curso, el pago se registra igual y la orden
 continúa; un pago confirmado nunca se descarta por haber llegado tarde.
 
-## Conciliar un pago incierto (`payment_unknown`)
+## Liquidación sin operador
+
+Desde el 2026-11-20 ninguna orden se crea por la respuesta del facilitador
+sola. Antes de completar el draft de Shopify, Setareh consulta el hash en dos
+lectores independientes de la red, Stellar RPC y Horizon, y exige que ambos
+muestren una transferencia USDC del monto exacto al comercio en el mismo
+ledger. El resultado queda guardado junto al pago (`verification` en
+`get_order_status`: veredicto, ledger y qué dijo cada fuente).
+
+| Lo que ve la red | Qué pasa |
+| --- | --- |
+| RPC y Horizon confirman el mismo ledger | Se crea la orden. |
+| Una fuente contradice (monto distinto, transacción fallida, ledgers distintos) | `manual_review`; no se crea orden. El pago queda registrado con la evidencia de ambas fuentes. |
+| El facilitador reporta un hash de otra red | Se rechaza en el acto con `409`; no se registra pago y el quote pasa a `manual_review`. |
+| Ninguna fuente lo ve todavía | La petición responde `202` con el estado del quote y el proceso interno sigue consultando; a los cinco minutos sin confirmación, `manual_review`. |
+
+Un proceso interno (el *settlement worker*, cada 30 segundos, `settlement.worker`
+en los logs) recorre todo lo que espera a la red y lo lleva a un estado final
+sin que nadie intervenga:
+
+| Estado | Qué hace el worker |
+| --- | --- |
+| `payment_unknown` | Concilia contra la red con los datos de la autorización firmada (misma lógica que `reconcile:payment`). `paid`: verifica el hash en RPC y Horizon y crea la orden. `unpaid`: cierra como `payment_failed`. `ambiguous` o datos inconsistentes: `manual_review`. Si sigue `pending` a los cinco minutos: `manual_review`. |
+| `payment_settled` sin verificar | Repite la verificación doble; con ambas confirmaciones crea la orden. |
+| `payment_submitted` más de cinco minutos | El proceso murió en medio del settlement: pasa a `payment_unknown` conservando pagador y expiración. |
+| `creating_shopify_order` más de cinco minutos | Adopta la orden si Shopify ya completó el draft; si no, la crea una vez. |
+| Una vez al día | Purga los datos personales según la [política de retención](/operaciones/logs-y-retencion/). |
+
+Nunca adivina: declara impago sólo cuando la autorización firmada expiró sin
+transferencia, y ante dos transferencias que coinciden no elige. Todo lo que
+escala a `manual_review` lleva en el log el motivo (`escalated:<motivo>`) y el
+`correlationId` del worker. El worker se desactiva con
+`SETAREH_SETTLEMENT_WORKER=off`; el intervalo y los plazos se ajustan con
+`SETAREH_SETTLEMENT_WORKER_INTERVAL_MS`, `SETAREH_SETTLEMENT_MAX_UNKNOWN_MS` y
+`SETAREH_SETTLEMENT_MAX_VERIFICATION_MS`.
+
+## Conciliar un pago incierto a mano (`payment_unknown`)
+
+El worker hace esto solo. El comando sigue para cuando un quote quedó en
+`manual_review` porque el RPC ya no tiene el historial (`--tx`), para revisar
+un caso con el servicio detenido, o para ver el veredicto sin aplicar nada.
 
 Setareh guarda de cada intento fallido sólo datos derivados de la autorización
 firmada: pagador, destinatario, monto y ledger de expiración. Con ellos el
@@ -46,7 +86,7 @@ npm.cmd run reconcile:payment -- <quoteId> --tx <hash>
 
 | Veredicto | Significado | Con `--apply` |
 | --- | --- | --- |
-| `paid` | Hay una transacción exitosa con una transferencia USDC del monto exacto al comercio. | Registra el pago y crea la orden Shopify por el camino idempotente. |
+| `paid` | Hay una transacción exitosa con una transferencia USDC del monto exacto al comercio. | Registra el pago, lo verifica también en Horizon y crea la orden Shopify por el camino idempotente. Si Horizon no confirma, el quote queda en `manual_review` o `payment_settled` y el comando lo dice. |
 | `unpaid` | No hay transferencia y la autorización del comprador ya expiró en la red, así que ya no puede cobrarse. | Cierra el quote como `payment_failed`. |
 | `pending` | Todavía no hay transferencia, pero la autorización sigue vigente (normalmente alrededor de un minuto). | Nada; repetir después del ledger indicado. |
 | `ambiguous` | Más de una transferencia coincide. | Nada; elegir la correcta y repetir con `--tx`. |
@@ -101,7 +141,9 @@ la semana 2). "Garantía" es lo que Setareh asegura sin intervención.
 
 Un quote no debería pasar más de cinco minutos en `payment_submitted`,
 `payment_settled` o `creating_shopify_order`. Si el proceso se reinició en
-medio de un pago o de una orden, queda ahí.
+medio de un pago o de una orden, queda ahí hasta que el worker lo retoma en su
+siguiente pasada. El comando sirve para hacerlo con el servicio detenido o
+para ver la lista sin esperar.
 
 ```powershell
 cd backend

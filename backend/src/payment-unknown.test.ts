@@ -4,15 +4,17 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { Account, Address, Keypair, Networks, Operation, StrKey, TransactionBuilder, authorizeInvocation, nativeToScVal, rpc, xdr } from "@stellar/stellar-sdk";
+import { Account, Address, Keypair, Networks, Operation, TransactionBuilder, authorizeInvocation, nativeToScVal, xdr } from "@stellar/stellar-sdk";
 import { FacilitatorResponseError, FacilitatorTimeoutError, SettleError } from "@x402/core/types";
 import { USDC_TESTNET_ADDRESS } from "@x402/stellar";
 import { CommerceService } from "./commerce.js";
 import type { SetarehConfig } from "./config.js";
+import { confirmingChain, rpcFrom, type ChainTransfer } from "./chain-double.test-support.js";
 import { SetarehDatabase, type PaymentAttemptRecord } from "./db.js";
 import { classifySettlementFailure, createHttpApp } from "./http.js";
 import { reconcileUnknownPayment } from "./payment-reconciliation.js";
 import { describeSignedTransfer, type SettlementRpc } from "./stellar-settlement.js";
+
 
 const merchant = Keypair.random().publicKey();
 const buyer = Keypair.random();
@@ -136,30 +138,8 @@ test("a rejection that reports a submitted transaction keeps its hash for reconc
   } finally { await run.close(); }
 });
 
-type ChainTransfer = { hash: string; ledger: number; from: string; to: string; amount: bigint; succeeded?: boolean };
-
-/** An RPC double that answers getTransaction and getEvents from a list of USDC transfers. */
-function chain(transfers: ChainTransfer[], latestLedger: number, oldestLedger = 1): SettlementRpc {
-  const topics = (transfer: ChainTransfer) => [nativeToScVal("transfer", { type: "symbol" }), nativeToScVal(transfer.from, { type: "address" }), nativeToScVal(transfer.to, { type: "address" }), nativeToScVal(`USDC:${merchant}`)];
-  return {
-    getHealth: async () => ({ status: "healthy", latestLedger, oldestLedger, ledgerRetentionWindow: latestLedger - oldestLedger }),
-    getTransaction: async (hash: string) => {
-      const transfer = transfers.find((candidate) => candidate.hash === hash);
-      if (!transfer) return { status: rpc.Api.GetTransactionStatus.NOT_FOUND, txHash: hash } as any;
-      if (transfer.succeeded === false) return { status: rpc.Api.GetTransactionStatus.FAILED, txHash: hash, ledger: transfer.ledger } as any;
-      const event = { contractId: { toXdrObject: () => StrKey.decodeContract(USDC_TESTNET_ADDRESS) }, body: { type: "v0", v0: { topics: topics(transfer), data: nativeToScVal(transfer.amount, { type: "i128" }) } } };
-      return { status: rpc.Api.GetTransactionStatus.SUCCESS, txHash: hash, ledger: transfer.ledger, events: { transactionEventsXdr: [], contractEventsXdr: [[event]] } } as any;
-    },
-    getEvents: async (request: any) => {
-      const events = transfers
-        .filter((transfer) => transfer.succeeded !== false && transfer.ledger >= request.startLedger && transfer.ledger < request.endLedger)
-        .map((transfer) => ({ txHash: transfer.hash, ledger: transfer.ledger, topic: topics(transfer), value: nativeToScVal(transfer.amount, { type: "i128" }) }))
-        // Mirrors the RPC topic filter on payer and merchant.
-        .filter((event) => request.filters[0].topics[0].slice(1, 3).every((wanted: string, index: number) => event.topic[index + 1].toXdr("base64") === wanted));
-      return { events, cursor: "", latestLedger, oldestLedger } as any;
-    },
-  } as unknown as SettlementRpc;
-}
+/** The RPC double, shared with the worker tests; events and transactions come from one transfer list. */
+const chain = (transfers: ChainTransfer[], latestLedger: number, oldestLedger = 1): SettlementRpc => rpcFrom(transfers, latestLedger, oldestLedger);
 
 function unknownAttempt(overrides: Partial<PaymentAttemptRecord> = {}): PaymentAttemptRecord {
   return { id: "attempt", quoteId: "q", outcome: "unknown", errorReason: "facilitator_timeout", facilitatorTransaction: null, payer: buyer.publicKey(), amount: quoteUnits.toString(), payTo: merchant, signatureExpirationLedger: 1_010, createdAt: new Date(Date.now() - 60_000).toISOString(), ...overrides };
@@ -218,11 +198,13 @@ test("a reconciled settlement completes the order once; an unpaid verdict frees 
   const database = new SetarehDatabase(join(directory, "setareh.db"));
   try {
     const shopify = shopifyDouble();
-    const service = new CommerceService(config(directory), database, shopify.client as any);
+    const service = new CommerceService(config(directory), database, shopify.client as any, confirmingChain(merchant, quoteUnits));
     const paid = database.createQuote({ ...quoteFixture("paid"), status: "payment_unknown" });
     const unpaid = database.createQuote({ ...quoteFixture("unpaid"), status: "payment_unknown" });
     service.recordReconciledSettlement(paid.id, "ab".repeat(32));
+    // Reconciliation alone is not enough: the order is placed only after both network readers confirm the hash.
     const order = await service.placePaidOrder(paid.id, true);
+    assert.ok(database.getPayment(paid.id)?.verified_at, "the payment was verified before the order");
     assert.equal(order.status, "created");
     assert.equal(order.payment?.transactionHash, "ab".repeat(32));
     assert.equal(shopify.calls.completeDraftOrder, 1);

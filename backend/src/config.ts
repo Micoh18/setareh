@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { StrKey } from "@stellar/stellar-sdk";
+import { DEFAULT_TESTNET_HORIZON_URL, DEFAULT_TESTNET_RPC_URL } from "@x402/stellar";
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
@@ -42,6 +43,14 @@ export type SetarehConfig = {
   port?: number;
   httpHost?: string;
   quoteRateLimits?: { perClientPerHour: number; globalPerHour: number };
+  /** Independent readers of the network used to verify every settlement before an order is created. */
+  stellarRpcUrl?: string;
+  stellarHorizonUrl?: string;
+  /** In-request verification: how many times to re-read the network before answering 202 and leaving it to the worker. */
+  verification?: { attempts: number; delayMs: number };
+  /** Background settlement worker: reconciles payment_unknown, verifies payment_settled, resumes interrupted orders, purges. */
+  settlementWorker?: { enabled: boolean; intervalMs: number; maxUnknownMs: number; maxVerificationMs: number };
+  retention?: { auto: boolean; expiredAfterDays: number; orderedAfterDays: number; everyMs: number };
 };
 
 function positiveInteger(name: string, fallback: number): number {
@@ -92,5 +101,16 @@ export function loadConfig(): SetarehConfig {
     port,
     httpHost: process.env.SETAREH_HTTP_HOST ?? "127.0.0.1",
     quoteRateLimits: { perClientPerHour: positiveInteger("SETAREH_QUOTES_PER_CLIENT_PER_HOUR", 10), globalPerHour: positiveInteger("SETAREH_QUOTES_PER_HOUR", 60) },
+    stellarRpcUrl: process.env.STELLAR_RPC_URL?.trim() || DEFAULT_TESTNET_RPC_URL,
+    stellarHorizonUrl: process.env.STELLAR_HORIZON_URL?.trim() || DEFAULT_TESTNET_HORIZON_URL,
+    verification: { attempts: positiveInteger("SETAREH_VERIFY_ATTEMPTS", 4), delayMs: positiveInteger("SETAREH_VERIFY_DELAY_MS", 2_000) },
+    settlementWorker: {
+      enabled: (process.env.SETAREH_SETTLEMENT_WORKER ?? "on") !== "off",
+      intervalMs: positiveInteger("SETAREH_SETTLEMENT_WORKER_INTERVAL_MS", 30_000),
+      // The addendum commits to a decision on every payment_unknown quote within five minutes, with no operator.
+      maxUnknownMs: positiveInteger("SETAREH_SETTLEMENT_MAX_UNKNOWN_MS", 5 * 60_000),
+      maxVerificationMs: positiveInteger("SETAREH_SETTLEMENT_MAX_VERIFICATION_MS", 5 * 60_000),
+    },
+    retention: { auto: (process.env.SETAREH_RETENTION_AUTO ?? "on") !== "off", expiredAfterDays: positiveInteger("SETAREH_RETENTION_EXPIRED_DAYS", 30), orderedAfterDays: positiveInteger("SETAREH_RETENTION_ORDERED_DAYS", 90), everyMs: positiveInteger("SETAREH_RETENTION_EVERY_MS", 24 * 60 * 60_000) },
   };
 }

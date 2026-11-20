@@ -48,8 +48,12 @@ npm.cmd run doctor -- --verify
 
 La última comprobación valida la conexión a Shopify, los scopes
 `read_products`, `read_inventory`, `write_draft_orders`, `read_orders` y
-`write_orders`, y que el facilitador x402 anuncie settlement `exact` para
-`stellar:testnet`. Corrige cualquier fallo antes de aceptar pagos.
+`write_orders`, que el facilitador x402 anuncie settlement `exact` para
+`stellar:testnet`, y que Stellar RPC y Horizon respondan (los dos lectores
+con los que se verifica cada pago antes de crear una orden). Informa la
+versión de protocolo que anuncia la red y avisa (`warning`) si es más nueva
+que la que esta versión probó. Corrige cualquier fallo antes de aceptar
+pagos; ante el aviso de protocolo, haz una compra de humo primero.
 
 Confirma también que la wallet del agente tenga una trustline de USDC testnet y
 que `AGENT_MAX_USDC` sea igual o menor al máximo permitido por Setareh.
@@ -103,9 +107,11 @@ límite local antes de firmar.
 | Pago liquidado pero orden en revisión | Detén nuevos intentos para ese quote y concilia antes de actuar manualmente. |
 | Duda sobre estado de un draft | Ejecuta `npm.cmd run reconcile:draft -- gid://shopify/DraftOrder/<id>`. |
 | Duda sobre una orden pagada | Ejecuta `npm.cmd run reconcile:order -- <quoteId>`. |
-| El servicio se reinició durante compras en curso | Ejecuta `npm.cmd run reconcile:stuck`; con `--apply` resuelve cada quote atascado según su estado. |
+| El servicio se reinició durante compras en curso | El worker retoma cada quote atascado en su siguiente pasada (30 s). Con el servicio detenido, `npm.cmd run reconcile:stuck -- --apply`. |
 | Revisión periódica | Ejecuta `npm.cmd run metrics` y atiende `alerts.stuck` y `alerts.needsReview`. Ver [Métricas](/operaciones/metricas/). |
-| Quote en `payment_unknown` (timeout o error del facilitador) | No pagues de nuevo. Ejecuta `npm.cmd run reconcile:payment -- <quoteId>` y, si el veredicto es `paid` o `unpaid`, repite con `--apply`. |
+| Quote en `payment_unknown` (timeout o error del facilitador) | No pagues de nuevo. El servicio lo concilia solo contra la red en cinco minutos o menos y crea la orden si RPC y Horizon confirman el hash; mira `settlement.worker` en el log. Si terminó en `manual_review`, ejecuta `npm.cmd run reconcile:payment -- <quoteId> --tx <hash>` con el hash del explorador. |
+| El pago respondió `202` (verificación pendiente) | El facilitador dijo liquidado pero la red aún no lo muestra en RPC y Horizon. No pagues de nuevo: consulta `get_order_status`; la orden se crea sola al confirmarse o el quote pasa a `manual_review` a los cinco minutos. |
+| `/health` o `doctor` avisan de un protocolo más nuevo | La red va por delante de la versión probada. Haz una compra de humo; si falla al decodificar, actualiza el SDK de Stellar y x402 como el 2026-11-05. |
 
 Un quote admite un pago y una orden. Ante reintentos, usa siempre el mismo
 `quoteId` para consultar o conciliar, nunca para iniciar una compra paralela.

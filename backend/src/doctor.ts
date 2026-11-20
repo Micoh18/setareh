@@ -4,7 +4,11 @@ import { dirname, resolve } from "node:path";
 import { existsSync } from "node:fs";
 import { loadConfig } from "./config.js";
 import { SetarehDatabase } from "./db.js";
+import { rpc } from "@stellar/stellar-sdk";
+import { DEFAULT_TESTNET_HORIZON_URL, DEFAULT_TESTNET_RPC_URL } from "@x402/stellar";
 import { SHOPIFY_REQUIRED_SCOPES, createShopifyRuntime, shopifyAuthMode } from "./shopify-oauth.js";
+import { createHorizonClient } from "./stellar-horizon.js";
+import { checkProtocol } from "./stellar-preflight.js";
 
 dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), "../.env"), quiet: true });
 
@@ -49,6 +53,13 @@ async function main() {
     if (!supportsStellarTestnet) throw new Error("Facilitator does not advertise exact settlement for stellar:testnet.");
     report.shopify = { connected: true, sampleVariants: variants.length, requiredScopesVerified: true };
     report.facilitator = { connected: true, stellarTestnetExact: true };
+    // Both network readers must answer: every order needs the hash confirmed by Stellar RPC and Horizon.
+    const readers = { rpc: new rpc.Server(config.stellarRpcUrl ?? DEFAULT_TESTNET_RPC_URL), horizon: createHorizonClient(config.stellarHorizonUrl ?? DEFAULT_TESTNET_HORIZON_URL) };
+    const protocol = await checkProtocol(readers);
+    if (protocol.rpc.error) throw new Error(`Stellar RPC is not answering: ${protocol.rpc.error}`);
+    if (protocol.horizon.error) throw new Error(`Horizon is not answering: ${protocol.horizon.error}`);
+    report.stellar = { rpc: { connected: true, protocolVersion: protocol.rpc.protocolVersion }, horizon: { connected: true, protocolVersion: protocol.horizon.protocolVersion }, knownProtocolVersion: protocol.known, protocolSupported: protocol.supported, settlementWorker: config.settlementWorker?.enabled === false ? "off" : "on" };
+    if (!protocol.supported) report.warning = `The network runs a protocol newer than ${protocol.known}, the version this build was tested with. Run a smoke purchase before accepting payments.`;
   }
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
 }

@@ -7,6 +7,7 @@ import test from "node:test";
 import { Keypair } from "@stellar/stellar-sdk";
 import { CommerceService } from "./commerce.js";
 import type { SetarehConfig } from "./config.js";
+import { confirmingChain } from "./chain-double.test-support.js";
 import { SetarehDatabase } from "./db.js";
 import { createHttpApp } from "./http.js";
 import { captureLogs, correlationIdFrom, log, scrub, withCorrelation } from "./log.js";
@@ -72,7 +73,7 @@ test("a full paid purchase logs every step under its request ID without buyer da
     // A Shopify error that echoes buyer data and a token must not reach the logs verbatim.
     attachPaymentEvidence: async () => { throw new Error(`metafield rejected for ${sensitive.email} using ${sensitive.shopifyToken}`); },
   };
-  const service = new CommerceService(config, database, shopify as any);
+  const service = new CommerceService(config, database, shopify as any, confirmingChain(config.stellarMerchantAddress, 100_000_000n));
   const appServer = createHttpApp(service).listen(0, "127.0.0.1");
   await new Promise<void>((resolve) => appServer.on("listening", resolve));
   const appAddress = appServer.address();
@@ -103,7 +104,7 @@ test("a full paid purchase logs every step under its request ID without buyer da
 
     const entries = lines.map((line) => JSON.parse(line) as Record<string, unknown>);
     const forPay = entries.filter((entry) => entry.correlationId === "agent-pay-0002").map((entry) => `${entry.event}${entry.to ? `:${entry.to}` : ""}`);
-    assert.deepEqual(forPay, ["quote.status:payment_submitted", "quote.status:payment_settled", "payment.settled", "quote.status:creating_shopify_order", "quote.status:manual_review", "http.error", "http.request"]);
+    assert.deepEqual(forPay, ["quote.status:payment_submitted", "quote.status:payment_settled", "payment.settled", "payment.verification_verified", "quote.status:creating_shopify_order", "quote.status:manual_review", "http.error", "http.request"]);
     assert.ok(entries.some((entry) => entry.event === "http.request" && entry.route === "/v1/quotes/:id/pay-and-place" && entry.httpStatus === 402));
     assert.ok(entries.find((entry) => entry.event === "http.error")?.message === "metafield rejected for [email] using [shopify-token]");
 

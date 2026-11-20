@@ -41,6 +41,10 @@ try {
     const commerce = new CommerceService(config, database, createShopifyRuntime(database, config.baseUrl).client);
     if (verdict.verdict === "paid") {
       commerce.recordReconciledSettlement(quoteId, verdict.transactionHash);
+      // Same rule as the automatic path: the order needs Stellar RPC and Horizon to agree on the hash.
+      const verification = await commerce.verifySettlementWithRetries(quoteId);
+      report.verification = { verdict: verification.verdict, reason: "reason" in verification ? verification.reason : undefined };
+      if (verification.verdict !== "verified") throw new Error(`The transaction was found by the RPC but not confirmed by both readers (${verification.verdict}); the quote is ${database.getQuote(quoteId)?.status}.`);
       report.order = await commerce.placePaidOrder(quoteId, true);
     } else {
       commerce.markReconciledUnpaid(quoteId);

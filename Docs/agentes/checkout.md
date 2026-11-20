@@ -86,5 +86,12 @@ de [recuperación](/operaciones/estados-y-recuperacion/).
 
 Si el pago devuelve un error o un timeout, no firmes otro pago: consulta
 `get_order_status`. Si el estado es `payment_unknown`, el cobro puede haber
-ocurrido; Setareh rechaza cualquier nuevo pago de ese quote hasta conciliarlo.
-Explícalo así y no crees un quote nuevo para el mismo pedido.
+ocurrido; Setareh rechaza cualquier nuevo pago de ese quote y lo concilia solo
+contra la red en cinco minutos o menos. Explícalo así y no crees un quote nuevo
+para el mismo pedido.
+
+Si el pago responde `202`, el facilitador dijo que liquidó pero Setareh todavía
+no ve la transacción en Stellar RPC y Horizon a la vez; la orden no existe aún y
+no se cobrará de nuevo. Vuelve a consultar `get_order_status` en un minuto: el
+campo `payment.verification` dice qué fuente confirmó y cuándo. Ninguna orden se
+crea sin esa doble confirmación.

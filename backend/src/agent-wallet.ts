@@ -100,6 +100,7 @@ export async function checkSetup(env: AgentEnv, options: { fetchImpl?: typeof fe
 
 export type PayOutcome =
   | { outcome: "created"; httpStatus: number; order: unknown }
+  | { outcome: "pending_verification"; httpStatus: number; order: unknown; meaning: string }
   | { outcome: "refused_locally"; message: string; meaning: string }
   | { outcome: "rejected_before_payment"; httpStatus: number; message: string; meaning: string }
   | { outcome: "failed_after_payment_attempt"; httpStatus: number; message: string; meaning: string };
@@ -108,8 +109,10 @@ export type PayOutcome =
  * Plain-language reading of a non-created outcome, so the agent that relays it to a non-technical
  * person explains it the same way regardless of how the person phrased the request.
  */
-export function describePayOutcome(outcome: "refused_locally" | "rejected_before_payment" | "failed_after_payment_attempt", httpStatus?: number) {
+export function describePayOutcome(outcome: "refused_locally" | "rejected_before_payment" | "failed_after_payment_attempt" | "pending_verification", httpStatus?: number) {
   switch (outcome) {
+    case "pending_verification":
+      return "La wallet firmó y el facilitador dice que el pago se liquidó, pero Setareh todavía no lo ve en Stellar RPC y Horizon a la vez. No se creó la orden ni se cobrará de nuevo: consulta el estado con el mismo quoteId en un minuto; la orden se crea sola cuando la red lo confirma.";
     case "refused_locally":
       return "La wallet local se negó a firmar: no se movió USDC ni se creó ninguna orden.";
     case "rejected_before_payment":
@@ -151,6 +154,7 @@ export async function payQuote(input: { apiUrl: string; quoteId: string; secret:
   });
   const response = await wrapFetchWithPayment(fetchImpl, client)(endpoint, request);
   if (!response.ok) return { outcome: "failed_after_payment_attempt", httpStatus: response.status, message: await response.text(), meaning: describePayOutcome("failed_after_payment_attempt", response.status) };
+  if (response.status === 202) return { outcome: "pending_verification", httpStatus: response.status, order: await response.json(), meaning: describePayOutcome("pending_verification", response.status) };
   return { outcome: "created", httpStatus: response.status, order: await response.json() };
 }
 
