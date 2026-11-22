@@ -224,7 +224,9 @@ body {
 
 /* ---------- Header ---------- */
 
-.header {
+/* Only the page frame's <header>: the inner Header.astro wrapper is also `.header`,
+   and a second border there draws a line through the search, theme and start buttons. */
+header.header {
   border-bottom: 1px solid var(--st-border);
   background: var(--st-bg);
 }
