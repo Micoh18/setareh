@@ -64,7 +64,7 @@ test("does not expose a settled quote for a second x402 payment", () => {
   try {
     const record = database.createQuote(quote("settled"));
     database.recordPaymentSettled({ quoteId: record.id, network: "stellar:testnet", asset: "USDC", amount: "10.000000", payTo: "GTEST", paymentPayloadHash: "payload", receipt: { transactionHash: "abc" } });
-    const service = new CommerceService({ databasePath: join(directory, "test.db"), merchantId: "micohstore", merchantName: "Micohstore", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: "GTEST", facilitatorUrl: "https://example.test", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 }, database, { domain: "micohstore.myshopify.com" } as any, confirmingChain("GTEST", 100_000_000n));
+    const service = new CommerceService({ databasePath: join(directory, "test.db"), merchantName: "Micohstore", agentAuth: "off", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: "GTEST", facilitatorUrl: "https://example.test", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 }, database, { domain: "micohstore.myshopify.com" } as any, confirmingChain("GTEST", 100_000_000n));
     assert.throws(() => service.getPayableQuote(record.id), /cannot be charged again/i);
   } finally { database.close(); rmSync(directory, { recursive: true, force: true }); }
 });
@@ -73,7 +73,7 @@ test("rejects a settled payload whose Stellar requirements differ from its quote
   const { database, directory } = fixture();
   try {
     const record = database.createQuote(quote("tampered-payment"));
-    const service = new CommerceService({ databasePath: join(directory, "test.db"), merchantId: "micohstore", merchantName: "Micohstore", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: "GTEST", facilitatorUrl: "https://example.test", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 }, database, { domain: "micohstore.myshopify.com" } as any, confirmingChain("GTEST", 100_000_000n));
+    const service = new CommerceService({ databasePath: join(directory, "test.db"), merchantName: "Micohstore", agentAuth: "off", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: "GTEST", facilitatorUrl: "https://example.test", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 }, database, { domain: "micohstore.myshopify.com" } as any, confirmingChain("GTEST", 100_000_000n));
     assert.throws(() => service.recordSettlement(record.id, { payload: { accepted: { network: "stellar:testnet", asset: USDC_TESTNET_ADDRESS, amount: "1", payTo: "GTEST" } }, receipt: {} }), /do not match/i);
     assert.equal(database.getPayment(record.id), undefined);
     assert.equal(database.getQuote(record.id)?.status, "quoted");
@@ -85,7 +85,7 @@ test("keeps settlement evidence and moves to manual review if Shopify fails afte
   try {
     const record = database.createQuote({ ...quote("shopify-failure"), lineItemsJson: JSON.stringify([{ variantId: "gid://shopify/ProductVariant/1", quantity: 1 }]) });
     database.recordPaymentSettled({ quoteId: record.id, network: "stellar:testnet", asset: "USDC", amount: "10.0000000", payTo: "GTEST", paymentPayloadHash: "payload", transactionHash: "stellar-hash", receipt: { transactionHash: "stellar-hash", signedAuthorization: "must-not-leak" } });
-    const service = new CommerceService({ databasePath: join(directory, "test.db"), merchantId: "micohstore", merchantName: "Micohstore", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: "GTEST", facilitatorUrl: "https://example.test", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 }, database, {
+    const service = new CommerceService({ databasePath: join(directory, "test.db"), merchantName: "Micohstore", agentAuth: "off", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: "GTEST", facilitatorUrl: "https://example.test", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 }, database, {
       domain: "micohstore.myshopify.com",
       getVariant: async () => ({ inventoryQuantity: 1, inventoryPolicy: "DENY", availableForSale: true, product: {} }),
       completeDraftOrder: async () => ({ id: "gid://shopify/Order/1", name: "#1001" }),
@@ -111,7 +111,7 @@ test("reconciles a completed Shopify draft after a local manual review", async (
     const record = database.createQuote(quote("reconcile-completed-draft"));
     database.recordPaymentSettled({ quoteId: record.id, network: "stellar:testnet", asset: "USDC", amount: "10.0000000", payTo: "GTEST", paymentPayloadHash: "payload", transactionHash: "stellar-hash", receipt: {} });
     database.markManualReview(record.id);
-    const service = new CommerceService({ databasePath: join(directory, "test.db"), merchantId: "micohstore", merchantName: "Micohstore", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: "GTEST", facilitatorUrl: "https://example.test", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 }, database, {
+    const service = new CommerceService({ databasePath: join(directory, "test.db"), merchantName: "Micohstore", agentAuth: "off", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: "GTEST", facilitatorUrl: "https://example.test", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 }, database, {
       domain: "micohstore.myshopify.com",
       getDraftOrder: async () => ({ id: "gid://shopify/DraftOrder/1", name: "#D1", status: "COMPLETED", invoiceUrl: null, totalPrice: "10000.00", currencyCode: "CLP", order: { id: "gid://shopify/Order/1", name: "#1001" } }),
       attachPaymentEvidence: async () => undefined,
@@ -134,7 +134,7 @@ test("claims Shopify completion once when paid-order retries overlap", async () 
     const completionStarted = new Promise<void>((resolve) => { releaseCompletion = resolve; });
     let entered: (() => void) | undefined;
     const completionEntered = new Promise<void>((resolve) => { entered = resolve; });
-    const service = new CommerceService({ databasePath: join(directory, "test.db"), merchantId: "micohstore", merchantName: "Micohstore", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: "GTEST", facilitatorUrl: "https://example.test", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 }, database, {
+    const service = new CommerceService({ databasePath: join(directory, "test.db"), merchantName: "Micohstore", agentAuth: "off", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: "GTEST", facilitatorUrl: "https://example.test", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 }, database, {
       domain: "micohstore.myshopify.com",
       getVariant: async () => ({ inventoryQuantity: 1, inventoryPolicy: "DENY", availableForSale: true, product: {} }),
       completeDraftOrder: async () => { completeCalls += 1; entered?.(); await completionStarted; return { id: "gid://shopify/Order/1", name: "#1001" }; },
@@ -153,7 +153,7 @@ test("freezes configured demo shipping in the Shopify draft and quote", async ()
   const { database, directory } = fixture();
   try {
     let shippingLine: unknown;
-    const service = new CommerceService({ databasePath: join(directory, "test.db"), merchantId: "micohstore", merchantName: "Micohstore", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: "GTEST", facilitatorUrl: "https://example.test", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001, shippingFlatClp: 1500, shippingTitle: "Despacho Santiago" }, database, {
+    const service = new CommerceService({ databasePath: join(directory, "test.db"), merchantName: "Micohstore", agentAuth: "off", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: "GTEST", facilitatorUrl: "https://example.test", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001, shippingFlatClp: 1500, shippingTitle: "Despacho Santiago" }, database, {
       domain: "micohstore.myshopify.com",
       getVariant: async () => ({ inventoryQuantity: 1, inventoryPolicy: "DENY", availableForSale: true, product: {} }),
       createDraftOrder: async (input: { shippingLine?: unknown }) => { shippingLine = input.shippingLine; return { id: "gid://shopify/DraftOrder/1", name: "#D1001", totalPrice: "11500.00", currencyCode: "CLP" }; },

@@ -24,9 +24,13 @@ function nonNegativeDecimal(name: string, fallback: number): number {
   return value;
 }
 
+/**
+ * `merchantName`, `stellarMerchantAddress`, `maxQuoteUsdc` and `maxDayUsdc` describe the one store this
+ * instance can define from its environment (SHOPIFY_STORE_DOMAIN). Stores that install through OAuth
+ * bring their own payout address and caps from their setup page and never read these values.
+ */
 export type SetarehConfig = {
   databasePath: string;
-  merchantId: string;
   merchantName: string;
   shopifyCredentialsRef?: string;
   stellarNetwork: "stellar:testnet";
@@ -34,7 +38,14 @@ export type SetarehConfig = {
   stellarMerchantAddress: string;
   facilitatorUrl: string;
   baseUrl?: string;
+  /** Per-order USDC cap of the environment store. */
   maxQuoteUsdc: number;
+  /** Per-day (UTC) USDC cap of the environment store; five times the per-order cap when unset. */
+  maxDayUsdc?: number;
+  /** "required": every /v1 route needs an agent key. "off" is for local development and tests only. */
+  agentAuth?: "required" | "off";
+  /** Wrong or missing keys tolerated per client address and hour before answering 429. */
+  authFailuresPerHour?: number;
   quoteTtlMinutes: number;
   usdcPerClp: number;
   fxSource?: string;
@@ -61,6 +72,12 @@ function positiveInteger(name: string, fallback: number): number {
   return value;
 }
 
+function agentAuthMode(): "required" | "off" {
+  const value = (process.env.SETAREH_AGENT_AUTH ?? "required").trim().toLowerCase();
+  if (value !== "required" && value !== "off") throw new Error("SETAREH_AGENT_AUTH must be required or off.");
+  return value;
+}
+
 export function loadConfig(): SetarehConfig {
   const network = process.env.STELLAR_NETWORK ?? "stellar:testnet";
   if (network !== "stellar:testnet") {
@@ -84,7 +101,6 @@ export function loadConfig(): SetarehConfig {
 
   return {
     databasePath: resolve(process.cwd(), process.env.SETAREH_DATABASE_PATH ?? "setareh.db"),
-    merchantId: process.env.SETAREH_MERCHANT_ID ?? "micohstore",
     merchantName: process.env.SETAREH_MERCHANT_NAME ?? "Micohstore",
     shopifyCredentialsRef: process.env.SHOPIFY_CREDENTIALS_REF ?? "env:SHOPIFY_CLIENT_ID",
     stellarNetwork: network,
@@ -93,6 +109,9 @@ export function loadConfig(): SetarehConfig {
     facilitatorUrl: process.env.X402_FACILITATOR_URL ?? "https://x402.org/facilitator",
     baseUrl,
     maxQuoteUsdc: decimal("SETAREH_MAX_QUOTE_USDC", 30),
+    maxDayUsdc: process.env.SETAREH_MAX_DAY_USDC ? decimal("SETAREH_MAX_DAY_USDC") : undefined,
+    agentAuth: agentAuthMode(),
+    authFailuresPerHour: positiveInteger("SETAREH_AUTH_FAILURES_PER_HOUR", 30),
     quoteTtlMinutes: decimal("QUOTE_TTL_MINUTES", 10),
     usdcPerClp: decimal("SETAREH_USDC_PER_CLP"),
     fxSource: process.env.SETAREH_FX_SOURCE ?? "configured_demo_rate",

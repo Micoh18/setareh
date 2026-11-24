@@ -21,7 +21,7 @@ const database = new SetarehDatabase(config.databasePath);
 try {
   const stuck = findStuckQuotes(database).filter((quote) => !filterQuote || quote.quoteId === filterQuote);
   const results: Array<Record<string, unknown>> = [];
-  const commerce = apply ? new CommerceService(config, database, createShopifyRuntime(database, config.baseUrl).client) : undefined;
+  const commerce = apply ? new CommerceService(config, database, createShopifyRuntime(database, config.baseUrl).directory) : undefined;
   for (const quote of stuck) {
     const entry: Record<string, unknown> = { ...quote, applied: false };
     if (commerce) {

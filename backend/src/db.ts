@@ -7,6 +7,8 @@ export type QuoteStatus = "quoted" | "payment_required" | "payment_submitted" | 
 export type QuoteRecord = {
   id: string;
   merchantId: string;
+  /** The agent key that created the quote; null for quotes older than agent keys or created by the operator. */
+  agentKeyId?: string | null;
   status: QuoteStatus;
   currencyShopify: string;
   totalShopify: string;
@@ -57,6 +59,36 @@ export type ShopifyInstallationRecord = {
   installedAt: string;
   updatedAt: string;
 };
+
+export type MerchantStatus = "pending_setup" | "active" | "disabled";
+
+/** A store Setareh sells for. Its id is the handle of its Shopify domain; the payout address and caps are its own. */
+export type MerchantRecord = {
+  id: string;
+  name: string;
+  shopDomain: string;
+  shopifyCredentialsRef: string;
+  /** Empty until the store finishes its setup page. */
+  stellarRecipient: string;
+  network: string;
+  /** USDC caps chosen by the store; null means not set yet (the store cannot sell). */
+  maxOrderUsdc: number | null;
+  maxDayUsdc: number | null;
+  status: MerchantStatus;
+  /** "env": defined by this instance's environment. "owner": set by the store on its setup page; the environment never overwrites it. */
+  configuredBy: "env" | "owner";
+  activatedAt: string | null;
+};
+
+export type AgentKeyRecord = { id: string; merchantId: string; label: string; prefix: string; createdAt: string; revokedAt: string | null; lastUsedAt: string | null };
+
+/** Statuses in which a quote's amount counts against the store's daily cap: paid, in flight, or held for a person. */
+const DAILY_CAP_COMMITTED: QuoteStatus[] = ["payment_submitted", "payment_settled", "creating_shopify_order", "created", "payment_unknown", "manual_review", "out_of_stock", "shopify_failed"];
+
+/** The merchant id of a store: the part of its Shopify domain before ".myshopify.com". */
+export function merchantIdFromShop(shopDomain: string) {
+  return shopDomain.trim().toLowerCase().replace(/\.myshopify\.com$/, "");
+}
 
 function now() { return new Date().toISOString(); }
 
@@ -118,12 +150,39 @@ export class SetarehDatabase {
         refresh_token_enc TEXT, refresh_token_expires_at TEXT,
         installed_at TEXT NOT NULL, updated_at TEXT NOT NULL
       ) STRICT;
+      CREATE TABLE IF NOT EXISTS agent_key (
+        id TEXT PRIMARY KEY, merchant_id TEXT NOT NULL, label TEXT NOT NULL, prefix TEXT NOT NULL,
+        key_hash TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, revoked_at TEXT, last_used_at TEXT,
+        FOREIGN KEY (merchant_id) REFERENCES merchant(id)
+      ) STRICT;
+      CREATE TABLE IF NOT EXISTS merchant_setup_token (
+        token_hash TEXT PRIMARY KEY, shop TEXT NOT NULL, expires_at TEXT NOT NULL
+      ) STRICT;
+      CREATE TABLE IF NOT EXISTS rate_hit (
+        bucket TEXT NOT NULL, at INTEGER NOT NULL
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS rate_hit_bucket ON rate_hit (bucket, at);
     `);
     const merchantColumns = this.db.prepare("PRAGMA table_info(merchant)").all() as Array<{ name: string }>;
     if (!merchantColumns.some((column) => column.name === "shopify_credentials_ref")) {
       this.db.exec("ALTER TABLE merchant ADD COLUMN shopify_credentials_ref TEXT NOT NULL DEFAULT 'env:SHOPIFY_CLIENT_ID'");
     }
+    if (!merchantColumns.some((column) => column.name === "status")) {
+      // D2: every store carries its own network, caps and lifecycle. Existing rows were selling already, so they stay active.
+      this.db.exec(`
+        ALTER TABLE merchant ADD COLUMN network TEXT NOT NULL DEFAULT 'stellar:testnet';
+        ALTER TABLE merchant ADD COLUMN max_order_usdc REAL;
+        ALTER TABLE merchant ADD COLUMN max_day_usdc REAL;
+        ALTER TABLE merchant ADD COLUMN status TEXT NOT NULL DEFAULT 'active';
+        ALTER TABLE merchant ADD COLUMN configured_by TEXT NOT NULL DEFAULT 'env';
+        ALTER TABLE merchant ADD COLUMN activated_at TEXT;
+      `);
+    }
     const quoteColumns = this.db.prepare("PRAGMA table_info(quote)").all() as Array<{ name: string }>;
+    if (!quoteColumns.some((column) => column.name === "agent_key_id")) {
+      this.db.exec("ALTER TABLE quote ADD COLUMN agent_key_id TEXT");
+    }
+    this.renameLegacyMerchantIds();
     if (!quoteColumns.some((column) => column.name === "fx_source")) {
       this.db.exec("ALTER TABLE quote ADD COLUMN fx_source TEXT NOT NULL DEFAULT 'configured_demo_rate'");
     }
@@ -138,18 +197,174 @@ export class SetarehDatabase {
     }
   }
 
-  upsertMerchant(merchant: { id: string; name: string; shopDomain: string; shopifyCredentialsRef?: string; stellarRecipient: string }) {
-    this.db.prepare(`INSERT INTO merchant (id, name, shop_domain, shopify_credentials_ref, stellar_recipient) VALUES (?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET name = excluded.name, shop_domain = excluded.shop_domain, shopify_credentials_ref = excluded.shopify_credentials_ref, stellar_recipient = excluded.stellar_recipient`).run(
-      merchant.id, merchant.name, merchant.shopDomain, merchant.shopifyCredentialsRef ?? "env:SHOPIFY_CLIENT_ID", merchant.stellarRecipient,
+  /**
+   * Until D2 the pilot store's id was whatever SETAREH_MERCHANT_ID said (its default, "micohstore", even
+   * for another store). Ids now derive from the Shopify domain, so a legacy row is renamed together with
+   * every quote that points at it, in one transaction. Idempotent: rows that already match are untouched.
+   */
+  private renameLegacyMerchantIds() {
+    const rows = this.db.prepare("SELECT id, shop_domain FROM merchant").all() as Array<{ id: string; shop_domain: string }>;
+    for (const row of rows) {
+      const target = merchantIdFromShop(row.shop_domain);
+      if (!target || target === row.id) continue;
+      if (rows.some((other) => other.id === target)) {
+        log("warn", "merchant.rename_skipped", { reason: "target_id_exists", merchantId: row.id });
+        continue;
+      }
+      this.db.exec("BEGIN");
+      try {
+        // Parent and children change inside the same transaction; the constraint is checked at COMMIT.
+        this.db.exec("PRAGMA defer_foreign_keys = ON");
+        this.db.prepare("UPDATE merchant SET id = ? WHERE id = ?").run(target, row.id);
+        const quotes = this.db.prepare("UPDATE quote SET merchant_id = ? WHERE merchant_id = ?").run(target, row.id).changes;
+        this.db.prepare("UPDATE agent_key SET merchant_id = ? WHERE merchant_id = ?").run(target, row.id);
+        this.db.exec("COMMIT");
+        log("info", "merchant.renamed", { merchantId: target, from: row.id, amount: Number(quotes) });
+      } catch (error) {
+        this.db.exec("ROLLBACK");
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Registers or refreshes a store from this instance's environment. Once the store itself has set its
+   * payout address and caps (configured_by = 'owner'), the environment no longer overwrites them.
+   */
+  upsertMerchant(merchant: { id: string; name: string; shopDomain: string; shopifyCredentialsRef?: string; stellarRecipient: string; maxOrderUsdc?: number | null; maxDayUsdc?: number | null }) {
+    const at = now();
+    this.db.prepare(`INSERT INTO merchant (id, name, shop_domain, shopify_credentials_ref, stellar_recipient, max_order_usdc, max_day_usdc, status, configured_by, activated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 'env', ?)
+      ON CONFLICT(id) DO UPDATE SET name = excluded.name, shop_domain = excluded.shop_domain, shopify_credentials_ref = excluded.shopify_credentials_ref,
+        stellar_recipient = excluded.stellar_recipient, max_order_usdc = COALESCE(excluded.max_order_usdc, merchant.max_order_usdc), max_day_usdc = COALESCE(excluded.max_day_usdc, merchant.max_day_usdc),
+        activated_at = COALESCE(merchant.activated_at, excluded.activated_at)
+      WHERE merchant.configured_by = 'env'`).run(
+      merchant.id, merchant.name, merchant.shopDomain, merchant.shopifyCredentialsRef ?? "env:SHOPIFY_CLIENT_ID", merchant.stellarRecipient, merchant.maxOrderUsdc ?? null, merchant.maxDayUsdc ?? null, at,
     );
   }
 
+  getMerchant(id: string): MerchantRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM merchant WHERE id = ?").get(id) as Record<string, unknown> | undefined;
+    return row ? this.merchantFromRow(row) : undefined;
+  }
+
+  getMerchantByShop(shopDomain: string): MerchantRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM merchant WHERE shop_domain = ?").get(shopDomain.toLowerCase()) as Record<string, unknown> | undefined;
+    return row ? this.merchantFromRow(row) : undefined;
+  }
+
+  listMerchants(): MerchantRecord[] {
+    return (this.db.prepare("SELECT * FROM merchant ORDER BY id").all() as Array<Record<string, unknown>>).map((row) => this.merchantFromRow(row));
+  }
+
+  /**
+   * A store approved the app through OAuth. A new store starts in pending_setup with no payout address;
+   * a store coming back after an uninstall is active again only if its setup was already complete.
+   */
+  registerInstalledMerchant(shopDomain: string): MerchantRecord {
+    const shop = shopDomain.toLowerCase();
+    const existing = this.getMerchantByShop(shop);
+    if (!existing) {
+      const id = merchantIdFromShop(shop);
+      this.db.prepare("INSERT INTO merchant (id, name, shop_domain, stellar_recipient, status, configured_by) VALUES (?, ?, ?, '', 'pending_setup', 'owner')").run(id, id, shop);
+      log("info", "merchant.registered", { merchantId: id, status: "pending_setup" });
+    } else if (existing.status === "disabled") {
+      const complete = Boolean(existing.stellarRecipient) && existing.maxOrderUsdc !== null && existing.maxDayUsdc !== null;
+      this.db.prepare("UPDATE merchant SET status = ? WHERE id = ?").run(complete ? "active" : "pending_setup", existing.id);
+      log("info", "merchant.reinstalled", { merchantId: existing.id, status: complete ? "active" : "pending_setup" });
+    }
+    return this.getMerchantByShop(shop)!;
+  }
+
+  /** The store's own setup: payout address and caps. Activates it and takes it out of the environment's hands. */
+  completeMerchantSetup(input: { shopDomain: string; name: string; stellarRecipient: string; maxOrderUsdc: number; maxDayUsdc: number }): MerchantRecord {
+    const existing = this.getMerchantByShop(input.shopDomain);
+    if (!existing) throw new Error("Merchant not found.");
+    this.db.prepare("UPDATE merchant SET name = ?, stellar_recipient = ?, max_order_usdc = ?, max_day_usdc = ?, status = 'active', configured_by = 'owner', activated_at = COALESCE(activated_at, ?) WHERE id = ?")
+      .run(input.name, input.stellarRecipient, input.maxOrderUsdc, input.maxDayUsdc, now(), existing.id);
+    const action = !existing.stellarRecipient ? "recipient_set" : existing.stellarRecipient !== input.stellarRecipient ? "recipient_changed" : "recipient_unchanged";
+    log(action === "recipient_changed" ? "warn" : "info", "merchant.setup_completed", { merchantId: existing.id, action });
+    return this.getMerchant(existing.id)!;
+  }
+
+  /** Operator-side caps (migration of the pilot store, mainnet canary). Does not touch the payout address. */
+  setMerchantLimits(id: string, limits: { maxOrderUsdc: number; maxDayUsdc: number }) {
+    return this.db.prepare("UPDATE merchant SET max_order_usdc = ?, max_day_usdc = ? WHERE id = ?").run(limits.maxOrderUsdc, limits.maxDayUsdc, id).changes === 1;
+  }
+
+  setMerchantStatus(id: string, status: MerchantStatus) {
+    return this.db.prepare("UPDATE merchant SET status = ? WHERE id = ?").run(status, id).changes === 1;
+  }
+
+  /** USDC a store already has committed in a period: paid or in-flight quotes, plus unpaid quotes that can still be paid. */
+  committedUsdc(merchantId: string, since: string, at = now()): number {
+    const row = this.db.prepare(`SELECT COALESCE(SUM(CAST(total_usdc AS REAL)), 0) AS total FROM quote
+      WHERE merchant_id = ? AND created_at >= ? AND (status IN (${DAILY_CAP_COMMITTED.map(() => "?").join(", ")}) OR (status IN ('quoted', 'payment_required') AND expires_at > ?))`)
+      .get(merchantId, since, ...DAILY_CAP_COMMITTED, at) as { total: number };
+    return Number(row.total);
+  }
+
+  /** Stores only the hash of an agent key; the key itself is shown once by whoever created it. */
+  createAgentKey(input: { id: string; merchantId: string; label: string; prefix: string; keyHash: string }): AgentKeyRecord {
+    const createdAt = now();
+    this.db.prepare("INSERT INTO agent_key (id, merchant_id, label, prefix, key_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(input.id, input.merchantId, input.label, input.prefix, input.keyHash, createdAt);
+    return { id: input.id, merchantId: input.merchantId, label: input.label, prefix: input.prefix, createdAt, revokedAt: null, lastUsedAt: null };
+  }
+
+  /** The active key with this hash, if any; revoked keys never match. */
+  findAgentKey(keyHash: string): AgentKeyRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM agent_key WHERE key_hash = ? AND revoked_at IS NULL").get(keyHash) as Record<string, unknown> | undefined;
+    return row ? this.agentKeyFromRow(row) : undefined;
+  }
+
+  touchAgentKey(id: string) { this.db.prepare("UPDATE agent_key SET last_used_at = ? WHERE id = ?").run(now(), id); }
+
+  listAgentKeys(merchantId?: string): AgentKeyRecord[] {
+    const rows = (merchantId ? this.db.prepare("SELECT * FROM agent_key WHERE merchant_id = ? ORDER BY created_at").all(merchantId) : this.db.prepare("SELECT * FROM agent_key ORDER BY merchant_id, created_at").all()) as Array<Record<string, unknown>>;
+    return rows.map((row) => this.agentKeyFromRow(row));
+  }
+
+  /** Accepts the key id or its public prefix. */
+  revokeAgentKey(idOrPrefix: string) {
+    return Number(this.db.prepare("UPDATE agent_key SET revoked_at = ? WHERE (id = ? OR prefix = ?) AND revoked_at IS NULL").run(now(), idOrPrefix, idOrPrefix).changes);
+  }
+
+  createSetupToken(tokenHash: string, shop: string, expiresAt: string) {
+    this.db.prepare("DELETE FROM merchant_setup_token WHERE expires_at <= ? OR shop = ?").run(now(), shop);
+    this.db.prepare("INSERT INTO merchant_setup_token (token_hash, shop, expires_at) VALUES (?, ?, ?)").run(tokenHash, shop, expiresAt);
+  }
+
+  /** Reads a live setup token without spending it (the form is shown first, saved later). */
+  peekSetupToken(tokenHash: string): { shop: string } | undefined {
+    const row = this.db.prepare("SELECT shop, expires_at FROM merchant_setup_token WHERE token_hash = ?").get(tokenHash) as { shop: string; expires_at: string } | undefined;
+    if (!row || new Date(row.expires_at).getTime() <= Date.now()) return undefined;
+    return { shop: row.shop };
+  }
+
+  /** Spends the token in the statement that reads it, so one link saves a store's setup at most once. */
+  consumeSetupToken(tokenHash: string): { shop: string } | undefined {
+    const row = this.db.prepare("DELETE FROM merchant_setup_token WHERE token_hash = ? RETURNING shop, expires_at").get(tokenHash) as { shop: string; expires_at: string } | undefined;
+    if (!row || new Date(row.expires_at).getTime() <= Date.now()) return undefined;
+    return { shop: row.shop };
+  }
+
+  /** Sliding-window rate limit kept on disk, so a restart does not hand every client a fresh quota. */
+  allowRateHit(bucket: string, limit: number, windowMs: number, at = Date.now()) {
+    const since = at - windowMs;
+    this.db.prepare("DELETE FROM rate_hit WHERE bucket = ? AND at <= ?").run(bucket, since);
+    const { n } = this.db.prepare("SELECT COUNT(*) AS n FROM rate_hit WHERE bucket = ?").get(bucket) as { n: number };
+    if (Number(n) >= limit) return false;
+    this.db.prepare("INSERT INTO rate_hit (bucket, at) VALUES (?, ?)").run(bucket, at);
+    return true;
+  }
+
+  /** Drops hits of buckets nobody asked about again; called by the settlement worker's daily pass. */
+  pruneRateHits(olderThan: number) { return Number(this.db.prepare("DELETE FROM rate_hit WHERE at <= ?").run(olderThan).changes); }
+
   createQuote(input: Omit<QuoteRecord, "createdAt" | "fxSource"> & { fxSource?: string }): QuoteRecord {
     const quote: QuoteRecord = { ...input, fxSource: input.fxSource ?? "configured_demo_rate", createdAt: now() };
-    this.db.prepare(`INSERT INTO quote (id, merchant_id, status, currency_shopify, total_shopify, currency_payment, total_usdc, fx_rate, fx_source, expires_at, shipping_address_json, line_items_json, email, shopify_draft_order_id, idempotency_key, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(quote.id, quote.merchantId, quote.status, quote.currencyShopify, quote.totalShopify, quote.currencyPayment, quote.totalUsdc, quote.fxRate, quote.fxSource, quote.expiresAt, quote.shippingAddressJson, quote.lineItemsJson, quote.email, quote.shopifyDraftOrderId, quote.idempotencyKey, quote.createdAt);
+    this.db.prepare(`INSERT INTO quote (id, merchant_id, agent_key_id, status, currency_shopify, total_shopify, currency_payment, total_usdc, fx_rate, fx_source, expires_at, shipping_address_json, line_items_json, email, shopify_draft_order_id, idempotency_key, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(quote.id, quote.merchantId, quote.agentKeyId ?? null, quote.status, quote.currencyShopify, quote.totalShopify, quote.currencyPayment, quote.totalUsdc, quote.fxRate, quote.fxSource, quote.expiresAt, quote.shippingAddressJson, quote.lineItemsJson, quote.email, quote.shopifyDraftOrderId, quote.idempotencyKey, quote.createdAt);
     this.recordTransition(quote.id, null, quote.status);
     return quote;
   }
@@ -405,9 +620,23 @@ export class SetarehDatabase {
 
   private quoteFromRow(row: Record<string, unknown>): QuoteRecord {
     return {
-      id: String(row.id), merchantId: String(row.merchant_id), status: row.status as QuoteStatus,
+      id: String(row.id), merchantId: String(row.merchant_id), agentKeyId: row.agent_key_id === null || row.agent_key_id === undefined ? null : String(row.agent_key_id), status: row.status as QuoteStatus,
       currencyShopify: String(row.currency_shopify), totalShopify: String(row.total_shopify), currencyPayment: String(row.currency_payment), totalUsdc: String(row.total_usdc), fxRate: String(row.fx_rate), fxSource: String(row.fx_source), expiresAt: String(row.expires_at), shippingAddressJson: String(row.shipping_address_json), lineItemsJson: String(row.line_items_json), email: String(row.email), shopifyDraftOrderId: String(row.shopify_draft_order_id), idempotencyKey: String(row.idempotency_key), createdAt: String(row.created_at),
     };
+  }
+
+  private merchantFromRow(row: Record<string, unknown>): MerchantRecord {
+    const amount = (value: unknown) => (value === null || value === undefined ? null : Number(value));
+    return {
+      id: String(row.id), name: String(row.name), shopDomain: String(row.shop_domain), shopifyCredentialsRef: String(row.shopify_credentials_ref), stellarRecipient: String(row.stellar_recipient),
+      network: String(row.network), maxOrderUsdc: amount(row.max_order_usdc), maxDayUsdc: amount(row.max_day_usdc), status: row.status as MerchantStatus,
+      configuredBy: row.configured_by === "owner" ? "owner" : "env", activatedAt: row.activated_at === null || row.activated_at === undefined ? null : String(row.activated_at),
+    };
+  }
+
+  private agentKeyFromRow(row: Record<string, unknown>): AgentKeyRecord {
+    const text = (value: unknown) => (value === null || value === undefined ? null : String(value));
+    return { id: String(row.id), merchantId: String(row.merchant_id), label: String(row.label), prefix: String(row.prefix), createdAt: String(row.created_at), revokedAt: text(row.revoked_at), lastUsedAt: text(row.last_used_at) };
   }
 
   private orderFromRow(row: Record<string, unknown>): OrderRecord {

@@ -73,6 +73,7 @@ export async function runSettlementTick(deps: SettlementWorkerDeps, now = new Da
     const results = db.purgePersonalData({ expiredAfterDays: options.retention.expiredAfterDays, orderedAfterDays: options.retention.orderedAfterDays, now, apply: true });
     purged = results.length;
     state.lastPurgeAt = now.getTime();
+    db.pruneRateHits(now.getTime() - 24 * 60 * 60_000);
     log("info", "retention.purged", { amount: purged, reason: `expired>${options.retention.expiredAfterDays}d,ordered>${options.retention.orderedAfterDays}d` });
   }
   return { at: now.toISOString(), actions, purged };
@@ -88,7 +89,7 @@ async function reconcileUnknown(deps: SettlementWorkerDeps, quote: { quoteId: st
   };
   if (!full || !attempt || attempt.outcome !== "unknown") return escalate("no_unknown_attempt");
   const verdict = await reconcileUnknownPayment(commerce.chain.rpc, {
-    quote: full, attempt, asset: USDC_TESTNET_ADDRESS, payTo: commerce.config.stellarMerchantAddress, now,
+    quote: full, attempt, asset: USDC_TESTNET_ADDRESS, payTo: commerce.recipientFor(full), now,
     claimedElsewhere: (hash) => { const owner = db.getQuoteIdByTransaction(hash); return owner !== undefined && owner !== quote.quoteId; },
   });
   if (verdict.verdict === "paid") {

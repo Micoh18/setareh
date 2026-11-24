@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import type { SetarehDatabase, ShopifyInstallationRecord } from "./db.js";
+import type { MerchantRecord, SetarehDatabase, ShopifyInstallationRecord } from "./db.js";
 import { ClientCredentialsTokenProvider, ShopifyClient, shopifyEnvironment, type ShopifyAccessTokenProvider } from "./shopify.js";
 import { errorMessage, log } from "./log.js";
 
@@ -92,11 +92,17 @@ export class TokenCipher {
 type TokenResponse = { access_token?: string; scope?: string; expires_in?: number; refresh_token?: string; refresh_token_expires_in?: number; error?: string; error_description?: string };
 type TokenSet = { accessToken: string; scope: string; accessTokenExpiresAt: string | null; refreshToken: string | null; refreshTokenExpiresAt: string | null };
 
+/** Credentials of one Shopify app. A custom-distribution app installs on a single store, so each store may have its own. */
+export type ShopifyAppCredentials = { clientId: string; clientSecret: string };
+
 export type ShopifyOAuthOptions = {
   db: SetarehDatabase;
   cipher: TokenCipher;
+  /** The default app, used for every shop not listed in `apps`. */
   clientId: string;
   clientSecret: string;
+  /** Apps for specific shops, keyed by their lowercase *.myshopify.com domain. */
+  apps?: Record<string, ShopifyAppCredentials>;
   redirectUri: string;
   scopes?: readonly string[];
   fetch?: typeof fetch;
@@ -119,7 +125,13 @@ export class ShopifyOAuth {
     this.adminOrigin = options.adminOrigin ?? ((shop) => `https://${shop}`);
   }
 
-  get clientSecret() { return this.options.clientSecret; }
+  /** The app a shop installs: its own when one is configured for that domain, otherwise the default. */
+  credentialsFor(shop: string): ShopifyAppCredentials {
+    return this.options.apps?.[shop.toLowerCase()] ?? { clientId: this.options.clientId, clientSecret: this.options.clientSecret };
+  }
+
+  /** Secret that signs the requests Shopify sends on behalf of this shop (launch links, callbacks, webhooks). */
+  secretFor(shop: string) { return this.credentialsFor(shop).clientSecret; }
 
   /** Starts an install: stores a single-use state nonce and returns Shopify's consent URL. */
   beginInstall(shop: string) {
@@ -127,7 +139,7 @@ export class ShopifyOAuth {
     const state = randomBytes(24).toString("base64url");
     this.options.db.createOAuthState(state, shop.toLowerCase(), new Date(Date.now() + OAUTH_STATE_TTL_MS).toISOString());
     const url = new URL(`${this.adminOrigin(shop.toLowerCase())}/admin/oauth/authorize`);
-    url.searchParams.set("client_id", this.options.clientId);
+    url.searchParams.set("client_id", this.credentialsFor(shop).clientId);
     url.searchParams.set("scope", this.scopes.join(","));
     url.searchParams.set("redirect_uri", this.options.redirectUri);
     url.searchParams.set("state", state);
@@ -138,7 +150,7 @@ export class ShopifyOAuth {
   async completeInstall(params: URLSearchParams) {
     const shop = params.get("shop");
     if (!isValidShopDomain(shop)) throw new ShopifyOAuthError("invalid_shop", "Invalid shop in OAuth callback.");
-    if (!verifyQueryHmac(params, this.options.clientSecret)) throw new ShopifyOAuthError("invalid_hmac", "OAuth callback signature is invalid.", 401);
+    if (!verifyQueryHmac(params, this.secretFor(shop))) throw new ShopifyOAuthError("invalid_hmac", "OAuth callback signature is invalid.", 401);
     const state = params.get("state");
     const pending = state ? this.options.db.consumeOAuthState(state) : undefined;
     if (!pending || pending.shop !== shop.toLowerCase()) throw new ShopifyOAuthError("invalid_state", "OAuth state is missing, expired, already used or for another shop.", 401);
@@ -209,7 +221,7 @@ export class ShopifyOAuth {
     const response = await this.fetchImpl(`${this.adminOrigin(shop)}/admin/oauth/access_token`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-      body: new URLSearchParams({ client_id: this.options.clientId, client_secret: this.options.clientSecret, ...grant }),
+      body: new URLSearchParams({ client_id: this.credentialsFor(shop).clientId, client_secret: this.credentialsFor(shop).clientSecret, ...grant }),
     });
     const payload = await response.json().catch(() => ({})) as TokenResponse;
     if (!response.ok || !payload.access_token) {
@@ -260,7 +272,7 @@ export function shopifyOAuthFromEnvironment(db: SetarehDatabase, baseUrl: string
   const origin = baseUrl.replace(/\/+$/, "");
   const apiVersion = process.env.SHOPIFY_API_VERSION ?? "2026-10";
   const oauth: ShopifyOAuth = new ShopifyOAuth({
-    db, cipher: new TokenCipher(encryptionKey), clientId, clientSecret, redirectUri: `${origin}${SHOPIFY_CALLBACK_PATH}`,
+    db, cipher: new TokenCipher(encryptionKey), clientId, clientSecret, apps: shopifyAppsFromEnvironment(), redirectUri: `${origin}${SHOPIFY_CALLBACK_PATH}`,
     onInstalled: async (shop) => {
       const result = await new ShopifyClient(shop, apiVersion, oauth.tokenProvider(shop)).ensureUninstallWebhook(`${origin}${SHOPIFY_UNINSTALLED_WEBHOOK_PATH}`);
       log("info", "shopify.webhook.uninstalled", { shop, action: result.action });
@@ -269,7 +281,31 @@ export function shopifyOAuthFromEnvironment(db: SetarehDatabase, baseUrl: string
   return oauth;
 }
 
-/** Wires the Shopify client for the configured store with the selected authentication mode. */
+/**
+ * SHOPIFY_APPS holds the apps of stores that cannot share the default one, as JSON:
+ * {"other-store.myshopify.com": {"clientId": "...", "clientSecret": "..."}}. Values are never logged.
+ */
+export function shopifyAppsFromEnvironment(raw = process.env.SHOPIFY_APPS): Record<string, ShopifyAppCredentials> | undefined {
+  if (!raw?.trim()) return undefined;
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { throw new Error("SHOPIFY_APPS must be a JSON object keyed by *.myshopify.com domain."); }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("SHOPIFY_APPS must be a JSON object keyed by *.myshopify.com domain.");
+  const apps: Record<string, ShopifyAppCredentials> = {};
+  for (const [shop, value] of Object.entries(parsed as Record<string, unknown>)) {
+    const app = value as { clientId?: unknown; clientSecret?: unknown } | null;
+    if (!isValidShopDomain(shop) || !app || typeof app.clientId !== "string" || !app.clientId || typeof app.clientSecret !== "string" || !app.clientSecret) {
+      throw new Error("Every SHOPIFY_APPS entry needs a *.myshopify.com domain with a clientId and a clientSecret.");
+    }
+    apps[shop.toLowerCase()] = { clientId: app.clientId, clientSecret: app.clientSecret };
+  }
+  return apps;
+}
+
+/**
+ * Wires Shopify for every store this instance serves. The store named by SHOPIFY_STORE_DOMAIN is the
+ * environment store and keeps the selected authentication mode; any other registered store installed
+ * the app through OAuth and is reached with its own stored tokens.
+ */
 export function createShopifyRuntime(db: SetarehDatabase, baseUrl: string | undefined) {
   const environment = shopifyEnvironment();
   const mode = shopifyAuthMode();
@@ -278,5 +314,19 @@ export function createShopifyRuntime(db: SetarehDatabase, baseUrl: string | unde
   const tokens = mode === "authorization_code"
     ? oauth!.tokenProvider(environment.storeDomain)
     : new ClientCredentialsTokenProvider(environment.storeDomain, environment.clientId, environment.clientSecret);
-  return { mode, oauth, client: new ShopifyClient(environment.storeDomain, environment.apiVersion, tokens) };
+  const client = new ShopifyClient(environment.storeDomain, environment.apiVersion, tokens);
+  const clients = new Map<string, ShopifyClient>([[environment.storeDomain, client]]);
+  const directory = {
+    environmentStore: client,
+    clientFor(merchant: MerchantRecord) {
+      const shop = merchant.shopDomain.toLowerCase();
+      const known = clients.get(shop);
+      if (known) return known;
+      if (!oauth) throw new Error(`Store ${shop} installed through OAuth, but this instance has no OAuth configuration (SETAREH_TOKEN_ENCRYPTION_KEY and SETAREH_BASE_URL).`);
+      const created = new ShopifyClient(shop, environment.apiVersion, oauth.tokenProvider(shop));
+      clients.set(shop, created);
+      return created;
+    },
+  };
+  return { mode, oauth, client, directory };
 }

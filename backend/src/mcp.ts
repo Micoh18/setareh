@@ -26,26 +26,30 @@ export function traced<A extends unknown[], R>(tool: string, handler: (...args: 
   });
 }
 
+/**
+ * The operator-side MCP server (stdio). It runs next to the database, so it is not behind agent keys;
+ * `merchantId` chooses the store and may be omitted while the instance serves a single one.
+ */
 export function createMcpServer(commerce: CommerceService, config: SetarehConfig) {
-  const server = new McpServer({ name: "setareh", version: "0.2.0" });
+  const server = new McpServer({ name: "setareh", version: "0.3.0" });
+  const merchantField = z.string().optional().describe("Id de la tienda (la parte del dominio Shopify antes de .myshopify.com). Opcional si el servicio atiende una sola tienda.");
+  const store = (merchantId?: string) => merchantId ?? commerce.defaultMerchantId();
   server.registerTool("search_catalog", {
-    title: "Buscar catálogo Shopify", description: "Busca variantes activas de Micohstore en Shopify. Esta operación no cobra ni reserva inventario.",
-    inputSchema: { merchantId: z.string().default(config.merchantId), query: z.string().max(120).optional(), limit: z.number().int().min(1).max(25).default(10) },
+    title: "Buscar catálogo Shopify", description: "Busca variantes activas de una tienda en Shopify. Esta operación no cobra ni reserva inventario.",
+    inputSchema: { merchantId: merchantField, query: z.string().max(120).optional(), limit: z.number().int().min(1).max(25).default(10) },
   }, traced("search_catalog", async ({ merchantId, query = "", limit }) => {
-    if (merchantId !== config.merchantId) throw new Error("Merchant is not enabled.");
-    return result(await commerce.searchCatalog(query, limit));
+    return result(await commerce.searchCatalog(store(merchantId), query, limit));
   }));
   server.registerTool("check_availability", {
     title: "Comprobar disponibilidad", description: "Reconsulta el inventario Shopify antes de crear una cotización. No reserva stock.",
-    inputSchema: { merchantId: z.string().default(config.merchantId), variantId: z.string().startsWith("gid://shopify/ProductVariant/"), quantity: z.number().int().min(1).max(20).default(1) },
+    inputSchema: { merchantId: merchantField, variantId: z.string().startsWith("gid://shopify/ProductVariant/"), quantity: z.number().int().min(1).max(20).default(1) },
   }, traced("check_availability", async ({ merchantId, variantId, quantity }) => {
-    if (merchantId !== config.merchantId) throw new Error("Merchant is not enabled.");
-    return result(await commerce.checkAvailability(variantId, quantity));
+    return result(await commerce.checkAvailability(store(merchantId), variantId, quantity));
   }));
   server.registerTool("create_quote", {
     title: "Crear cotización de compra", description: "Fija productos, dirección, total Shopify y monto USDC durante un tiempo limitado. Úsala sólo después de confirmación explícita de la persona.",
-    inputSchema: { merchantId: z.string().default(config.merchantId), items: z.array(itemSchema).min(1).max(10), email: z.string().email(), shippingAddress: addressSchema, userConfirmed: z.literal(true) },
-  }, traced("create_quote", async (input) => result(await commerce.createQuote(input))));
+    inputSchema: { merchantId: merchantField, items: z.array(itemSchema).min(1).max(10), email: z.string().email(), shippingAddress: addressSchema, userConfirmed: z.literal(true) },
+  }, traced("create_quote", async (input) => result(await commerce.createQuote({ ...input, merchantId: store(input.merchantId) }))));
   server.registerTool("pay_and_place_order", {
     title: "Obtener el endpoint pagable de una cotización", description: "Devuelve el endpoint HTTP x402 que debe invocar la wallet del agente. El endpoint responde 402, liquida USDC Stellar testnet y crea una orden Shopify exactamente una vez.",
     inputSchema: { quoteId: z.string().uuid(), userConfirmed: z.literal(true) },
@@ -53,7 +57,7 @@ export function createMcpServer(commerce: CommerceService, config: SetarehConfig
     const quote = commerce.getPayableQuote(quoteId);
     const path = `/v1/quotes/${quoteId}/pay-and-place`;
     const endpoint = config.baseUrl ? new URL(path, config.baseUrl).toString() : path;
-    return result({ status: "payment_required", quoteId, endpoint, method: "POST", body: { userConfirmed: true }, payment: { network: config.stellarNetwork, asset: config.stellarAsset, amount: quote.totalUsdc, payTo: config.stellarMerchantAddress, expiresAt: quote.expiresAt }, disclosure: "The agent wallet must call this endpoint with x402. Setareh never receives the wallet private key." });
+    return result({ status: "payment_required", quoteId, endpoint, method: "POST", body: { userConfirmed: true }, payment: { network: config.stellarNetwork, asset: config.stellarAsset, amount: quote.totalUsdc, payTo: commerce.recipientFor(quote), expiresAt: quote.expiresAt }, disclosure: "The agent wallet must call this endpoint with x402. Setareh never receives the wallet private key." });
   }));
   server.registerTool("get_order_status", {
     title: "Consultar orden Setareh", description: "Devuelve el estado de orden Shopify y un resumen seguro del settlement Stellar. Acepta el orderId de Setareh/Shopify o el quoteId si la compra está en revisión manual.",
