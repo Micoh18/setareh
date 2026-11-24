@@ -22,12 +22,13 @@ Tiempo estimado: 45 minutos la primera vez, incluida la instalación.
 
 ## Antes de empezar: lo que te envía Setareh
 
-Por el canal privado recibes tres datos. Sin ellos no sigas:
+Por el canal privado recibes cuatro datos. Sin ellos no sigas:
 
 | Dato | Para qué |
 | --- | --- |
 | Día y hora de la ventana de prueba | Durante la ventana el fundador está disponible por chat, pero no interviene |
 | Nombre del producto de prueba | Se lo pedirás al agente en el paso 5 |
+| Tu clave de agente (empieza con `sak_`) | Identifica a tu agente ante Setareh y dice en qué tienda compra. No es la clave de tu wallet y no puede mover fondos |
 | Un canal para enviar la evidencia | Nada se publica sin tu autorización |
 
 También necesitas una cuenta de Claude con acceso a Claude Code (plan Pro o
@@ -94,15 +95,20 @@ touch agent.env
 open -e agent.env
 ```
 
-Se abre TextEdit con un archivo vacío. Pega estas tres líneas, cambia
-`<tu clave secreta S...>` por tu clave secreta (sin los signos `<` `>`) y
+Se abre TextEdit con un archivo vacío. Pega estas cuatro líneas, cambia
+`<tu clave de agente sak_...>` y `<tu clave secreta S...>` por las tuyas (sin los signos `<` `>`) y
 guarda con Cmd+S:
 
 ```ini
 SETAREH_API_URL=https://api.setareh.site
+SETAREH_AGENT_KEY=<tu clave de agente sak_...>
 AGENT_MAX_USDC=5
 AGENT_STELLAR_PRIVATE_KEY=<tu clave secreta S...>
 ```
+
+Son dos claves distintas. La de agente (`sak_...`) te la envió Setareh y sólo
+abre la API. La secreta (`S...`) es la de tu wallet, la creaste tú en el paso 2
+y no sale de tu computador.
 
 `AGENT_MAX_USDC=5` es tu tope: el agente local se niega a firmar cualquier
 pago mayor a 5 USDC, aunque alguien se lo pida. El producto de prueba cuesta
@@ -235,6 +241,8 @@ y puede publicarse.
 | El agente no encuentra el producto | Aún no está publicado o el nombre es distinto | Confirma el nombre exacto con Setareh por el canal privado |
 | En el mensaje 5 el agente dice que ya está pagada y no reintenta | Ignoró las instrucciones del servidor | Insiste: "Sí, ya sé que está pagada; quiero que intentes cobrarla de nuevo con la misma cotización". Anota que hizo falta insistir: es un hallazgo |
 | Código `429` al crear el quote | Límite de 10 quotes por hora | Espera los segundos que indique y repite el mensaje 3 |
+| En el mensaje 1 falla `SETAREH_AGENT_KEY`, o aparece un código `401` | Falta la clave de agente en `agent.env`, quedó mal copiada o fue revocada | Pégala completa, tal como llegó (empieza con `sak_`); si sigue fallando, pide una nueva por el canal privado |
+| Código `402` al crear el quote, sin que el agente intente pagar | La compra supera el tope por orden o por día que fijó la tienda | No es un cobro. Avisa a Setareh por el canal privado con el mensaje que muestra el agente |
 | `Quote expired` en el mensaje 4 | Pasaron más de 10 minutos | Repite el mensaje 3 para pedir una cotización nueva. Es una compra nueva, no un reintento |
 | Error extraño o tiempo de espera durante el mensaje 4 | El cobro pudo o no haber ocurrido | **No pidas otra cotización.** Pregunta al agente "¿cómo quedó la compra?" y envía lo que responda, aunque diga `payment_unknown` o `manual_review` |
 

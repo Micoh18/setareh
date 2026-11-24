@@ -11,6 +11,16 @@ description: Controles implementados, límites del MVP, amenazas tratadas y ries
   vencimiento.
 - Antes de completar Shopify, el backend compara los requisitos liquidados con
   red, activo, destinatario y monto exactos del quote.
+- Cada agente comprador se identifica con una clave ligada a una sola tienda.
+  La tienda sale de la clave, nunca de lo que envía la petición: nombrar otra
+  tienda, o tocar un quote o una orden ajenos, responde `401`. Las claves se
+  guardan como hash SHA-256 y no aparecen en los logs.
+- Cada tienda tiene su propia dirección de cobro y sus propios topes por orden
+  y por día. El desafío de pago de un quote nombra la dirección de su tienda, y
+  la verificación en la red exige esa misma dirección.
+- La dirección de cobro de una tienda que instala por OAuth sólo se fija o se
+  cambia desde su página de configuración, a la que se llega después del
+  consentimiento en Shopify, con un enlace de un solo uso.
 - Un quote tiene una fila de pago y una orden; la creación de orden se reclama
   atómicamente para evitar duplicados ante reintentos.
 - La evidencia persistida expone un resumen y hash de transacción, no el
@@ -42,6 +52,8 @@ description: Controles implementados, límites del MVP, amenazas tratadas y ries
 | Clave y política de gasto de la wallet | Persona/agente | La clave no llega al backend; la wallet decide si firma. |
 | Catálogo, stock, precio y fulfillment | Comercio/Shopify | Shopify sigue siendo la fuente de verdad hasta crear la orden. |
 | Quote, estado de pago e idempotencia | Setareh | Se persisten para impedir que un reintento cree dos órdenes. |
+| Dirección de cobro y topes de cada tienda | Comercio | Los escribe quien administra la tienda; Setareh los aplica y no los sobrescribe. |
+| Claves de agente | Operador de Setareh las emite; cada agente guarda la suya | Abren la API de una tienda; no firman pagos ni dan acceso a ninguna wallet. |
 | Autorización/settlement x402 | Wallet y facilitador | Setareh verifica requisitos del pago antes de crear la orden. |
 | Secretos Shopify y operación | Comercio/operador | Nunca se publican en docs, logs ni respuestas MCP. |
 | Tokens OAuth de cada tienda | Setareh | Se guardan cifrados con AES-256-GCM ligados a la tienda y se borran al desinstalar. |
@@ -49,8 +61,9 @@ description: Controles implementados, límites del MVP, amenazas tratadas y ries
 ### Amenazas, controles y riesgo residual
 
 Revisado el 2026-11-08 con lo observado en el piloto (semanas 1 a 3 de la
-[evidencia](/evidencia/)). Cada control está cubierto por una prueba
-automática o por un incidente real documentado.
+[evidencia](/evidencia/)) y el 2026-11-24 al pasar a varias tiendas y agentes
+identificados. Cada control está cubierto por una prueba automática o por un
+incidente real documentado.
 
 | Amenaza | Control actual | Riesgo que permanece |
 | --- | --- | --- |
@@ -64,7 +77,12 @@ automática o por un incidente real documentado.
 | Instalación OAuth falsificada, repetida o con permisos insuficientes | El callback exige firma HMAC de Shopify, dominio `*.myshopify.com` anclado al configurado y un `state` de un solo uso que vence en 10 minutos; se verifican los scopes concedidos; los tokens se guardan cifrados. | Quien controle el entorno del servidor puede descifrar los tokens. |
 | Suplantación ante la persona dueña: alguien le envía un enlace de otra app haciéndose pasar por Setareh | El enlace legítimo lleva a la pantalla de permisos de Shopify con la app registrada y los scopes publicados; la [guía](/comercios/shopify/) dice qué no se pide nunca. | Setareh no puede impedir que quien administra la tienda apruebe otra app; el control es la guía y el canal privado. |
 | Desinstalación no propagada | El webhook `app/uninstalled` firmado borra los tokens; Shopify ya los revocó, así que cualquier llamada falla igual. | Si la suscripción al webhook se pierde, el registro local queda activo con tokens inútiles hasta que una llamada falle o un operador lo revoque. |
-| Endpoint público recibe abuso (drafts reales, stock agotado) | La creación de quotes está limitada por cliente y en total por hora (`429` con `Retry-After`); el despliegue termina HTTPS. | Límite en memoria de una sola instancia; sin autenticación de agentes, WAF ni control por comercio. |
+| Endpoint público recibe abuso (drafts reales, stock agotado) | Toda ruta de compra exige una clave de agente; la creación de quotes está limitada por clave y por tienda por hora (`429` con `Retry-After`), y el límite se guarda en la base de datos, así que un reinicio no lo pone en cero; los intentos sin clave válida se frenan por dirección; el despliegue termina HTTPS. | Una sola instancia; sin WAF. |
+| Una clave de agente se filtra | Sólo abre la API de una tienda y no mueve fondos; se revoca con un comando y deja de servir en el acto; los topes de la tienda acotan lo que puede cotizar; cada quote guarda qué clave lo creó. | Hasta la revocación, quien la tenga puede crear drafts y consumir el límite de esa clave. |
+| Un agente de una tienda cotiza, paga o lee en otra | La tienda se deduce de la clave; quotes y órdenes ajenos responden `401` antes de entregar un desafío de pago o llamar al facilitador. Cubierto por dos pruebas automáticas con dos tiendas. | Una ruta nueva que omita la comprobación; las actuales están cubiertas. |
+| Alguien redirige los cobros de una tienda a otra cuenta | La dirección sólo se cambia en la página de configuración, tras el consentimiento en Shopify y con un enlace de un solo uso que vence en 30 minutos; la cuenta debe existir y tener trustline a USDC; el entorno del servidor no la sobrescribe; el cambio queda registrado. | Quien controle la sesión de Shopify de la tienda puede cambiarla. La página no confirma la dirección por un segundo canal. |
+| La persona dueña pega su clave secreta en la página de configuración | La página sólo acepta una dirección pública válida, y ante un error no devuelve en pantalla lo que se pegó. | La clave ya salió de su computador hacia el servidor en esa petición; debe darse por expuesta y reemplazarse. |
+| Una tienda vende más de lo que quiso exponer (error de precio, agente en bucle) | Topes propios por orden y por día (UTC), comprobados antes de crear nada en Shopify y otra vez con el total real; un exceso responde `402` sin requisitos de pago. | Dentro del tope, cada orden es válida; no hay reembolso automático. |
 | El agente altera datos de la persona compradora sin avisar | Las instrucciones del MCP comprador exigen mostrar el quote completo antes de pedir confirmación y avisar de cualquier corrección. | Depende del modelo que ejecute el agente; no hay validación estructural de que lo mostrado sea lo enviado. |
 | La red cambia de protocolo y el cliente o el servidor dejan de decodificar | SDK de Stellar fijado en una versión mínima y requisito en la guía; ocurrió con el Protocolo 30 el 2026-11-05. Desde el 2026-11-20 el arranque, `doctor -- --verify` y `/health` comparan la versión de protocolo que anuncian RPC y Horizon con la que esta versión probó (30) y avisan si la red va por delante. | El aviso no bloquea pagos: es la señal para hacer una compra de humo antes de aceptar cobros. |
 | Dependencias vulnerables en producción | La CI falla ante cualquier aviso de `npm audit` no aceptado; las excepciones llevan paquete, ruta y fecha de vencimiento. Desde el 2026-11-07 no hay excepciones activas. | El árbol incluye dos copias del SDK de Stellar (la principal y una anidada en la librería x402), que hay que vigilar en cada cambio de protocolo. |
@@ -76,33 +94,42 @@ automática o por un incidente real documentado.
 | Secreto de la app Shopify (`SHOPIFY_CLIENT_SECRET`) | Operador de Setareh | Gestor de secretos del despliegue; nunca en Git. | Se regenera en Shopify y se redespliega; las instalaciones existentes siguen válidas. |
 | Clave de cifrado de tokens (`SETAREH_TOKEN_ENCRYPTION_KEY`) | Operador de Setareh | Gestor de secretos del despliegue. | Se rota y las tiendas reinstalan; sin la base de datos la clave sola no sirve. |
 | Tokens OAuth de cada tienda | Setareh, derivados de la aprobación de quien administra la tienda | Base de datos, cifrados; duran 1 hora y se renuevan solos. | La tienda desinstala la app desde Shopify y quedan revocados. |
+| Clave de agente (`SETAREH_AGENT_KEY`) | Quien opera el agente; la emite el operador de Setareh | `agent.env` en la máquina del agente; en el servidor sólo su hash. | Se revoca con un comando y se emite otra. No da acceso a fondos. |
 | Clave de la wallet compradora (`AGENT_STELLAR_PRIVATE_KEY`) | Quien opera el agente | `agent.env` en la máquina del agente; nunca llega al servidor. | Se vacía la wallet a una nueva. |
 | Clave de la wallet receptora del comercio | Comercio | Fuera de Setareh; Setareh sólo conoce la dirección pública. | Fuera de Setareh. |
 
-Configuración sensible que no es secreta pero cambia el comportamiento
-(dirección receptora, tasa, tope por quote, dominio de tienda, URL del
-facilitador) vive en la configuración del despliegue, se refleja en la salida
-de `doctor` y queda congelada en cada quote.
+Configuración sensible que no es secreta pero cambia el comportamiento (tasa,
+dominio de la tienda del entorno, URL del facilitador) vive en la
+configuración del despliegue. La dirección receptora y los topes de cada
+tienda viven en la base de datos, los fija la propia tienda y `doctor` informa
+si están definidos sin mostrar la dirección. Importe, tasa y destinatario
+quedan congelados en cada quote.
 
 Lo que Setareh no tiene ni pide: contraseña, MFA ni códigos de recuperación de
 la tienda; tokens entregados por chat o correo; claves de ninguna wallet;
 datos de clientes de la tienda más allá de la dirección y el correo que la
 persona compradora entrega para su propia orden.
 
-## Riesgos abiertos (2026-11-20)
+## Riesgos abiertos (2026-11-24)
 
 1. Facilitador x402 público sin SLA que puede liquidar y responder `504`. La
    orden ya no depende de su respuesta (se completa por lo que dicen RPC y
    Horizon), pero sigue siendo el único camino para enviar la transacción.
 2. Sin gestor de secretos ni rotación automatizada; la clave de cifrado vive
    en el entorno del servidor.
-3. Rate limit en memoria y sin autenticación de agentes; no apto para
-   exposición productiva.
-4. Dos copias del SDK de Stellar en el árbol de dependencias.
-5. Instalar el entorno del agente sigue costando unos 45 minutos a una persona
+3. Dos copias del SDK de Stellar en el árbol de dependencias.
+4. Instalar el entorno del agente sigue costando unos 45 minutos a una persona
    no técnica. No es un riesgo de seguridad, pero sí de adopción.
-6. Si Stellar RPC y Horizon fueran suplantados a la vez, la verificación doble
+5. Si Stellar RPC y Horizon fueran suplantados a la vez, la verificación doble
    no lo detectaría; ambas URLs son configuración del servidor.
+6. Las claves de agente las emite y las reparte una persona por un canal
+   privado; no vencen solas ni rotan.
+7. Quien controle la sesión de Shopify de una tienda puede cambiar su
+   dirección de cobro; no hay confirmación por un segundo canal.
+
+Cerrado el 2026-11-24 (entregable D2): el riesgo 3 de la lista del 2026-11-20,
+"rate limit en memoria y sin autenticación de agentes". Los riesgos 4, 5 y 6
+de esa lista pasan a ser los 3, 4 y 5 de esta.
 
 Cerrados el 2026-11-20 (sprint de noviembre, entregable D1): la
 autoconciliación de `payment_unknown` sin operador, la purga automática de
@@ -122,8 +149,9 @@ genera únicamente desde `Docs/`.
 
 ## Límites del MVP
 
-Setareh no es todavía un servicio de producción. No incluye autenticación,
-autorización multi-tenant, rate limiting más allá de la creación de quotes, gestión de secretos, webhooks de
+Setareh no es todavía un servicio de producción. Identifica a los agentes con
+claves emitidas a mano y separa las tiendas por clave, pero no incluye cuentas
+de usuario, autoservicio de claves, rate limiting más allá de la creación de quotes y de los intentos sin clave, gestión de secretos, webhooks de
 Shopify distintos de la desinstalación, monitoreo centralizado, reembolsos automáticos, soporte mainnet ni
 políticas avanzadas por colección o zona.
 

@@ -52,9 +52,15 @@ instalar la app. Trátala como el secreto más sensible del despliegue.
    - El log de arranque indica el modo de autenticación Shopify esperado y si
      las rutas de instalación OAuth están habilitadas.
 5. Ejecuta el preflight dentro de la instancia desplegada:
-   `node dist/doctor.js --verify`. Debe confirmar conexión Shopify, scopes,
-   estado de la instalación OAuth y capacidad `exact` del facilitador en
-   `stellar:testnet`.
+   `node dist/doctor.js --verify`. Debe listar cada tienda con su estado y,
+   para las activas, confirmar conexión Shopify, scopes, cuenta de cobro con
+   trustline a USDC y topes definidos; además, el estado de la instalación
+   OAuth y la capacidad `exact` del facilitador en `stellar:testnet`.
+   `node dist/merchant.js list` muestra las tiendas y cuántas claves de agente
+   activas tiene cada una; `node dist/agent-key.js create --merchant <id>
+   --label "<quién>"` emite una clave. Una release que activa las claves deja
+   sin acceso a todo agente que aún no tenga la suya: emítelas en el mismo
+   momento del despliegue.
 6. Si cambiaste configuración no secreta, edítala en el entorno del despliegue
    y vuelve a desplegar. Si cambiaste un secreto, cárgalo en el gestor del
    proveedor y vuelve a desplegar; nunca lo pegues en el repositorio.
