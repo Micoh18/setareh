@@ -10,7 +10,7 @@ if (!env.secret) throw new Error("AGENT_STELLAR_PRIVATE_KEY is required in agent
 if (!Number.isFinite(maxUsdc) || maxUsdc <= 0) throw new Error("AGENT_MAX_USDC must be positive.");
 
 async function main(secret: string) {
-  const result = await payQuote({ apiUrl, quoteId, secret, maxUsdc });
+  const result = await payQuote({ apiUrl, quoteId, secret, maxUsdc, agentKey: env.agentKey });
   switch (result.outcome) {
     case "created": process.stdout.write(`${JSON.stringify(result.order, null, 2)}\n`); return;
     case "refused_locally": throw new Error(result.message);

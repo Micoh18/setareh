@@ -12,7 +12,7 @@ import { createMcpServer } from "./mcp.js";
 test("an MCP client discovers Setareh tools and searches the Shopify catalog", async () => {
   const directory = mkdtempSync(join(tmpdir(), "setareh-mcp-"));
   const config: SetarehConfig = {
-    databasePath: join(directory, "setareh.db"), merchantId: "micohstore", merchantName: "Micohstore",
+    databasePath: join(directory, "setareh.db"), merchantName: "Micohstore", agentAuth: "off",
     stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
     facilitatorUrl: "https://example.test", baseUrl: "http://127.0.0.1:4020", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001,
   };

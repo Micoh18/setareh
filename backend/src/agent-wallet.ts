@@ -18,7 +18,10 @@ export const MIN_NODE_MAJOR = 22;
 export const RECOMMENDED_NODE_MAJOR = 24;
 export const MIN_XLM_FOR_FEES = 1;
 
-export type AgentEnv = { file: string; apiUrl?: string; maxUsdc?: string; secret?: string };
+export type AgentEnv = { file: string; apiUrl?: string; maxUsdc?: string; secret?: string; agentKey?: string };
+
+/** Shape of a Setareh agent key. It identifies this agent to the API; it is not the wallet secret. */
+export const AGENT_KEY_PATTERN = /^sak_[0-9a-f]{8}_[A-Za-z0-9_-]{43}$/;
 
 /** `agent.env` lives next to the backend package unless SETAREH_AGENT_ENV_FILE points elsewhere. */
 export function agentEnvPath() {
@@ -29,12 +32,17 @@ export function agentEnvPath() {
 export function loadAgentEnv(): AgentEnv {
   const file = agentEnvPath();
   dotenv.config({ path: file, quiet: true });
-  return { file, apiUrl: process.env.SETAREH_API_URL?.trim() || undefined, maxUsdc: process.env.AGENT_MAX_USDC?.trim() || undefined, secret: process.env.AGENT_STELLAR_PRIVATE_KEY?.trim() || undefined };
+  return { file, apiUrl: process.env.SETAREH_API_URL?.trim() || undefined, maxUsdc: process.env.AGENT_MAX_USDC?.trim() || undefined, secret: process.env.AGENT_STELLAR_PRIVATE_KEY?.trim() || undefined, agentKey: process.env.SETAREH_AGENT_KEY?.trim() || undefined };
 }
 
 /** Replaces the secret key with a marker wherever it could have leaked into a message. */
 export function redactSecret(message: string, secret?: string) {
   return secret ? message.replaceAll(secret, "[redacted]") : message;
+}
+
+/** The header that identifies this agent; empty while the service runs without agent keys (local development). */
+export function agentAuthorization(env: Pick<AgentEnv, "agentKey">): Record<string, string> {
+  return env.agentKey ? { Authorization: `Bearer ${env.agentKey}` } : {};
 }
 
 export type SetupCheck = { name: string; ok: boolean; detail: string };
@@ -71,12 +79,27 @@ export async function checkSetup(env: AgentEnv, options: { fetchImpl?: typeof fe
     add("AGENT_STELLAR_PRIVATE_KEY", false, env.secret ? "La clave no es una clave secreta Stellar válida (debe empezar con S y tener 56 caracteres)" : (error as Error).message);
   }
 
+  if (env.agentKey && !AGENT_KEY_PATTERN.test(env.agentKey)) add("SETAREH_AGENT_KEY", false, "SETAREH_AGENT_KEY no tiene el formato de una clave de agente (empieza con sak_); cópiala completa desde el mensaje que te enviaron");
+
   if (env.apiUrl) {
+    let keyRequired = false;
     try {
       const response = await fetchImpl(new URL("/health", env.apiUrl), { signal: AbortSignal.timeout(10_000) });
       add("api", response.ok, response.ok ? `${env.apiUrl} responde ${response.status}` : `${env.apiUrl}/health respondió ${response.status}`);
+      if (response.ok) keyRequired = ((await response.json().catch(() => ({}))) as { agentAuth?: string }).agentAuth === "required";
     } catch (error) {
       add("api", false, `No se pudo contactar ${env.apiUrl}: ${(error as Error).message}`);
+    }
+    if (keyRequired && !env.agentKey) {
+      add("SETAREH_AGENT_KEY", false, "Falta SETAREH_AGENT_KEY en agent.env: pide tu clave de agente al equipo de Setareh");
+    } else if (keyRequired && AGENT_KEY_PATTERN.test(env.agentKey ?? "")) {
+      try {
+        // The cheapest authenticated call: it proves the key is live without touching the store.
+        const response = await fetchImpl(new URL("/v1/orders/agent-key-check", env.apiUrl), { headers: agentAuthorization(env), signal: AbortSignal.timeout(10_000) });
+        add("SETAREH_AGENT_KEY", response.status !== 401 && response.status !== 429, response.status === 401 ? "La API rechazó la clave de agente: fue revocada o está mal copiada" : response.status === 429 ? "Demasiados intentos con una clave inválida; espera una hora" : "Clave de agente aceptada por la API");
+      } catch (error) {
+        add("SETAREH_AGENT_KEY", false, `No se pudo comprobar la clave de agente: ${(error as Error).message}`);
+      }
     }
   }
 
@@ -135,10 +158,11 @@ function decodePaymentRequired(response: Response) {
  * and the local spending limit, and only then signs and retries. Any non-402 answer to the first
  * request means nothing was signed; this is how a repeated quote is rejected (409).
  */
-export async function payQuote(input: { apiUrl: string; quoteId: string; secret: string; maxUsdc: number; fetchImpl?: typeof fetch }): Promise<PayOutcome> {
+export async function payQuote(input: { apiUrl: string; quoteId: string; secret: string; maxUsdc: number; agentKey?: string; fetchImpl?: typeof fetch }): Promise<PayOutcome> {
   const fetchImpl = input.fetchImpl ?? fetch;
   const endpoint = new URL(`/v1/quotes/${input.quoteId}/pay-and-place`, input.apiUrl).toString();
-  const request = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userConfirmed: true }) };
+  // The agent key travels on both requests: the unpaid one that asks for the challenge and the signed retry.
+  const request = { method: "POST", headers: { "Content-Type": "application/json", ...agentAuthorization(input) }, body: JSON.stringify({ userConfirmed: true }) };
   const preview = await fetchImpl(endpoint, request);
   if (preview.status !== 402) return { outcome: "rejected_before_payment", httpStatus: preview.status, message: await preview.text(), meaning: describePayOutcome("rejected_before_payment", preview.status) };
   const requirement = decodePaymentRequired(preview).accepts[0];

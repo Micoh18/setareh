@@ -90,7 +90,7 @@ correlación y métricas. Estado al 30 de octubre de 2026:
 | Pruebas automatizadas | 67 pruebas en `backend/src/*.test.ts` (35 en la semana 1) |
 | Métricas del entorno publicado | `metrics` ejecutado el 30 de octubre de 2026 sobre el entorno publicado: embudo quote → pago → orden 1/1/1 desde que existe `quote_event`, 0 excepciones, latencia pago enviado → liquidado 3,5 s y liquidado → orden 2,4 s, sin alertas de quotes atascados ni en revisión |
 | Documentación publicada en la semana | PRs [#11](https://github.com/Micoh18/setareh/pull/11), [#12](https://github.com/Micoh18/setareh/pull/12) y [#13](https://github.com/Micoh18/setareh/pull/13) con CI en verde; `main` cerró la semana en `f7d5bbd` ([run](https://github.com/Micoh18/setareh/actions/runs/40602795629)) |
-| Demostración grabada | [Video de la semana 2](https://youtu.be/QTsrii0g9D4): una compra real en testnet con el código nuevo y el reintento rechazado |
+| Demostración grabada | [Video de la semana 2](https://youtu.be/QTsrii0g9D4): una compra en la tienda real, pagada con USDC de testnet, con el código nuevo y el reintento rechazado |
 | Auditoría de dependencias | `npm audit` sigue bloqueando el CI ante cualquier aviso, salvo una excepción acotada y con vencimiento (2026-11-30) para `GHSA-mrhx-c7xc-m3w5` en la copia de zod 3 que fija `@x402/core`, que no tiene versión corregida; la justificación está en `backend/scripts/audit-prod.mjs` |
 
 Hallazgos corregidos durante la semana, todos encontrados al escribir estas
@@ -193,11 +193,11 @@ abierto principal.
 | Una persona evaluadora autorizada obtiene una orden por quote y el reintento no duplica | Sí, con límites | Orden `#1006` y reintento `409`, dirigidos por Cristina el 6 de noviembre | Sesión compartida en el computador del fundador y con su wallet; la repetición desde su propia máquina queda fuera del sprint |
 | La persona dueña aprueba los scopes sin compartir secretos | Sí | Ciclo revocar y reinstalar desde su sesión el 8 de noviembre, con logs y preflight | El equipo de Setareh también tiene acceso de administración a la tienda; la aprobación la hizo ella desde su sesión. Autorizó por escrito publicar nombre, URL y resultado; la confirmación firmada de la sesión se incorporará cuando llegue |
 | Una persona evaluadora puede repetir el flujo con la guía | Parcial | [Reproducir el piloto](/agentes/reproducir-el-piloto/) y MCP comprador; prueba de Cristina | La instalación previa cuesta unos 45 minutos a una persona no técnica |
-| Limitaciones y riesgos abiertos declarados | Sí | [Riesgos abiertos](/seguridad/#riesgos-abiertos-2026-11-08) | — |
+| Limitaciones y riesgos abiertos declarados | Sí | [Riesgos abiertos](/seguridad/#riesgos-abiertos-2026-11-24) | — |
 
 ### Limitaciones y riesgos abiertos, sin suavizar
 
-Son los mismos que declara la página de [Seguridad](/seguridad/#riesgos-abiertos-2026-11-08):
+Son los mismos que declara la página de [Seguridad](/seguridad/#riesgos-abiertos-2026-11-24):
 el facilitador x402 público no tiene SLA y puede liquidar y responder `504`;
 no hay autoconciliación programada de `payment_unknown`; la purga de datos
 personales es manual; no hay gestor de secretos ni rotación automatizada; el

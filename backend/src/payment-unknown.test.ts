@@ -31,7 +31,7 @@ async function signedPayload(options: { amount?: bigint; payTo?: string; expirat
 }
 
 function config(directory: string, facilitatorUrl = "https://facilitator.invalid"): SetarehConfig {
-  return { databasePath: join(directory, "setareh.db"), merchantId: "micohstore", merchantName: "Micohstore", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: merchant, facilitatorUrl, maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 };
+  return { databasePath: join(directory, "setareh.db"), merchantName: "Micohstore", agentAuth: "off", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: merchant, facilitatorUrl, maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 };
 }
 
 function quoteFixture(id: string) {

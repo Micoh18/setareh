@@ -29,7 +29,7 @@ async function harness(options: { quoteTtlMs: number; facilitator: FacilitatorHa
   const facilitatorAddress = facilitator.address();
   assert.ok(facilitatorAddress && typeof facilitatorAddress !== "string");
   const database = new SetarehDatabase(join(directory, "setareh.db"));
-  const config: SetarehConfig = { databasePath: join(directory, "setareh.db"), merchantId: "micohstore", merchantName: "Micohstore", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: merchantAddress, facilitatorUrl: `http://127.0.0.1:${facilitatorAddress.port}`, maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 };
+  const config: SetarehConfig = { databasePath: join(directory, "setareh.db"), merchantName: "Micohstore", agentAuth: "off", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: merchantAddress, facilitatorUrl: `http://127.0.0.1:${facilitatorAddress.port}`, maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 };
   const shopifyCalls = { completeDraftOrder: 0 };
   const shopify = {
     domain: "micohstore.myshopify.com",

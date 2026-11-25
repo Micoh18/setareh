@@ -32,7 +32,7 @@ test("a payable quote exposes a Stellar x402 402 challenge", async () => {
   });
   const facilitatorUrl = await listen(facilitator);
   const database = new SetarehDatabase(join(directory, "setareh.db"));
-  const config: SetarehConfig = { databasePath: join(directory, "setareh.db"), merchantId: "micohstore", merchantName: "Micohstore", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: merchantAddress, facilitatorUrl, maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 };
+  const config: SetarehConfig = { databasePath: join(directory, "setareh.db"), merchantName: "Micohstore", agentAuth: "off", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: merchantAddress, facilitatorUrl, maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 };
   const service = new CommerceService(config, database, { domain: "micohstore.myshopify.com" } as any, confirmingChain(config.stellarMerchantAddress, 100_000_000n));
   const quote = database.createQuote({ id: "320e4b70-a3f7-4ecd-bf59-bbc26d9cefe6", merchantId: "micohstore", status: "quoted", currencyShopify: "CLP", totalShopify: "10000.00", currencyPayment: "USDC", totalUsdc: "10.000000", fxRate: "0.001", expiresAt: new Date(Date.now() + 60_000).toISOString(), shippingAddressJson: "{}", lineItemsJson: "[]", email: "buyer@example.com", shopifyDraftOrderId: "gid://shopify/DraftOrder/1", idempotencyKey: "quote:http" });
   const appServer = createHttpApp(service).listen(0, "127.0.0.1");
@@ -67,7 +67,7 @@ test("a settled x402 payment creates one Shopify order and records its receipt",
   });
   const facilitatorUrl = await listen(facilitator);
   const database = new SetarehDatabase(join(directory, "setareh.db"));
-  const config: SetarehConfig = { databasePath: join(directory, "setareh.db"), merchantId: "micohstore", merchantName: "Micohstore", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: merchantAddress, facilitatorUrl, maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 };
+  const config: SetarehConfig = { databasePath: join(directory, "setareh.db"), merchantName: "Micohstore", agentAuth: "off", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: merchantAddress, facilitatorUrl, maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 };
   let paymentEvidence: { quoteId: string; network: string; asset: string; transactionHash?: string } | undefined;
   const shopify = {
     domain: "micohstore.myshopify.com",
@@ -115,7 +115,7 @@ test("an explicit facilitator rejection marks the submitted quote as payment_fai
   });
   const facilitatorUrl = await listen(facilitator);
   const database = new SetarehDatabase(join(directory, "setareh.db"));
-  const config: SetarehConfig = { databasePath: join(directory, "setareh.db"), merchantId: "micohstore", merchantName: "Micohstore", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: merchantAddress, facilitatorUrl, maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 };
+  const config: SetarehConfig = { databasePath: join(directory, "setareh.db"), merchantName: "Micohstore", agentAuth: "off", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: merchantAddress, facilitatorUrl, maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 };
   let completeCalls = 0;
   const service = new CommerceService(config, database, { domain: "micohstore.myshopify.com", completeDraftOrder: async () => { completeCalls += 1; return { id: "gid://shopify/Order/1", name: "#1001" }; } } as any, confirmingChain(config.stellarMerchantAddress, 100_000_000n));
   const quote = database.createQuote({ id: "5b45c7f1-2c2e-4e8d-bd4e-17c4078df3ba", merchantId: "micohstore", status: "quoted", currencyShopify: "CLP", totalShopify: "10000.00", currencyPayment: "USDC", totalUsdc: "10.000000", fxRate: "0.001", expiresAt: new Date(Date.now() + 60_000).toISOString(), shippingAddressJson: "{}", lineItemsJson: "[]", email: "buyer@example.com", shopifyDraftOrderId: "gid://shopify/DraftOrder/1", idempotencyKey: "quote:settlement-failure" });

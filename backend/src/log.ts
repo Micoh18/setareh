@@ -32,6 +32,8 @@ const ALLOWED_FIELDS = new Set([
   "quoteId", "orderId", "shopifyOrderName", "from", "to", "status", "outcome", "verdict", "reason", "errorCode", "message",
   "transactionHash", "network", "amount", "method", "route", "httpStatus", "durationMs", "operation", "attempt",
   "tool", "shop", "action", "transport", "url", "authMode", "oauthRoutes",
+  // merchantId is a store handle; agentKey is only ever the public prefix of an agent key.
+  "merchantId", "agentKey",
 ]);
 
 const SCRUBBERS: Array<[RegExp, string]> = [
@@ -40,6 +42,8 @@ const SCRUBBERS: Array<[RegExp, string]> = [
   [/\bS[A-Z2-7]{55}\b/g, "[stellar-secret]"],
   [/\bshp(?:at|rt|ca|pa|ss)_[A-Za-z0-9]+/g, "[shopify-token]"],
   [/\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/gi, "[credential]"],
+  // Agent keys: the prefix may be logged on its own, the full key never.
+  [/\bsak_[0-9a-f]{8}_[A-Za-z0-9_-]{20,}/g, "[agent-key]"],
   // Signed payments, XDR envelopes and other long encoded blobs.
   [/[A-Za-z0-9+/_-]{120,}={0,2}/g, "[blob]"],
 ];

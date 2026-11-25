@@ -61,7 +61,7 @@ async function harness(settle: Settle, transfers: ChainTransfer[], options: { la
   assert.ok(facilitatorAddress && typeof facilitatorAddress !== "string");
   const database = new SetarehDatabase(join(directory, "setareh.db"));
   const shopify = shopifyDouble();
-  const config: SetarehConfig = { databasePath: join(directory, "setareh.db"), merchantId: "micohstore", merchantName: "Micohstore", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: merchant, facilitatorUrl: `http://127.0.0.1:${facilitatorAddress.port}`, maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001, verification: { attempts: 2, delayMs: 10 } };
+  const config: SetarehConfig = { databasePath: join(directory, "setareh.db"), merchantName: "Micohstore", agentAuth: "off", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: merchant, facilitatorUrl: `http://127.0.0.1:${facilitatorAddress.port}`, maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001, verification: { attempts: 2, delayMs: 10 } };
   const chain = chainFrom(transfers, options.latestLedger ?? 1_020, 1, options.horizon);
   const service = new CommerceService(config, database, shopify.client as any, chain);
   const quote = database.createQuote(quoteFixture("1f7c2d4e-9a31-4b8e-a6f2-0c5d7e8f9a10"));
@@ -269,7 +269,7 @@ test("the worker resumes interrupted settlements and orders, and purges personal
   const database = new SetarehDatabase(join(directory, "setareh.db"));
   try {
     const shopify = shopifyDouble();
-    const config: SetarehConfig = { databasePath: join(directory, "setareh.db"), merchantId: "micohstore", merchantName: "Micohstore", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: merchant, facilitatorUrl: "https://facilitator.invalid", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 };
+    const config: SetarehConfig = { databasePath: join(directory, "setareh.db"), merchantName: "Micohstore", agentAuth: "off", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: merchant, facilitatorUrl: "https://facilitator.invalid", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 };
     const service = new CommerceService(config, database, shopify.client as any, confirmingChain(merchant, quoteUnits));
     const deps = { db: database, commerce: service, options: { maxUnknownMs: 5 * minute, maxVerificationMs: 5 * minute, retention: { expiredAfterDays: 30, orderedAfterDays: 90, everyMs: 24 * 60 * minute } } };
 

@@ -12,12 +12,18 @@ args = ["run", "dev"]
 cwd = "C:/ruta/a/setareh/backend"
 ```
 
+En todas las herramientas `merchantId` es el identificador de la tienda (la
+parte de su dominio Shopify anterior a `.myshopify.com`). Es opcional mientras
+la instancia atienda una sola tienda. Este servidor corre junto a la base de
+datos de quien opera Setareh y no usa claves de agente; los agentes
+compradores usan la [API HTTP](/referencia/http-x402/) con su clave.
+
 ## `search_catalog`
 
 Busca variantes activas en Shopify; no cobra, no reserva stock.
 
 ```json
-{ "merchantId": "micohstore", "query": "tortuga", "limit": 10 }
+{ "merchantId": "mi-tienda", "query": "tortuga", "limit": 10 }
 ```
 
 Devuelve productos, variantes, precio, SKU cuando existe y una evaluación de
@@ -29,7 +35,7 @@ Vuelve a consultar Shopify antes de cotizar.
 
 ```json
 {
-  "merchantId": "micohstore",
+  "merchantId": "mi-tienda",
   "variantId": "gid://shopify/ProductVariant/123",
   "quantity": 1
 }
@@ -45,7 +51,7 @@ Crea un draft order, fija los importes y devuelve el `quoteId`.
 
 ```json
 {
-  "merchantId": "micohstore",
+  "merchantId": "mi-tienda",
   "items": [{ "variantId": "gid://shopify/ProductVariant/123", "quantity": 1 }],
   "email": "cliente@example.com",
   "shippingAddress": {

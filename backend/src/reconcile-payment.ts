@@ -32,13 +32,13 @@ try {
   // @x402/stellar bundles an older stellar-sdk; build the client from ours so XDR types match.
   const server = new rpc.Server(process.env.STELLAR_RPC_URL?.trim() || getRpcUrl(config.stellarNetwork));
   const verdict = await reconcileUnknownPayment(server, {
-    quote, attempt, asset: USDC_TESTNET_ADDRESS, payTo: config.stellarMerchantAddress, operatorTransaction,
+    quote, attempt, asset: USDC_TESTNET_ADDRESS, payTo: database.getMerchant(quote.merchantId)?.stellarRecipient ?? config.stellarMerchantAddress, operatorTransaction,
     claimedElsewhere: (hash) => { const owner = database.getQuoteIdByTransaction(hash); return owner !== undefined && owner !== quoteId; },
   });
   const report: Record<string, unknown> = { quoteId, attempt: { reason: attempt.errorReason, recordedAt: attempt.createdAt }, ...verdict, applied: false };
 
   if (apply && (verdict.verdict === "paid" || verdict.verdict === "unpaid")) {
-    const commerce = new CommerceService(config, database, createShopifyRuntime(database, config.baseUrl).client);
+    const commerce = new CommerceService(config, database, createShopifyRuntime(database, config.baseUrl).directory);
     if (verdict.verdict === "paid") {
       commerce.recordReconciledSettlement(quoteId, verdict.transactionHash);
       // Same rule as the automatic path: the order needs Stellar RPC and Horizon to agree on the hash.

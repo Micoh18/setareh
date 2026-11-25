@@ -68,14 +68,18 @@ en lugar de una instancia local. En `backend/agent.env`:
 
 ```ini
 SETAREH_API_URL=https://api.setareh.site
+SETAREH_AGENT_KEY=<clave de agente que entrega Setareh>
 AGENT_MAX_USDC=5
 # AGENT_STELLAR_PRIVATE_KEY se queda en este archivo local; nunca viaja al servidor.
 ```
 
+`SETAREH_AGENT_KEY` viaja en cada petición como `Authorization: Bearer …`,
+incluida la de pago. Identifica al agente y define la tienda en la que compra;
+no firma nada ni da acceso a la wallet.
+
 El servidor nunca recibe la clave privada: la wallet firma el reintento x402 en
 local y Setareh sólo ve la prueba de pago que el facilitador liquida. Mantén
-`AGENT_MAX_USDC` igual o por debajo del tope del servidor (`30` USDC por quote
-en el piloto) y usa únicamente fondos de `stellar:testnet`.
+`AGENT_MAX_USDC` igual o por debajo del tope por orden de la tienda y usa únicamente fondos de `stellar:testnet`.
 
 ## Resultado y lenguaje seguro
 

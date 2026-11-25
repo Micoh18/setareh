@@ -11,11 +11,11 @@ import { captureLogs } from "./log.js";
 
 const API = "https://api.example.test";
 
-function fakeApi(calls: Array<{ method: string; path: string; requestId: string | null }>) {
+function fakeApi(calls: Array<{ method: string; path: string; requestId: string | null; authorization?: string | null }>) {
   return async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
     const method = init?.method ?? "GET";
-    calls.push({ method, path: url.pathname, requestId: new Headers(init?.headers).get("x-request-id") });
+    calls.push({ method, path: url.pathname, requestId: new Headers(init?.headers).get("x-request-id"), authorization: new Headers(init?.headers).get("authorization") });
     const json = (status: number, body: unknown, headers: Record<string, string> = {}) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...headers } });
     if (url.pathname === "/v1/catalog") return json(200, { merchantId: "micohstore", products: [{ product: { title: "Prueba evaluador Setareh" }, variant: { id: "gid://shopify/ProductVariant/1", price: "3000" }, availability: { canPurchase: true } }] });
     if (url.pathname === "/v1/quotes" && method === "POST") return json(201, { quoteId: "11111111-1111-4111-8111-111111111111", status: "quoted", payment: { amount: "3.0000000" } });
@@ -26,10 +26,11 @@ function fakeApi(calls: Array<{ method: string; path: string; requestId: string 
 }
 
 test("the buyer-side MCP exposes the evaluator tools, relays the request id and reports a repeated payment as rejected before signing", async () => {
-  const calls: Array<{ method: string; path: string; requestId: string | null }> = [];
+  const calls: Array<{ method: string; path: string; requestId: string | null; authorization?: string | null }> = [];
   const restore = captureLogs(() => undefined);
   const secret = Keypair.random().secret();
-  const server = createAgentMcpServer({ env: { file: "agent.env", apiUrl: API, maxUsdc: "5", secret }, fetchImpl: fakeApi(calls) as typeof fetch });
+  const agentKey = `sak_0a1b2c3d_${"k".repeat(43)}`;
+  const server = createAgentMcpServer({ env: { file: "agent.env", apiUrl: API, maxUsdc: "5", secret, agentKey }, fetchImpl: fakeApi(calls) as typeof fetch });
   const client = new Client({ name: "evaluator-test", version: "1.0.0" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   try {
@@ -56,8 +57,12 @@ test("the buyer-side MCP exposes the evaluator tools, relays the request id and 
     assert.match(payment.meaning, /no se movió USDC ni se creó otra orden/, "a plain-language reading travels with the raw 409");
     assert.equal(calls.filter((call) => call.path.endsWith("/pay-and-place")).length, 1, "a non-402 answer must not trigger a signed retry");
 
+    const apiCalls = calls.filter((call) => call.path.startsWith("/v1/"));
+    assert.ok(apiCalls.length >= 3 && apiCalls.every((call) => call.authorization === `Bearer ${agentKey}`), "every API call, the payment included, identifies the agent with its key");
+
     const serialized = JSON.stringify(await client.callTool({ name: "check_setup", arguments: {} }));
     assert.ok(!serialized.includes(secret), "the secret key never leaves the process");
+    assert.ok(!serialized.includes(agentKey), "nor does the agent key appear in what the agent reports");
   } finally {
     restore();
     await client.close();

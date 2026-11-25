@@ -99,7 +99,7 @@ function paidQuote() {
   database.upsertMerchant({ id: "micohstore", name: "Micohstore", shopDomain: "micohstore.myshopify.com", stellarRecipient: "GTEST" });
   const quote = database.createQuote({ id: "paid", merchantId: "micohstore", status: "quoted", currencyShopify: "CLP", totalShopify: "15000.00", currencyPayment: "USDC", totalUsdc: "15.0000000", fxRate: "0.001", expiresAt: new Date(Date.now() + 60_000).toISOString(), shippingAddressJson: "{}", lineItemsJson: JSON.stringify([{ variantId: variant.id, quantity: 1 }]), email: "buyer@example.com", shopifyDraftOrderId: "gid://shopify/DraftOrder/1", idempotencyKey: "quote:paid" });
   database.recordPaymentSettled({ quoteId: quote.id, network: "stellar:testnet", asset: "USDC", amount: "15.0000000", payTo: "GTEST", paymentPayloadHash: "payload", transactionHash: "cd".repeat(32), receipt: {} });
-  const config = { databasePath: join(directory, "test.db"), merchantId: "micohstore", merchantName: "Micohstore", stellarNetwork: "stellar:testnet" as const, stellarAsset: "USDC", stellarMerchantAddress: "GTEST", facilitatorUrl: "https://example.test", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 };
+  const config = { databasePath: join(directory, "test.db"), merchantName: "Micohstore", agentAuth: "off" as const, stellarNetwork: "stellar:testnet" as const, stellarAsset: "USDC", stellarMerchantAddress: "GTEST", facilitatorUrl: "https://example.test", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 };
   return { database, quote, config, cleanup: () => { database.close(); rmSync(directory, { recursive: true, force: true }); } };
 }
 

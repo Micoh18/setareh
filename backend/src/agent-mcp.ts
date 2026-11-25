@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { pathToFileURL } from "node:url";
 import * as z from "zod/v4";
-import { checkSetup, horizonTransaction, loadAgentEnv, payQuote, redactSecret, type AgentEnv } from "./agent-wallet.js";
+import { agentAuthorization, checkSetup, horizonTransaction, loadAgentEnv, payQuote, redactSecret, type AgentEnv } from "./agent-wallet.js";
 import { log } from "./log.js";
 import { result, traced } from "./mcp.js";
 
@@ -37,11 +37,13 @@ Reglas fijas:
 - Nunca muestres ni pidas la clave secreta de agent.env. Si algo falla por configuración, explica qué revisar en palabras simples.
 - Todo es testnet: no hay dinero real ni se despacha nada.`;
 
+/** `merchantId` is only needed against a service without agent keys; with a key, the key names the store. */
 export type AgentMcpOptions = { env: AgentEnv; merchantId?: string; fetchImpl?: typeof fetch; horizonUrl?: string };
 
 export function createAgentMcpServer(options: AgentMcpOptions) {
   const fetchImpl = options.fetchImpl ?? fetch;
-  const merchantId = options.merchantId ?? process.env.SETAREH_MERCHANT_ID ?? "micohstore";
+  const merchantId = options.merchantId ?? (process.env.SETAREH_MERCHANT_ID?.trim() || undefined);
+  const merchantQuery = merchantId ? `merchantId=${encodeURIComponent(merchantId)}&` : "";
   const apiUrl = () => {
     if (!options.env.apiUrl) throw new Error("SETAREH_API_URL no está definido en agent.env.");
     return options.env.apiUrl;
@@ -49,6 +51,7 @@ export function createAgentMcpServer(options: AgentMcpOptions) {
   /** Returns the parsed body on any status so the agent can read 4xx details such as Retry-After. */
   const api = async (path: string, init?: RequestInit & { requestId?: string }) => {
     const headers = new Headers(init?.headers);
+    for (const [name, value] of Object.entries(agentAuthorization(options.env))) headers.set(name, value);
     if (init?.body) headers.set("Content-Type", "application/json");
     if (init?.requestId) headers.set("X-Request-Id", init.requestId);
     const response = await fetchImpl(new URL(path, apiUrl()), { ...init, headers, signal: AbortSignal.timeout(30_000) });
@@ -71,7 +74,7 @@ export function createAgentMcpServer(options: AgentMcpOptions) {
     title: "Buscar en el catálogo de la tienda piloto",
     description: "Úsala cuando la persona pida buscar un producto, su precio o si está disponible. Busca por texto en el catálogo público de Setareh; no cobra ni reserva inventario. Devuelve título, variantId (guárdalo tú para cotizar), precio en moneda de la tienda y si se puede comprar.",
     inputSchema: { query: z.string().max(120).default(""), limit: z.number().int().min(1).max(25).default(10) },
-  }, traced("agent.search_catalog", async ({ query, limit }) => result(await api(`/v1/catalog?merchantId=${encodeURIComponent(merchantId)}&query=${encodeURIComponent(query)}&limit=${limit}`))));
+  }, traced("agent.search_catalog", async ({ query, limit }) => result(await api(`/v1/catalog?${merchantQuery}query=${encodeURIComponent(query)}&limit=${limit}`))));
 
   server.registerTool("check_availability", {
     title: "Comprobar disponibilidad de una variante",
@@ -85,7 +88,7 @@ export function createAgentMcpServer(options: AgentMcpOptions) {
     inputSchema: { items: z.array(itemSchema).min(1).max(10), email: z.string().email(), shippingAddress: addressSchema, userConfirmed: z.literal(true), requestId: z.string().regex(/^[A-Za-z0-9._-]{4,64}$/).optional() },
   }, traced("agent.create_quote", async ({ requestId, ...input }) => {
     const id = requestId ?? `eval-${Math.floor(Date.now() / 1000)}`;
-    const response = await api("/v1/quotes", { method: "POST", body: JSON.stringify({ merchantId, ...input }), requestId: id });
+    const response = await api("/v1/quotes", { method: "POST", body: JSON.stringify({ ...(merchantId ? { merchantId } : {}), ...input }), requestId: id });
     return result({ requestId: id, ...(response as Record<string, unknown>) });
   }));
 
@@ -98,7 +101,7 @@ export function createAgentMcpServer(options: AgentMcpOptions) {
     const maxUsdc = Number(options.env.maxUsdc ?? "");
     if (!Number.isFinite(maxUsdc) || maxUsdc <= 0) throw new Error("AGENT_MAX_USDC debe ser un número positivo en agent.env.");
     try {
-      return result(await payQuote({ apiUrl: apiUrl(), quoteId, secret: options.env.secret, maxUsdc, fetchImpl }));
+      return result(await payQuote({ apiUrl: apiUrl(), quoteId, secret: options.env.secret, maxUsdc, agentKey: options.env.agentKey, fetchImpl }));
     } catch (error) {
       throw new Error(redactSecret(error instanceof Error ? error.message : String(error), options.env.secret));
     }

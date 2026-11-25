@@ -21,6 +21,28 @@ firma de Shopify, el dominio de la tienda y un identificador de un solo uso que
 vence a los 10 minutos antes de guardar el acceso cifrado. Ese acceso se
 renueva solo.
 
+## Configurar los cobros
+
+Al aprobar los permisos, Shopify te devuelve a una página de Setareh que pide
+cuatro datos. Hasta guardarlos la tienda no recibe compras.
+
+| Dato | Qué es |
+| --- | --- |
+| Nombre de la tienda | Cómo aparece para los agentes compradores. |
+| Dirección Stellar que recibe los pagos | La clave **pública** de tu cuenta (empieza con `G`). La cuenta debe existir en Stellar testnet y tener trustline a USDC; Setareh lo comprueba en la red antes de guardar. |
+| Tope por orden (USDC) | Ninguna compra por este canal puede superarlo. |
+| Tope por día (USDC) | Suma máxima de las compras de un día; el día cambia a las 00:00 UTC. |
+
+Los eliges tú; nadie del equipo de Setareh los escribe por ti. El enlace a esa
+página sirve una sola vez y vence a los 30 minutos. Para cambiar la dirección o
+los topes más adelante, vuelve a abrir la app desde el administrador de
+Shopify: se repite la autorización y recibes un enlace nuevo. Así, sólo quien
+tiene sesión en la tienda puede decidir a dónde va su dinero.
+
+Nunca pegues ahí una clave secreta (las que empiezan con `S`). La página la
+rechaza y no la muestra de vuelta, pero una clave secreta que salió de tu
+computador debe darse por expuesta.
+
 Para instalar, Setareh **nunca** pide:
 
 - la contraseña de Shopify ni códigos MFA o de recuperación;
@@ -89,15 +111,18 @@ cd backend
 npm.cmd run doctor -- --verify
 ```
 
-El preflight debe confirmar conexión, scopes, una consulta de catálogo y
-capacidad x402 para `stellar:testnet`. Realiza después una compra de prueba de
+El preflight lista cada tienda registrada con su estado y, para las activas,
+confirma conexión, scopes, una consulta de catálogo, que la cuenta de cobro
+existe y tiene trustline a USDC, y que los topes están definidos. También
+confirma la capacidad x402 para `stellar:testnet`. Realiza después una compra de prueba de
 bajo importe y verifica una orden real en Shopify Admin.
 
 ## Operación
 
 En Shopify Admin el comercio puede revisar drafts, nuevas órdenes, stock y el
 metafield de evidencia. Para pausar el piloto sin desinstalar, pide al equipo
-de Setareh que deshabilite el comercio en su entorno.
+de Setareh que pause la tienda (`npm run merchant -- disable <merchantId>`):
+deja de aceptar quotes nuevos en el acto y los pagos en curso se terminan.
 
 ## Desinstalar
 
@@ -114,7 +139,7 @@ Qué ocurre después:
 | Quién | Qué |
 | --- | --- |
 | Shopify | Revoca los tokens de la app y envía a Setareh el webhook `app/uninstalled`, firmado. |
-| Setareh | Verifica la firma, marca la instalación como desinstalada y borra sus copias de los tokens. Cualquier intento de cotizar en esa tienda falla con un error de instalación, no con datos. |
+| Setareh | Verifica la firma, marca la instalación como desinstalada, borra sus copias de los tokens y deja la tienda sin aceptar compras. Cualquier intento de cotizar en esa tienda responde `409`, no datos. |
 
 Qué permanece y quién lo borra, si quiere:
 
@@ -129,7 +154,8 @@ la capacidad de Setareh de leer catálogo, crear drafts o completar órdenes en
 esa tienda.
 
 Para volver a conectar la tienda se repite la instalación; Shopify entrega
-tokens nuevos. Antes de desinstalar conviene que no haya quotes en
+tokens nuevos y la tienda vuelve a quedar activa con la dirección y los topes
+que ya tenía, que puedes revisar en la página de configuración. Antes de desinstalar conviene que no haya quotes en
 `payment_pending`, `payment_unknown` ni `manual_review`, porque Setareh no
 podrá completar sus órdenes después (ver
 [estados y recuperación](/operaciones/estados-y-recuperacion/)).

@@ -181,7 +181,7 @@ test("an uninstalled shop has no usable tokens", async () => {
 
 test("HTTP install, callback and uninstall webhook routes", async () => {
   const { db, oauth, cleanup } = setup();
-  const config: SetarehConfig = { databasePath: ":memory:", merchantId: "micohstore", merchantName: "Micohstore", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: merchantAddress, facilitatorUrl: "http://127.0.0.1:9", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 };
+  const config: SetarehConfig = { databasePath: ":memory:", merchantName: "Micohstore", agentAuth: "off", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: merchantAddress, facilitatorUrl: "http://127.0.0.1:9", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 };
   const service = new CommerceService(config, db, { domain: shop } as any);
   const server = createHttpApp(service, { shopifyOAuth: oauth }).listen(0, "127.0.0.1");
   const base = await new Promise<string>((resolve) => server.on("listening", () => { const address = server.address(); assert.ok(address && typeof address !== "string"); resolve(`http://127.0.0.1:${address.port}`); }));
@@ -195,9 +195,9 @@ test("HTTP install, callback and uninstall webhook routes", async () => {
     const location = install.headers.get("location")!;
     assert.ok(location.startsWith(`https://${shop}/admin/oauth/authorize?`));
 
-    const callback = await fetch(`${base}/shopify/oauth/callback?${callbackFor(location)}`);
-    assert.equal(callback.status, 200);
-    assert.match(await callback.text(), /quedó conectado/);
+    const callback = await fetch(`${base}/shopify/oauth/callback?${callbackFor(location)}`, { redirect: "manual" });
+    assert.equal(callback.status, 303, "the owner is sent to the store's own setup page");
+    assert.match(callback.headers.get("location")!, /^\/shopify\/setup\?token=[A-Za-z0-9_-]{43}$/);
     assert.equal(oauth.installationStatus(shop).installed, true);
 
     const replay = await fetch(`${base}/shopify/oauth/callback?${callbackFor(location)}`);
@@ -211,6 +211,7 @@ test("HTTP install, callback and uninstall webhook routes", async () => {
     const webhook = await fetch(`${base}/shopify/webhooks/app-uninstalled`, { method: "POST", headers: { "Content-Type": "application/json", "X-Shopify-Shop-Domain": shop, "X-Shopify-Hmac-Sha256": createHmac("sha256", clientSecret).update(body).digest("base64") }, body });
     assert.equal(webhook.status, 200);
     assert.equal(oauth.installationStatus(shop).installed, false);
+    assert.equal(db.getMerchantByShop(shop)?.status, "disabled", "an uninstalled store stops taking quotes");
 
     const health = await fetch(`${base}/health`);
     assert.equal(health.status, 200, "JSON routes keep working after the raw webhook route");

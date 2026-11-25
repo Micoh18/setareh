@@ -64,7 +64,7 @@ test("a full paid purchase logs every step under its request ID without buyer da
   const facilitatorAddress = facilitator.address();
   assert.ok(facilitatorAddress && typeof facilitatorAddress !== "string");
   const database = new SetarehDatabase(join(directory, "setareh.db"));
-  const config: SetarehConfig = { databasePath: join(directory, "setareh.db"), merchantId: "micohstore", merchantName: "Micohstore", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: merchant, facilitatorUrl: `http://127.0.0.1:${facilitatorAddress.port}`, maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 };
+  const config: SetarehConfig = { databasePath: join(directory, "setareh.db"), merchantName: "Micohstore", agentAuth: "off", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: merchant, facilitatorUrl: `http://127.0.0.1:${facilitatorAddress.port}`, maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 };
   const shopify = {
     domain: "micohstore.myshopify.com",
     getVariant: async () => ({ id: "gid://shopify/ProductVariant/1", inventoryQuantity: 5, inventoryPolicy: "DENY", availableForSale: true, product: { id: "gid://shopify/Product/1", title: "Gato mago", handle: "gato-mago", status: "ACTIVE" } }),

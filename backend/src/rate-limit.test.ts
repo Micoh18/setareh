@@ -27,7 +27,7 @@ test("client key prefers the Fly proxy header over the socket address", () => {
 test("quote creation is throttled per client before the request body is processed", async () => {
   const directory = mkdtempSync(join(tmpdir(), "setareh-ratelimit-"));
   const database = new SetarehDatabase(join(directory, "setareh.db"));
-  const config: SetarehConfig = { databasePath: join(directory, "setareh.db"), merchantId: "micohstore", merchantName: "Micohstore", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF", facilitatorUrl: "http://127.0.0.1:9", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 };
+  const config: SetarehConfig = { databasePath: join(directory, "setareh.db"), merchantName: "Micohstore", agentAuth: "off", stellarNetwork: "stellar:testnet", stellarAsset: "USDC", stellarMerchantAddress: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF", facilitatorUrl: "http://127.0.0.1:9", maxQuoteUsdc: 30, quoteTtlMinutes: 10, usdcPerClp: 0.001 };
   const service = new CommerceService(config, database, { domain: "micohstore.myshopify.com" } as any);
   const server = createHttpApp(service, { quoteRateLimits: { perClientPerHour: 2, globalPerHour: 3 } }).listen(0, "127.0.0.1");
   const base = await new Promise<string>((resolve) => server.on("listening", () => { const address = server.address(); assert.ok(address && typeof address !== "string"); resolve(`http://127.0.0.1:${address.port}`); }));
